@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     top_k: int = 5
 
-    request_timeout: float = 120.0
+    request_timeout: float = 300.0
 
 
 settings = Settings()

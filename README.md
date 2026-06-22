@@ -5,6 +5,9 @@ It uses [Ollama](https://ollama.com) for GPU-accelerated LLM and embedding infer
 [FastAPI](https://fastapi.tiangolo.com) application for the RAG pipeline, and
 [ChromaDB](https://www.trychroma.com) as a local, file-based vector store.
 
+For day-to-day usage (ingesting documents, asking questions, interpreting
+answers), see the [RAG User Guide](docs/RAG_USER_GUIDE.md).
+
 ## Architecture
 
 ```
