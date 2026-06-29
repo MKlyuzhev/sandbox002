@@ -51,6 +51,9 @@ async def answer(question: str, top_k: int | None = None) -> QueryResponse:
                 chunk_index=int(meta.get("chunk_index", -1)),
                 distance=float(dist) if dist is not None else None,
                 preview=preview,
+                chunk_type=meta.get("chunk_type"),
+                page=int(meta["page"]) if meta.get("page") is not None else None,
+                image_path=meta.get("image_path"),
             )
         )
 

@@ -145,7 +145,7 @@ Tips:
 
 ### 3.3 `POST /ingest/file` - upload a file
 
-Upload a `.txt`, `.md`, or `.pdf` file. This uses multipart form data, not JSON.
+Upload a `.txt`, `.md`, `.pdf`, or `.epub` file. This uses multipart form data, not JSON.
 
 Form fields:
 
@@ -163,12 +163,19 @@ curl -X POST http://localhost:8000/ingest/file \
 Response:
 
 ```json
-{ "source": "employee-handbook", "chunks_added": 42 }
+{ "source": "employee-handbook", "chunks_added": 42, "figures_added": 0 }
 ```
 
 Notes:
-- PDFs have their text extracted automatically. Scanned/image-only PDFs contain no
-  extractable text and will be rejected with a `400` error.
+- PDFs with an embedded text layer are extracted directly. Image-only (scanned) pages
+  are OCR'd automatically via Tesseract when `PDF_OCR_ENABLED=true` (requires
+  `sudo apt install tesseract-ocr`). Large scanned books can take a long time to
+  ingest.
+- Chart-heavy PDFs: embedded images are extracted; scanned pages with little OCR text
+  are rendered and captioned with a vision model (`ollama pull moondream`). Figure
+  descriptions are stored in ChromaDB alongside text chunks. Re-ingest skips figures
+  already stored (same figure ID).
+- EPUB files have their chapter HTML converted to plain text in spine order.
 - Non-UTF-8 text files are read with a best-effort fallback encoding.
 
 ---
@@ -212,6 +219,9 @@ Response:
 | `sources[].chunk_index` | Position of the chunk within that document |
 | `sources[].distance` | Similarity score; **lower means more relevant** (cosine distance) |
 | `sources[].preview` | First ~200 characters of the chunk |
+| `sources[].chunk_type` | `"text"` or `"figure"` when available |
+| `sources[].page` | PDF page number for figure chunks |
+| `sources[].image_path` | Path to stored figure PNG for figure chunks |
 
 If nothing has been ingested, you will get:
 
@@ -293,7 +303,7 @@ for s in data["sources"]:
 
 | Status | Meaning | What to do |
 |--------|---------|------------|
-| `400` | Bad input (for example, a PDF with no extractable text) | Check the file/body; scanned PDFs need OCR first |
+| `400` | Bad input (for example, unreadable PDF or OCR disabled on a scan) | Check the file; install `tesseract-ocr` for scanned PDFs |
 | `422` | Validation error (missing `text` or `question`) | Fix the request body to match the schema |
 | `502` | The model server (Ollama) returned an error | Check `GET /health`; restart with `scripts/start.sh` |
 | `500` + timeout | Request exceeded the time budget | Usually a cold model load; retry once the model is warm |

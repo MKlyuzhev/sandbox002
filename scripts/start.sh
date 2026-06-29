@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Start the local RAG server stack: Ollama (GPU via Vulkan) + FastAPI.
+# Start the local RAG server stack: Ollama (CUDA GPU backend) + FastAPI.
 # Usage: bash scripts/start.sh
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OLLAMA_BIN="$HOME/.local/bin/ollama"
+if [[ -x /usr/local/bin/ollama ]]; then
+  OLLAMA_BIN=/usr/local/bin/ollama
+elif [[ -x "$HOME/.local/bin/ollama" ]]; then
+  OLLAMA_BIN="$HOME/.local/bin/ollama"
+else
+  OLLAMA_BIN="$(command -v ollama)"
+fi
 
 # Uses the CUDA backend (driver 595 / CUDA 13.2). If a future Ollama or driver
 # change breaks CUDA, fall back to the Vulkan backend by uncommenting:

@@ -1,8 +1,8 @@
-import io
+import asyncio
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
-from . import ingest, ollama_client, rag, store
+from . import ingest, ollama_client, epub_text, pdf_ingest, rag, store
 from .config import settings
 from .models import (
     HealthResponse,
@@ -50,12 +50,35 @@ async def ingest_file(file: UploadFile = File(...), source: str = Form("")) -> I
 
     if filename.endswith(".pdf"):
         try:
-            from pypdf import PdfReader
+            result = await asyncio.to_thread(pdf_ingest.process_pdf, raw, name)
+        except pdf_ingest.PdfIngestError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-            reader = PdfReader(io.BytesIO(raw))
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Could not read PDF: {exc}") from exc
+        text_added = 0
+        if result.full_text.strip():
+            try:
+                text_added = await ingest.ingest_text(result.full_text, name)
+            except ollama_client.OllamaError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        try:
+            figures_added = await ingest.ingest_figures(result.figures, name)
+        except ollama_client.OllamaError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        if text_added == 0 and figures_added == 0:
+            raise HTTPException(status_code=400, detail="No extractable text or figures in file")
+
+        return IngestResponse(
+            source=name,
+            chunks_added=text_added,
+            figures_added=figures_added,
+        )
+    elif filename.endswith(".epub"):
+        try:
+            text = await asyncio.to_thread(epub_text.extract_text, raw)
+        except epub_text.EpubTextError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     else:
         try:
             text = raw.decode("utf-8")

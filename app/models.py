@@ -9,6 +9,7 @@ class IngestTextRequest(BaseModel):
 class IngestResponse(BaseModel):
     source: str
     chunks_added: int
+    figures_added: int = 0
 
 
 class QueryRequest(BaseModel):
@@ -21,6 +22,9 @@ class Source(BaseModel):
     chunk_index: int
     distance: float | None = None
     preview: str
+    chunk_type: str | None = None
+    page: int | None = None
+    image_path: str | None = None
 
 
 class QueryResponse(BaseModel):

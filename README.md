@@ -6,7 +6,9 @@ It uses [Ollama](https://ollama.com) for GPU-accelerated LLM and embedding infer
 [ChromaDB](https://www.trychroma.com) as a local, file-based vector store.
 
 For day-to-day usage (ingesting documents, asking questions, interpreting
-answers), see the [RAG User Guide](docs/RAG_USER_GUIDE.md).
+answers), see the [RAG User Guide](docs/RAG_USER_GUIDE.md). For a conceptual
+plan to build agentic trading on top of this stack, see
+[Agentic Trading Roadmap](docs/AGENTIC_TRADING_ROADMAP.md).
 
 ## Architecture
 
@@ -24,38 +26,51 @@ client -> FastAPI (/ingest, /query, /health)
 
 ## Hardware
 
-- GPU: NVIDIA GeForce GTX 1660 SUPER (6 GB VRAM), driver 535 / CUDA 12.2
-- CPU: Intel i7-2700K (4c/8t), 16 GB RAM
+| Component | Specification |
+|-----------|---------------|
+| **Host** | Dell OptiPlex 9010 |
+| **CPU** | Intel Core i7-3770 @ 3.40 GHz (4 cores / 8 threads) |
+| **RAM** | 16 GB |
+| **GPU** | NVIDIA GeForce RTX 3050 6 GB (GA107) |
+| **Driver** | NVIDIA 595.71.05 (open kernel module) |
+| **OS** | Ubuntu 24.04, kernel 6.14.0-37-generic |
+| **OS disk** | Samsung SSD 870 232.9 GB (`/`) |
+| **Data disk** | WDC WDS100T2B0A 931.5 GB (`/media/maxim/Store`) |
 
 The 6 GB VRAM ceiling is why 3B-class models are used. All 29 layers of
 `llama3.2:3b` fit in VRAM (~2.7 GB resident).
 
-## GPU backend (important)
+## GPU backend
 
-This machine runs Ollama on the **Vulkan** backend, not CUDA. Driver 535 ships
-CUDA 12.2, which is too old for the current Ollama build's CUDA kernels and
-fails with `CUDA error: device kernel image is invalid`. Vulkan offloads all
-model layers to the GPU and works well, so the startup script forces it via
-`CUDA_VISIBLE_DEVICES=-1`.
+This machine runs Ollama on the **CUDA** backend (driver 595). The previous
+deployment used a GTX 1660 SUPER with driver 535, which was too old for
+Ollama's CUDA kernels and required a Vulkan fallback (`CUDA_VISIBLE_DEVICES=-1`).
 
-To switch to the CUDA backend later, upgrade the NVIDIA driver to 580+
-(`sudo ubuntu-drivers install nvidia:580 && sudo reboot`) and remove the
-`CUDA_VISIBLE_DEVICES=-1` line from `scripts/start.sh`.
+If CUDA breaks after an Ollama or driver upgrade, fall back to Vulkan by
+uncommenting these lines in `scripts/start.sh`:
 
-## Install (already done on this machine)
+```bash
+export CUDA_VISIBLE_DEVICES="-1"
+export OLLAMA_VULKAN=1
+```
 
-This deployment was installed entirely in user space (no root required):
+## Install
 
+On this machine:
+
+- Ollama installed system-wide at `/usr/local/bin/ollama` (via the official installer)
 - Python venv at `./.venv` (pip bootstrapped via `get-pip.py`)
-- Ollama extracted to `~/.local` (binary at `~/.local/bin/ollama`)
 - Models in `~/.ollama/models`: `llama3.2:3b`, `nomic-embed-text`
 
 To reproduce on another machine:
 
 ```bash
-# Ollama (user-space)
-curl -fsSL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst -o /tmp/ollama.tar.zst
-mkdir -p ~/.local && tar --zstd -C ~/.local -xf /tmp/ollama.tar.zst
+# Ollama (system install — recommended when root is available)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Or user-space install:
+# curl -fsSL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst -o /tmp/ollama.tar.zst
+# mkdir -p ~/.local && tar --zstd -C ~/.local -xf /tmp/ollama.tar.zst
 
 # Python env
 cd ~/Projects/sandbox002
@@ -65,9 +80,9 @@ curl -fsSL https://bootstrap.pypa.io/get-pip.py | .venv/bin/python
 cp .env.example .env
 
 # Models
-CUDA_VISIBLE_DEVICES=-1 ~/.local/bin/ollama serve &
-~/.local/bin/ollama pull llama3.2:3b
-~/.local/bin/ollama pull nomic-embed-text
+ollama serve &
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
 ```
 
 ## Run
@@ -76,7 +91,7 @@ CUDA_VISIBLE_DEVICES=-1 ~/.local/bin/ollama serve &
 bash scripts/start.sh
 ```
 
-This starts Ollama (Vulkan GPU backend) if needed, then the FastAPI server.
+This starts Ollama (CUDA GPU backend) if needed, then the FastAPI server.
 Interactive API docs: http://localhost:8000/docs
 
 ## Usage
@@ -89,7 +104,7 @@ curl -X POST http://localhost:8000/ingest \
   -d '{"text": "Your document text here.", "source": "notes"}'
 ```
 
-Ingest a file (.txt, .md, .pdf):
+Ingest a file (.txt, .md, .pdf, .epub):
 
 ```bash
 curl -X POST http://localhost:8000/ingest/file \
@@ -124,6 +139,29 @@ All settings are read from `.env` (see `.env.example`):
 | `CHUNK_SIZE` | `500` | Chunk size in tokens (approx) |
 | `CHUNK_OVERLAP` | `50` | Overlap between chunks |
 | `TOP_K` | `5` | Chunks retrieved per query |
+| `PDF_OCR_ENABLED` | `true` | OCR image-only PDF pages when no text layer is present |
+| `PDF_OCR_DPI` | `200` | Render resolution for OCR (higher = slower, more accurate) |
+| `PDF_FIGURES_ENABLED` | `true` | Extract and caption charts/figures from PDFs |
+| `PDF_FIGURE_TEXT_THRESHOLD` | `200` | OCR char count below which a scanned page becomes a figure candidate |
+| `PDF_FIGURE_MIN_SIZE` | `150` | Min width/height for embedded images |
+| `FIGURES_DIR` | `./data/figures` | Stored figure PNG paths |
+| `OLLAMA_VISION_MODEL` | `moondream` | Vision model for figure captions at ingest |
+
+Scanned PDFs require `tesseract-ocr`; figure captions require a vision model:
+
+```bash
+sudo apt install tesseract-ocr
+ollama pull moondream
+```
+
+Large scanned books (hundreds of pages) can take hours to ingest (OCR + selective
+vision). Ingest is resumable: existing figure IDs are skipped on re-run.
+
+Test figure extraction on the Murphy PDF (first 5 pages):
+
+```bash
+bash scripts/test_pdf_figures.sh
+```
 
 ## Project Layout
 
@@ -133,10 +171,13 @@ app/
   config.py         env-based settings
   ollama_client.py  LLM + embedding calls
   ingest.py         chunk, embed, store
+  pdf_ingest.py     unified PDF text + figure extraction
+  pdf_figures.py    figure asset extraction
   rag.py            retrieve + prompt + generate
   store.py          ChromaDB client
   models.py         Pydantic schemas
 data/documents/     drop zone for source files
+data/figures/       extracted figure images (gitignored)
 chroma_db/          persisted vector store
 scripts/            system setup helpers
 ```

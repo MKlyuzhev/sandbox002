@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .env
 chroma_db/
+data/figures/
 data/documents/*
 !data/documents/.gitkeep
