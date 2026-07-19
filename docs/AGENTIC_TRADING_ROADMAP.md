@@ -249,9 +249,42 @@ Success is:
 Ordered suggestions for future work:
 
 1. `GET /figures/{id}` or static file serving for `data/figures/`
-2. `search_knowledge` tool wrapping Chroma (filter by `source`, `chunk_type`)
+2. `search_knowledge` tool wrapping Chroma (filter by `source`, `chunk_type`) — **done** (`app/rag_mcp.py`)
 3. Minimal `/agent/run` endpoint with tool loop
 4. Separate `agent/` package or script calling RAG + market stubs
 5. Paper broker integration behind a risk gate
 
 See also: [RAG User Guide](RAG_USER_GUIDE.md) for current API usage.
+
+---
+
+## 14. Headless core boundary
+
+To keep the system UI-agnostic (so Cursor today and an autonomous ops dashboard
+later are both thin clients over one core), all logic lives in the stack, not in
+any UI:
+
+```
+core (this repo)
+├── libraries        app/rag.py, app/risk.py (deterministic, no LLM)
+├── MCP servers      app/oanda_mcp.py (FX data), app/rag_mcp.py (corpus retrieval)
+└── HTTP API         FastAPI /ingest, /query, /health
+
+clients (interchangeable, own no logic)
+├── Cursor Agent     frontier or local model, via .cursor/mcp.json
+├── CLI / scripts    deterministic automation
+└── future dashboard positions, P&L, signals, kill switch (Phase B/C)
+```
+
+- **`app/rag_mcp.py`** — `search_knowledge`, `get_source_chunk`, `corpus_stats`.
+  Pure retrieval (no answer synthesis), so any model reasons with its own
+  weights. Maps to section 3's tool table. Distinct from the FastAPI `/query`
+  endpoint, which still offers full generate-an-answer RAG.
+- **`app/risk.py`** — `position_size`, `r_multiple`, `expectancy`,
+  `max_exposure_ok`. This is the section 4 rule ("deterministic code, not LLM
+  math") as a library: the model decides *which* rule; the numbers are computed
+  here. Not an MCP tool yet — the autonomous loop (Phase C) or a later `risk`
+  MCP wrapper plugs in here.
+
+Both MCP servers are read-only and registered in `.cursor/mcp.json`. Execution
+(order placement) is deliberately absent and remains a separate, gated step.

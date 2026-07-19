@@ -4,6 +4,10 @@
       "command": "/home/maxim/Projects/sandbox002/.venv/bin/python",
       "args": ["/home/maxim/Projects/sandbox002/app/oanda_mcp.py"],
       "env": { "OANDA_ENV": "practice" }
+    },
+    "rag-knowledge": {
+      "command": "/home/maxim/Projects/sandbox002/.venv/bin/python",
+      "args": ["/home/maxim/Projects/sandbox002/app/rag_mcp.py"]
     }
   }
 }
