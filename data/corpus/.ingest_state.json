@@ -1,0 +1,191 @@
+{
+  "ingested": {
+    "reminiscences": {
+      "chunks_added": 133,
+      "figures_added": 0,
+      "file": "reminiscences.epub",
+      "note": "Wrong Gutenberg file ingested; disabled in manifest until correct text acquired"
+    },
+    "murphy-intermarket": {
+      "chunks_added": 179,
+      "figures_added": 197,
+      "file": "murphy-intermarket.pdf"
+    },
+    "lien-fx": {
+      "chunks_added": 178,
+      "figures_added": 83,
+      "file": "lien-fx.pdf"
+    },
+    "laidi-intermarket-fx": {
+      "chunks_added": 228,
+      "figures_added": 27,
+      "file": "laidi-intermarket-fx.pdf"
+    },
+    "murphy-digital": {
+      "chunks_added": 621,
+      "figures_added": 373,
+      "file": "murphy-digital.pdf",
+      "note": "Pre-existing ingest before metadata tags; re-run --only murphy-digital to refresh metadata"
+    },
+    "schwager-wizards": {
+      "chunks_added": 613,
+      "figures_added": 0,
+      "file": "schwager-wizards.pdf"
+    },
+    "bis-triennial-fx": {
+      "chunks_added": 47,
+      "figures_added": 13,
+      "file": "bis-triennial-fx.pdf"
+    },
+    "edwards-magee": {
+      "chunks_added": 1309,
+      "figures_added": 3,
+      "file": "edwards-magee.pdf"
+    },
+    "nison-candlesticks": {
+      "chunks_added": 317,
+      "figures_added": 596,
+      "file": "nison-candlesticks.pdf"
+    },
+    "taleb-fooled": {
+      "chunks_added": 317,
+      "figures_added": 219,
+      "file": "taleb-fooled.pdf"
+    },
+    "carver-systematic": {
+      "chunks_added": 429,
+      "figures_added": 32,
+      "file": "carver-systematic.pdf"
+    },
+    "aronson-ebta": {
+      "chunks_added": 831,
+      "figures_added": 544,
+      "file": "aronson-ebta.pdf"
+    },
+    "chan-quant": {
+      "chunks_added": 254,
+      "figures_added": 47,
+      "file": "chan-quant.pdf"
+    },
+    "harris-microstructure": {
+      "chunks_added": 139,
+      "figures_added": 20,
+      "file": "harris-microstructure.epub"
+    },
+    "pring-ta": {
+      "chunks_added": 811,
+      "figures_added": 330,
+      "file": "pring-ta.pdf"
+    }
+  },
+  "smoke_tests": {
+    "head_shoulders": {
+      "pass": true,
+      "expected": [
+        "murphy-digital",
+        "edwards-magee",
+        "pring-ta"
+      ],
+      "sources": [
+        "edwards-magee",
+        "edwards-magee-test"
+      ],
+      "answer": "According to the context, a Head-and-Shoulders Reversal (or \"Kilroy Bottom\") is a formation that develops at an important Reversal of Trend from down to up, with three stages:\n\nA. "
+    },
+    "fx_sessions": {
+      "pass": true,
+      "expected": [
+        "lien-fx"
+      ],
+      "sources": [
+        "bis-triennial-fx",
+        "lien-fx"
+      ],
+      "answer": "According to the text, trading activity varies significantly during each session, but traditionally tends to be quietest during Asian market hours. During European and London tradi"
+    },
+    "risk_on_off": {
+      "pass": true,
+      "expected": [
+        "laidi-intermarket-fx",
+        "murphy-intermarket"
+      ],
+      "sources": [
+        "laidi-intermarket-fx",
+        "lien-fx"
+      ],
+      "answer": "Risk-on and risk-off refer to market conditions where investors shift their focus from safe-haven assets (such as the US dollar) to higher-risk assets, including currencies, and vi"
+    },
+    "intermarket_bonds": {
+      "pass": true,
+      "expected": [
+        "murphy-intermarket"
+      ],
+      "sources": [
+        "murphy-intermarket"
+      ],
+      "answer": "Murphy says that a rising bond market is considered bullish for stocks and a falling bond market is considered bearish for stocks, but also notes that there are some qualifiers to "
+    },
+    "expectancy_sizing": {
+      "pass": false,
+      "expected": [
+        "carver-systematic",
+        "taleb-fooled"
+      ],
+      "sources": [
+        "edwards-magee",
+        "edwards-magee-test",
+        "schwager-wizards"
+      ],
+      "answer": "According to the provided context:\n\nExpectancy refers to a fundamental aspect of trading, where \"entry\" is a critical component of trading. However, there is no explicit definition"
+    },
+    "pattern_limits": {
+      "pass": false,
+      "expected": [
+        "aronson-ebta"
+      ],
+      "sources": [
+        "edwards-magee",
+        "edwards-magee-test",
+        "murphy-digital"
+      ],
+      "answer": "According to the provided context, the limitations of chart pattern studies include:\n\n* Chart patterns are almost completely subjective and subjective interpretations can vary (Tew"
+    },
+    "limit_order_book": {
+      "pass": false,
+      "expected": [
+        "harris-microstructure"
+      ],
+      "sources": [
+        "lien-fx",
+        "murphy-digital"
+      ],
+      "answer": "I don't know how a limit order book works based on the provided context. The relevant information is found in section [3] and [4], which describe market, limit, stop, and stop-limi"
+    },
+    "overfitting": {
+      "pass": false,
+      "expected": [
+        "chan-quant"
+      ],
+      "sources": [
+        "edwards-magee",
+        "edwards-magee-test"
+      ],
+      "answer": "I don't know based on the available documents what \"overfitting\" means in backtesting, as the term is not mentioned in the provided context. However, I can say that caution and res"
+    },
+    "fx_turnover": {
+      "pass": true,
+      "expected": [
+        "bis-triennial-fx"
+      ],
+      "sources": [
+        "bis-triennial-fx",
+        "lien-fx"
+      ],
+      "answer": "According to the provided context:\n\nGlobal FX turnover refers to the total value of all trades conducted in foreign exchange markets over a given period. In the 2022 Triennial Surv"
+    },
+    "livermore": {
+      "pass": false,
+      "note": "reminiscences disabled; wrong Gutenberg file previously ingested"
+    }
+  }
+}

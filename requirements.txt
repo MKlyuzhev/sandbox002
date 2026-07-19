@@ -10,3 +10,4 @@ pytesseract>=0.3.10
 Pillow>=10.0.0
 ebooklib>=0.18
 beautifulsoup4>=4.12.0
+pyyaml>=6.0.0

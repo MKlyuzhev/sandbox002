@@ -299,6 +299,35 @@ for s in data["sources"]:
 
 ---
 
+## 6. Corpus ingest (trading knowledge base)
+
+For the curated 15-book trading corpus (Murphy, Harris, Lien, etc.), see the
+[Corpus Runbook](CORPUS_RUNBOOK.md).
+
+Quick batch ingest from manifest:
+
+```bash
+.venv/bin/python scripts/ingest_corpus.py --dry-run
+.venv/bin/python scripts/ingest_corpus.py --only harris-microstructure
+```
+
+### Document metadata on upload
+
+`POST /ingest` and `POST /ingest/file` accept optional document metadata as JSON.
+Allowed keys: `title`, `author`, `asset_class`, `topics`, `evidence_level`, `acquisition`.
+
+```bash
+curl -X POST http://localhost:8000/ingest/file \
+  -F "file=@data/documents/lien-fx.pdf" \
+  -F "source=lien-fx" \
+  -F 'metadata={"title":"Day Trading and Swing Trading the Currency Market","author":"Kathy Lien","asset_class":"fx","topics":"fx,session,macro,carry","evidence_level":"heuristic","acquisition":"owned"}'
+```
+
+Metadata is stored on every chunk and returned in query `sources` (`title`, `author`,
+`asset_class`, `topics`, `evidence_level`).
+
+---
+
 ## 7. Errors You May See
 
 | Status | Meaning | What to do |

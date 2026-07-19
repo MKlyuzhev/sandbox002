@@ -1,0 +1,156 @@
+version: 1
+defaults:
+  evidence_level: principle
+documents:
+  - source_id: murphy-digital
+    title: "Technical Analysis of the Financial Markets"
+    author: "John Murphy"
+    asset_class: general
+    topics: [trend, pattern, oscillator, intermarket]
+    evidence_level: principle
+    acquisition: owned
+    file: murphy-digital.pdf
+    enabled: true
+    notes: "Already ingested; re-run to apply metadata tags"
+
+  - source_id: murphy-intermarket
+    title: "Intermarket Analysis"
+    author: "John Murphy"
+    asset_class: general
+    topics: [intermarket, macro]
+    evidence_level: principle
+    acquisition: owned
+    file: murphy-intermarket.pdf
+    enabled: true
+
+  - source_id: edwards-magee
+    title: "Technical Analysis of Stock Trends"
+    author: "Edwards & Magee"
+    asset_class: equity
+    topics: [trend, pattern, dow]
+    evidence_level: principle
+    acquisition: owned
+    file: edwards-magee.pdf
+    enabled: true
+
+  - source_id: nison-candlesticks
+    title: "Japanese Candlestick Charting Techniques"
+    author: "Steve Nison"
+    asset_class: general
+    topics: [pattern, candlestick]
+    evidence_level: principle
+    acquisition: owned
+    file: nison-candlesticks.pdf
+    enabled: true
+
+  - source_id: lien-fx
+    title: "Day Trading and Swing Trading the Currency Market"
+    author: "Kathy Lien"
+    asset_class: fx
+    topics: [fx, session, macro, carry]
+    evidence_level: heuristic
+    acquisition: owned
+    file: lien-fx.pdf
+    enabled: true
+
+  - source_id: laidi-intermarket-fx
+    title: "Currency Trading and Intermarket Analysis"
+    author: "Ashraf Laidi"
+    asset_class: fx
+    topics: [fx, intermarket]
+    evidence_level: heuristic
+    acquisition: owned
+    file: laidi-intermarket-fx.pdf
+    enabled: true
+
+  - source_id: schwager-wizards
+    title: "Market Wizards"
+    author: "Jack Schwager"
+    asset_class: general
+    topics: [psychology, risk, heuristic]
+    evidence_level: heuristic
+    acquisition: owned
+    file: schwager-wizards.pdf
+    enabled: true
+
+  - source_id: taleb-fooled
+    title: "Fooled by Randomness"
+    author: "Nassim Taleb"
+    asset_class: general
+    topics: [risk, probability, psychology]
+    evidence_level: principle
+    acquisition: owned
+    file: taleb-fooled.pdf
+    enabled: true
+
+  - source_id: carver-systematic
+    title: "Systematic Trading"
+    author: "Robert Carver"
+    asset_class: general
+    topics: [systematic, risk, sizing]
+    evidence_level: principle
+    acquisition: owned
+    file: carver-systematic.pdf
+    enabled: true
+
+  - source_id: aronson-ebta
+    title: "Evidence-Based Technical Analysis"
+    author: "David Aronson"
+    asset_class: general
+    topics: [systematic, evidence]
+    evidence_level: empirical
+    acquisition: owned
+    file: aronson-ebta.pdf
+    enabled: true
+
+  - source_id: chan-quant
+    title: "Quantitative Trading"
+    author: "Ernest Chan"
+    asset_class: general
+    topics: [systematic, backtest]
+    evidence_level: heuristic
+    acquisition: owned
+    file: chan-quant.pdf
+    enabled: true
+
+  - source_id: harris-microstructure
+    title: "Trading and Exchanges: Market Microstructure for Practitioners"
+    author: "Larry Harris"
+    asset_class: general
+    topics: [microstructure, execution]
+    evidence_level: principle
+    acquisition: owned
+    file: harris-microstructure.epub
+    enabled: true
+
+  - source_id: pring-ta
+    title: "Technical Analysis Explained"
+    author: "Martin Pring"
+    asset_class: general
+    topics: [trend, oscillator, pattern]
+    evidence_level: principle
+    acquisition: owned
+    file: pring-ta.pdf
+    enabled: true
+
+  - source_id: reminiscences
+    title: "Reminiscences of a Stock Operator"
+    author: "Edwin Lefèvre"
+    asset_class: general
+    topics: [psychology, tape, principle]
+    evidence_level: principle
+    acquisition: public_domain
+    file: reminiscences.txt
+    enabled: false
+    notes: "Acquire public-domain text manually; Gutenberg #1440 is wrong title. Internet Archive item reminiscencesofs00lefe is lend-only."
+
+  - source_id: bis-triennial-fx
+    title: "BIS Triennial Central Bank Survey (FX turnover)"
+    author: "BIS"
+    asset_class: fx
+    topics: [fx, microstructure, empirical]
+    evidence_level: empirical
+    acquisition: free_official
+    file: bis-triennial-fx.pdf
+    enabled: true
+    notes: "Download latest PDF from bis.org/statistics"

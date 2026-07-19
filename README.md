@@ -6,8 +6,10 @@ It uses [Ollama](https://ollama.com) for GPU-accelerated LLM and embedding infer
 [ChromaDB](https://www.trychroma.com) as a local, file-based vector store.
 
 For day-to-day usage (ingesting documents, asking questions, interpreting
-answers), see the [RAG User Guide](docs/RAG_USER_GUIDE.md). For a conceptual
-plan to build agentic trading on top of this stack, see
+answers), see the [RAG User Guide](docs/RAG_USER_GUIDE.md). For the trading
+knowledge corpus (acquisition, batch ingest, validation), see the
+[Corpus Runbook](docs/CORPUS_RUNBOOK.md). For a conceptual plan to build
+agentic trading on top of this stack, see
 [Agentic Trading Roadmap](docs/AGENTIC_TRADING_ROADMAP.md).
 
 ## Architecture

@@ -1,9 +1,11 @@
 import asyncio
+import json
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
-from . import ingest, ollama_client, epub_text, pdf_ingest, rag, store
+from . import epub_ingest, ingest, ollama_client, pdf_ingest, rag, store
 from .config import settings
+from .metadata import MetadataError, validate_metadata
 from .models import (
     HealthResponse,
     IngestResponse,
@@ -17,6 +19,18 @@ app = FastAPI(
     description="Retrieval-augmented Q&A backed by Ollama and ChromaDB.",
     version="1.0.0",
 )
+
+
+def _parse_metadata_json(raw: str | None) -> dict[str, str] | None:
+    if not raw or not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid metadata JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=422, detail="metadata must be a JSON object")
+    return validate_metadata({str(k): str(v) for k, v in parsed.items()})
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -36,17 +50,29 @@ async def health() -> HealthResponse:
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest_text(req: IngestTextRequest) -> IngestResponse:
     try:
-        added = await ingest.ingest_text(req.text, req.source)
+        metadata = validate_metadata(req.metadata)
+        added = await ingest.ingest_text(req.text, req.source, metadata)
+    except MetadataError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ollama_client.OllamaError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return IngestResponse(source=req.source, chunks_added=added)
 
 
 @app.post("/ingest/file", response_model=IngestResponse)
-async def ingest_file(file: UploadFile = File(...), source: str = Form("")) -> IngestResponse:
+async def ingest_file(
+    file: UploadFile = File(...),
+    source: str = Form(""),
+    metadata: str = Form(""),
+) -> IngestResponse:
     raw = await file.read()
     name = source or file.filename or "uploaded"
     filename = (file.filename or "").lower()
+
+    try:
+        doc_metadata = _parse_metadata_json(metadata)
+    except MetadataError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     if filename.endswith(".pdf"):
         try:
@@ -57,12 +83,12 @@ async def ingest_file(file: UploadFile = File(...), source: str = Form("")) -> I
         text_added = 0
         if result.full_text.strip():
             try:
-                text_added = await ingest.ingest_text(result.full_text, name)
+                text_added = await ingest.ingest_text(result.full_text, name, doc_metadata)
             except ollama_client.OllamaError as exc:
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
 
         try:
-            figures_added = await ingest.ingest_figures(result.figures, name)
+            figures_added = await ingest.ingest_figures(result.figures, name, doc_metadata)
         except ollama_client.OllamaError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -74,22 +100,44 @@ async def ingest_file(file: UploadFile = File(...), source: str = Form("")) -> I
             chunks_added=text_added,
             figures_added=figures_added,
         )
-    elif filename.endswith(".epub"):
+
+    if filename.endswith(".epub"):
         try:
-            text = await asyncio.to_thread(epub_text.extract_text, raw)
-        except epub_text.EpubTextError as exc:
+            result = await asyncio.to_thread(epub_ingest.process_epub, raw, name)
+        except epub_ingest.EpubIngestError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-    else:
+
+        text_added = 0
+        if result.full_text.strip():
+            try:
+                text_added = await ingest.ingest_text(result.full_text, name, doc_metadata)
+            except ollama_client.OllamaError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+
         try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            text = raw.decode("latin-1", errors="ignore")
+            figures_added = await ingest.ingest_figures(result.figures, name, doc_metadata)
+        except ollama_client.OllamaError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        if text_added == 0 and figures_added == 0:
+            raise HTTPException(status_code=400, detail="No extractable text or figures in file")
+
+        return IngestResponse(
+            source=name,
+            chunks_added=text_added,
+            figures_added=figures_added,
+        )
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1", errors="ignore")
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="No extractable text in file")
 
     try:
-        added = await ingest.ingest_text(text, name)
+        added = await ingest.ingest_text(text, name, doc_metadata)
     except ollama_client.OllamaError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return IngestResponse(source=name, chunks_added=added)

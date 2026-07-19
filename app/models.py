@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 class IngestTextRequest(BaseModel):
     text: str = Field(..., description="Raw text to ingest")
     source: str = Field("inline", description="Identifier for the source document")
+    metadata: dict[str, str] | None = Field(
+        None,
+        description="Document-level metadata (title, author, asset_class, topics, evidence_level, acquisition)",
+    )
 
 
 class IngestResponse(BaseModel):
@@ -25,6 +29,11 @@ class Source(BaseModel):
     chunk_type: str | None = None
     page: int | None = None
     image_path: str | None = None
+    title: str | None = None
+    author: str | None = None
+    asset_class: str | None = None
+    topics: str | None = None
+    evidence_level: str | None = None
 
 
 class QueryResponse(BaseModel):

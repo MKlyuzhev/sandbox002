@@ -54,6 +54,11 @@ async def answer(question: str, top_k: int | None = None) -> QueryResponse:
                 chunk_type=meta.get("chunk_type"),
                 page=int(meta["page"]) if meta.get("page") is not None else None,
                 image_path=meta.get("image_path"),
+                title=meta.get("title"),
+                author=meta.get("author"),
+                asset_class=meta.get("asset_class"),
+                topics=meta.get("topics"),
+                evidence_level=meta.get("evidence_level"),
             )
         )
 

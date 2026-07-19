@@ -1,9 +1,14 @@
 import base64
+import io
+import logging
 from pathlib import Path
 
 import httpx
+from PIL import Image
 
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaError(RuntimeError):
@@ -53,7 +58,14 @@ async def describe_image(image_path: str, prompt: str | None = None) -> str:
     if not path.is_file():
         raise OllamaError(f"Image not found: {image_path}")
 
-    image_b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    try:
+        with Image.open(path) as img:
+            rgb = img.convert("RGB")
+            buf = io.BytesIO()
+            rgb.save(buf, format="PNG")
+            image_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as exc:
+        raise OllamaError(f"Could not read image {image_path}: {exc}") from exc
     url = f"{settings.ollama_base_url}/api/chat"
     payload = {
         "model": settings.ollama_vision_model,
