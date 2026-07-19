@@ -88,6 +88,17 @@ mcp = FastMCP("oanda-research")
 
 
 @mcp.tool()
+async def list_accounts() -> list[dict]:
+    """List the accounts the API token can access (v20 REST only).
+
+    Useful for discovering the correct account id: the v20 REST API serves only
+    v20 accounts, so an MT4 account id will not appear here. Each entry includes
+    the account ``id`` and its ``tags``. Does not require OANDA_ACCOUNT_ID."""
+    data = await _get("/v3/accounts")
+    return data.get("accounts", [])
+
+
+@mcp.tool()
 async def get_account_summary() -> dict:
     """Return the OANDA account summary: balance, equity (NAV), unrealized P&L,
     margin used/available, open position/trade counts, and home currency."""
