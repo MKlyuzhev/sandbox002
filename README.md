@@ -148,6 +148,9 @@ All settings are read from `.env` (see `.env.example`):
 | `PDF_FIGURE_MIN_SIZE` | `150` | Min width/height for embedded images |
 | `FIGURES_DIR` | `./data/figures` | Stored figure PNG paths |
 | `OLLAMA_VISION_MODEL` | `moondream` | Vision model for figure captions at ingest |
+| `OANDA_API_KEY` | (empty) | OANDA v20 personal access token (research MCP) |
+| `OANDA_ACCOUNT_ID` | (empty) | OANDA account id, e.g. `101-001-1234567-001` |
+| `OANDA_ENV` | `practice` | OANDA REST environment: `practice` or `live` |
 
 Scanned PDFs require `tesseract-ocr`; figure captions require a vision model:
 
@@ -165,6 +168,40 @@ Test figure extraction on the Murphy PDF (first 5 pages):
 bash scripts/test_pdf_figures.sh
 ```
 
+## Research MCP (OANDA, read-only)
+
+A local [Model Context Protocol](https://modelcontextprotocol.io) server exposes
+broker-accurate FX data to Cursor for FOREX research. It is **read-only**: it
+wraps OANDA's v20 REST API for market data and account context only, and defines
+**no order placement, modification, or position-closing tools**. It defaults to
+the `practice` environment.
+
+Tools: `get_account_summary`, `list_instruments`, `get_pricing`, `get_candles`,
+`get_open_positions`, `get_open_trades`, `get_order_book`, `get_position_book`.
+
+Setup:
+
+1. Create an OANDA personal access token (Manage API Access in your OANDA account)
+   and note your account id.
+2. Add both to `.env`:
+
+```bash
+OANDA_API_KEY=your-token
+OANDA_ACCOUNT_ID=101-001-1234567-001
+OANDA_ENV=practice
+```
+
+3. Ensure `mcp` is installed: `.venv/bin/pip install -r requirements.txt`.
+4. The project-scoped config at `.cursor/mcp.json` registers the server with
+   Cursor (no secrets stored there; the server reads `.env`). Reload Cursor and
+   check Settings > Tools & MCP for `oanda-research`.
+
+Smoke test the server standalone (Ctrl-C to exit; it waits on stdio):
+
+```bash
+.venv/bin/python app/oanda_mcp.py
+```
+
 ## Project Layout
 
 ```
@@ -177,6 +214,7 @@ app/
   pdf_figures.py    figure asset extraction
   rag.py            retrieve + prompt + generate
   store.py          ChromaDB client
+  oanda_mcp.py      read-only OANDA FX research MCP server
   models.py         Pydantic schemas
 data/documents/     drop zone for source files
 data/figures/       extracted figure images (gitignored)

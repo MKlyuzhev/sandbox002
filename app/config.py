@@ -30,5 +30,10 @@ class Settings(BaseSettings):
         "axes, labels, indicators, patterns, trends, and any readable numeric values."
     )
 
+    # OANDA read-only research MCP (see app/oanda_mcp.py).
+    oanda_api_key: str = ""
+    oanda_account_id: str = ""
+    oanda_env: str = "practice"
+
 
 settings = Settings()

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "oanda-research": {
+      "command": "/home/maxim/Projects/sandbox002/.venv/bin/python",
+      "args": ["/home/maxim/Projects/sandbox002/app/oanda_mcp.py"],
+      "env": { "OANDA_ENV": "practice" }
+    }
+  }
+}
