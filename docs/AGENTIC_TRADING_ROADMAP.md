@@ -254,6 +254,8 @@ Ordered suggestions for future work:
 4. Separate `agent/` package or script calling RAG + market stubs
 5. Paper broker integration behind a risk gate
 
+Early formation analysis (trendlines / H&S): see [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
+
 See also: [RAG User Guide](RAG_USER_GUIDE.md) for current API usage.
 
 ---
@@ -266,7 +268,7 @@ any UI:
 
 ```
 core (this repo)
-├── libraries        app/rag.py, app/risk.py (deterministic, no LLM)
+├── libraries        app/rag.py, app/risk.py, app/patterns.py (deterministic)
 ├── MCP servers      app/oanda_mcp.py (FX data), app/rag_mcp.py (corpus retrieval)
 └── HTTP API         FastAPI /ingest, /query, /health
 
@@ -285,6 +287,8 @@ clients (interchangeable, own no logic)
   math") as a library: the model decides *which* rule; the numbers are computed
   here. Not an MCP tool yet — the autonomous loop (Phase C) or a later `risk`
   MCP wrapper plugs in here.
+- **`app/patterns.py`** — early formation geometry; see
+  [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
 
 Both MCP servers are read-only and registered in `.cursor/mcp.json`. Execution
 (order placement) is deliberately absent and remains a separate, gated step.

@@ -11,6 +11,8 @@ knowledge corpus (acquisition, batch ingest, validation), see the
 [Corpus Runbook](docs/CORPUS_RUNBOOK.md). For a conceptual plan to build
 agentic trading on top of this stack, see
 [Agentic Trading Roadmap](docs/AGENTIC_TRADING_ROADMAP.md).
+Early trendline / H&S formation analysis:
+[Formation Analysis](docs/FORMATION_ANALYSIS.md).
 
 ## Architecture
 
@@ -18,7 +20,7 @@ agentic trading on top of this stack, see
 client -> FastAPI (/ingest, /query, /health)
             |-> chunk + embed (Ollama: nomic-embed-text)
             |-> store / retrieve (ChromaDB)
-            \-> generate answer (Ollama: llama3.2:3b)
+            \-> generate answer (Ollama: qwen3:4b)
 ```
 
 - Ollama serves the chat LLM and the embedding model on `http://localhost:11434`.
@@ -147,7 +149,7 @@ All settings are read from `.env` (see `.env.example`):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint |
-| `OLLAMA_LLM_MODEL` | `llama3.2:3b` | Chat model |
+| `OLLAMA_LLM_MODEL` | `qwen3:4b` | Chat model |
 | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Embedding model |
 | `CHROMA_PERSIST_DIR` | `./chroma_db` | Vector store location |
 | `CHUNK_SIZE` | `500` | Chunk size in tokens (approx) |
@@ -270,8 +272,10 @@ app/
   rag.py            retrieve + prompt + generate
   store.py          ChromaDB client
   oanda_mcp.py      read-only OANDA FX research MCP server
+  oanda_client.py   shared OANDA v20 REST client
   rag_mcp.py        read-only corpus retrieval MCP server
   risk.py           deterministic position sizing / risk math
+  patterns.py       swings, trendlines, early H&S geometry
   models.py         Pydantic schemas
 data/documents/     drop zone for source files
 data/figures/       extracted figure images (gitignored)
