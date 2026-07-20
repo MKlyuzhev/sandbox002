@@ -122,6 +122,18 @@ curl -X POST http://localhost:8000/query \
   -d '{"question": "What does the document say about X?"}'
 ```
 
+Query locally without the server (direct call to the RAG pipeline, uses the
+configured Ollama model):
+
+```bash
+# Fast answer (defaults to qwen3 /no_think), with source list
+.venv/bin/python scripts/query_corpus_local.py "What is a head and shoulders pattern?"
+
+# Higher-quality reasoning (slower), more chunks, JSON output
+.venv/bin/python scripts/query_corpus_local.py --think --top-k 8 "Explain expectancy"
+.venv/bin/python scripts/query_corpus_local.py --json "Define risk of ruin"
+```
+
 Health:
 
 ```bash
@@ -176,8 +188,15 @@ wraps OANDA's v20 REST API for market data and account context only, and defines
 **no order placement, modification, or position-closing tools**. It defaults to
 the `practice` environment.
 
-Tools: `get_account_summary`, `list_instruments`, `get_pricing`, `get_candles`,
-`get_open_positions`, `get_open_trades`, `get_order_book`, `get_position_book`.
+Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`,
+`get_candles`, `get_open_positions`, `get_open_trades`, `get_order_book`,
+`get_position_book`.
+
+A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
+ingested corpus for retrieval: `search_knowledge`, `get_source_chunk`, and
+`corpus_stats`. It performs pure retrieval (no answer synthesis) so any agent -
+frontier or a local model - reasons with its own weights. Both servers are
+registered in `.cursor/mcp.json`.
 
 Setup:
 
@@ -192,15 +211,51 @@ OANDA_ENV=practice
 ```
 
 3. Ensure `mcp` is installed: `.venv/bin/pip install -r requirements.txt`.
-4. The project-scoped config at `.cursor/mcp.json` registers the server with
+4. The project-scoped config at `.cursor/mcp.json` registers the servers with
    Cursor (no secrets stored there; the server reads `.env`). Reload Cursor and
-   check Settings > Tools & MCP for `oanda-research`.
+   check Settings > Tools & MCP for `oanda-research` and `rag-knowledge`.
 
-Smoke test the server standalone (Ctrl-C to exit; it waits on stdio):
+Smoke test a server standalone (Ctrl-C to exit; it waits on stdio):
 
 ```bash
 .venv/bin/python app/oanda_mcp.py
+.venv/bin/python app/rag_mcp.py
 ```
+
+## Local model override (Cursor + Ollama)
+
+Cursor's Agent normally reasons with a cloud model. You can override it to run on
+a **local Ollama model** (e.g. `qwen3:4b`) via Ollama's OpenAI-compatible API,
+while Cursor keeps the chat GUI, tool routing, and MCP client. The local model
+then drives the same MCP tools (`oanda-research`, `rag-knowledge`).
+
+Ollama serves the compatible API at `http://localhost:11434/v1`. In Cursor
+Settings > Models > OpenAI configuration:
+
+- **Override Base URL:** `http://localhost:11434/v1` (default: `https://api.openai.com/v1`)
+- **API key:** any non-empty placeholder (Ollama ignores it)
+- **Model name:** the exact Ollama tag, e.g. `qwen3:4b`
+
+What it affects:
+
+| Feature | On override |
+|---------|-------------|
+| Chat / Agent / Cmd+K | Run on the local model |
+| MCP tools | Available (Cursor remains the MCP client; the model chooses calls) |
+| Tab autocomplete | Stays cloud (not supported on local models) |
+| Background Agent / Bugbot | Stay cloud |
+
+Caveats:
+
+- **localhost reachability:** if the override fails to connect while Ollama is
+  running, your Cursor build may route model requests server-side and cannot
+  reach `localhost`. Expose Ollama via a tunnel and use that URL + `/v1`.
+- **Tool-calling reliability:** small models (4B class) are weaker at long
+  multi-step tool loops than frontier models; keep tool lists small.
+- **Thinking mode:** qwen3 emits `<think>` traces by default. Add `/no_think` to
+  a prompt for faster, terser responses.
+- **VRAM:** `qwen3:4b` fits the 6 GB card; `qwen3:8b` will offload to CPU and run
+  slower. Only one heavy model resident at a time.
 
 ## Project Layout
 
@@ -215,6 +270,8 @@ app/
   rag.py            retrieve + prompt + generate
   store.py          ChromaDB client
   oanda_mcp.py      read-only OANDA FX research MCP server
+  rag_mcp.py        read-only corpus retrieval MCP server
+  risk.py           deterministic position sizing / risk math
   models.py         Pydantic schemas
 data/documents/     drop zone for source files
 data/figures/       extracted figure images (gitignored)

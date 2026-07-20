@@ -1,3 +1,5 @@
+import re
+
 from . import ollama_client, store
 from .config import settings
 from .models import QueryResponse, Source
@@ -7,6 +9,13 @@ SYSTEM_PROMPT = (
     "If the context does not contain the answer, say you don't know based on the available "
     "documents. Be concise and cite facts from the context."
 )
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _strip_think(text: str) -> str:
+    """Remove qwen3-style <think>...</think> reasoning blocks from model output."""
+    return _THINK_BLOCK.sub("", text).strip()
 
 
 def _build_prompt(question: str, contexts: list[str]) -> str:
@@ -18,7 +27,9 @@ def _build_prompt(question: str, contexts: list[str]) -> str:
     )
 
 
-async def answer(question: str, top_k: int | None = None) -> QueryResponse:
+async def answer(
+    question: str, top_k: int | None = None, no_think: bool = False
+) -> QueryResponse:
     k = top_k or settings.top_k
     query_vector = await ollama_client.embed(question)
 
@@ -39,8 +50,9 @@ async def answer(question: str, top_k: int | None = None) -> QueryResponse:
             sources=[],
         )
 
+    system = SYSTEM_PROMPT + ("\n\n/no_think" if no_think else "")
     prompt = _build_prompt(question, documents)
-    llm_answer = await ollama_client.chat(SYSTEM_PROMPT, prompt)
+    llm_answer = await ollama_client.chat(system, prompt)
 
     sources: list[Source] = []
     for doc, meta, dist in zip(documents, metadatas, distances):
@@ -62,4 +74,4 @@ async def answer(question: str, top_k: int | None = None) -> QueryResponse:
             )
         )
 
-    return QueryResponse(answer=llm_answer.strip(), sources=sources)
+    return QueryResponse(answer=_strip_think(llm_answer), sources=sources)
