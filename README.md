@@ -276,9 +276,11 @@ app/
   rag_mcp.py        read-only corpus retrieval MCP server
   risk.py           deterministic position sizing / risk math
   patterns.py       swings, trendlines, early H&S geometry
+  formation_plot.py candlestick chart with formation overlays
   models.py         Pydantic schemas
 data/documents/     drop zone for source files
 data/figures/       extracted figure images (gitignored)
+data/plots/         formation analysis charts (gitignored)
 chroma_db/          persisted vector store
 scripts/            system setup helpers
 ```

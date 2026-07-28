@@ -3,11 +3,14 @@
 
 By default prints geometry JSON only (no local model). Pass ``--brief`` to
 retrieve a book checklist and ask the configured Ollama model to interpret
-the stage — see docs/FORMATION_ANALYSIS.md.
+the stage — see docs/FORMATION_ANALYSIS.md. Pass ``--plot`` to write a
+candlestick chart with detected overlays.
 
 Examples:
     .venv/bin/python scripts/analyze_formation.py
     .venv/bin/python scripts/analyze_formation.py --instrument GBP_USD --count 150
+    .venv/bin/python scripts/analyze_formation.py --count 2000 --to 2024-06-01T00:00:00.000000000Z --plot
+    .venv/bin/python scripts/analyze_formation.py --plot
     .venv/bin/python scripts/analyze_formation.py --brief
 """
 
@@ -17,12 +20,13 @@ import argparse
 import asyncio
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app import oanda_client, ollama_client, patterns, store  # noqa: E402
+from app import formation_plot, oanda_client, ollama_client, patterns, store  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.rag import _strip_think  # noqa: E402
 
@@ -91,12 +95,22 @@ async def _brief(analysis: dict, think: bool) -> str:
 
 
 async def run(args: argparse.Namespace) -> int:
+    # OANDA: cannot combine from + to + count. If both ends given, drop count.
+    count: int | None = args.count
+    if args.from_time and args.to_time:
+        count = None
+    elif args.from_time or args.to_time:
+        # from+count or to+count — keep count (CLI default 200)
+        pass
+
     try:
         payload = await oanda_client.get_candles(
             args.instrument,
             granularity=args.granularity,
-            count=args.count,
+            count=count,
             price="M",
+            from_time=args.from_time,
+            to_time=args.to_time,
         )
     except oanda_client.OandaError as exc:
         print(f"OANDA error: {exc}", file=sys.stderr)
@@ -122,6 +136,35 @@ async def run(args: argparse.Namespace) -> int:
     analysis["instrument"] = args.instrument
     analysis["granularity"] = args.granularity
     analysis["model"] = settings.ollama_llm_model
+    if args.from_time:
+        analysis["from_time"] = args.from_time
+    if args.to_time:
+        analysis["to_time"] = args.to_time
+    if count is not None:
+        analysis["count"] = count
+
+    if args.plot or args.plot_path:
+        if args.plot_path:
+            plot_path = Path(args.plot_path)
+        else:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            plot_path = (
+                ROOT
+                / "data"
+                / "plots"
+                / f"{args.instrument}_{args.granularity}_{stamp}.png"
+            )
+        try:
+            saved = formation_plot.plot_formation(
+                bars,
+                analysis,
+                plot_path,
+                title=f"{args.instrument} {args.granularity}",
+            )
+            analysis["plot_path"] = str(saved)
+        except formation_plot.PlotError as exc:
+            print(f"Plot error: {exc}", file=sys.stderr)
+            return 1
 
     if args.brief:
         try:
@@ -140,7 +183,26 @@ def main() -> int:
     )
     parser.add_argument("--instrument", default="EUR_USD")
     parser.add_argument("--granularity", default="H1")
-    parser.add_argument("--count", type=int, default=200)
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=200,
+        help="Candle count (max 5000). Ignored when both --from and --to are set.",
+    )
+    parser.add_argument(
+        "--from",
+        dest="from_time",
+        default=None,
+        metavar="RFC3339",
+        help="Start time (e.g. 2024-01-01T00:00:00.000000000Z). With --count: N bars from this time.",
+    )
+    parser.add_argument(
+        "--to",
+        dest="to_time",
+        default=None,
+        metavar="RFC3339",
+        help="End time. With --count: N bars ending at this time (lookback from date).",
+    )
     parser.add_argument("--swing-left", type=int, default=3)
     parser.add_argument("--swing-right", type=int, default=3)
     parser.add_argument("--max-lines", type=int, default=5)
@@ -159,6 +221,17 @@ def main() -> int:
         "--think",
         action="store_true",
         help="With --brief, enable model thinking (slower). Default is /no_think.",
+    )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Write a candlestick chart PNG with detected overlays",
+    )
+    parser.add_argument(
+        "--plot-path",
+        type=Path,
+        default=None,
+        help="Output PNG path (implies --plot). Default: data/plots/{instrument}_{granularity}_{utc}.png",
     )
     args = parser.parse_args()
     return asyncio.run(run(args))

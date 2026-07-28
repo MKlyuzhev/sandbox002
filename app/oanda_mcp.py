@@ -76,6 +76,8 @@ async def get_candles(
     granularity: str = "H1",
     count: int = 100,
     price: str = "MBA",
+    from_time: str = "",
+    to_time: str = "",
 ) -> dict:
     """Get historical OHLC candles for an instrument.
 
@@ -83,14 +85,24 @@ async def get_candles(
         instrument: Instrument name, e.g. "EUR_USD".
         granularity: Candle size, e.g. "S5", "M1", "M5", "M15", "H1", "H4",
             "D", "W". Defaults to "H1".
-        count: Number of candles to return (max 5000). Defaults to 100.
-        price: Which price components to return: "M" (mid), "B" (bid),
-            "A" (ask), or a combination like "MBA". Defaults to "MBA".
+        count: Number of candles (max 5000). Defaults to 100. Omit-style
+            historical windows: use from_time+to_time without relying on all
+            three together (OANDA forbids from+to+count).
+        price: Which price components: "M" (mid), "B" (bid), "A" (ask), or
+            "MBA". Defaults to "MBA".
+        from_time: Optional RFC3339 start (e.g. 2024-01-01T00:00:00.000000000Z).
+        to_time: Optional RFC3339 end. With count alone ending at ``to_time``,
+            use to_time+count for N candles ending at that time.
 
     Returns the OANDA candles payload with an ``candles`` list of OHLC values.
     """
     return await oanda_client.get_candles(
-        instrument, granularity=granularity, count=count, price=price
+        instrument,
+        granularity=granularity,
+        count=count,
+        price=price,
+        from_time=from_time or None,
+        to_time=to_time or None,
     )
 
 

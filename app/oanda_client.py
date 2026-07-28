@@ -99,13 +99,34 @@ async def get_pricing(instruments: str) -> list[dict]:
 async def get_candles(
     instrument: str,
     granularity: str = "H1",
-    count: int = 100,
+    count: int | None = 100,
     price: str = "MBA",
+    from_time: str | None = None,
+    to_time: str | None = None,
 ) -> dict:
-    return await get(
-        f"/v3/instruments/{instrument}/candles",
-        params={"granularity": granularity, "count": count, "price": price},
-    )
+    """Fetch candles. OANDA forbids combining from + to + count all at once.
+
+    Allowed shapes: count only; from+count; to+count; from+to.
+    Datetimes should be RFC3339 (e.g. ``2024-06-01T00:00:00.000000000Z``).
+    """
+    if from_time and to_time and count is not None:
+        raise OandaError(
+            "OANDA candles: cannot combine from, to, and count; "
+            "use count only, from+count, to+count, or from+to."
+        )
+    params: dict[str, str | int] = {
+        "granularity": granularity,
+        "price": price,
+    }
+    if count is not None:
+        params["count"] = count
+    if from_time:
+        params["from"] = from_time
+    if to_time:
+        params["to"] = to_time
+    if "count" not in params and not from_time and not to_time:
+        params["count"] = 100
+    return await get(f"/v3/instruments/{instrument}/candles", params=params)
 
 
 async def get_open_positions() -> list[dict]:
