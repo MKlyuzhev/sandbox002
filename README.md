@@ -192,7 +192,9 @@ the `practice` environment.
 
 Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`,
 `get_candles`, `get_open_positions`, `get_open_trades`, `get_order_book`,
-`get_position_book`.
+`get_position_book`, plus MT4 display helpers `mt4_status`, `mt4_upsert_objects`,
+`mt4_delete_objects`, `mt4_clear_layer`, `mt4_draw_formation` (chart objects via
+a file inbox; no MT4 orders).
 
 A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
 ingested corpus for retrieval: `search_knowledge`, `get_source_chunk`, and
@@ -273,6 +275,7 @@ app/
   store.py          ChromaDB client
   oanda_mcp.py      read-only OANDA FX research MCP server
   oanda_client.py   shared OANDA v20 REST client
+  mt4_bridge.py     MT4 chart-object file inbox (Wine Files sandbox)
   rag_mcp.py        read-only corpus retrieval MCP server
   risk.py           deterministic position sizing / risk math
   patterns.py       swings, trendlines, early H&S geometry

@@ -11,6 +11,7 @@ Examples:
     .venv/bin/python scripts/analyze_formation.py --instrument GBP_USD --count 150
     .venv/bin/python scripts/analyze_formation.py --count 2000 --to 2024-06-01T00:00:00.000000000Z --plot
     .venv/bin/python scripts/analyze_formation.py --plot
+    .venv/bin/python scripts/analyze_formation.py --mt4
     .venv/bin/python scripts/analyze_formation.py --brief
 """
 
@@ -173,6 +174,22 @@ async def run(args: argparse.Namespace) -> int:
             print(f"Ollama error: {exc}", file=sys.stderr)
             return 2
 
+    if args.mt4:
+        from app import mt4_bridge  # noqa: E402
+
+        result = mt4_bridge.apply_formation(
+            analysis,
+            bars,
+            args.instrument,
+            args.granularity,
+            prefix=args.mt4_prefix,
+        )
+        analysis["mt4"] = {k: v for k, v in result.items() if k != "analysis"}
+        if not result.get("ok"):
+            print(f"MT4 error: {result.get('error')}", file=sys.stderr)
+            print(json.dumps(analysis, indent=2, default=str))
+            return 1
+
     print(json.dumps(analysis, indent=2, default=str))
     return 0
 
@@ -232,6 +249,16 @@ def main() -> int:
         type=Path,
         default=None,
         help="Output PNG path (implies --plot). Default: data/plots/{instrument}_{granularity}_{utc}.png",
+    )
+    parser.add_argument(
+        "--mt4",
+        action="store_true",
+        help="Draw overlays on the MT4 chart via SandboxChartBridge (file inbox).",
+    )
+    parser.add_argument(
+        "--mt4-prefix",
+        default="sbox.formation.",
+        help="Object name prefix for --mt4 (default: sbox.formation.).",
     )
     args = parser.parse_args()
     return asyncio.run(run(args))

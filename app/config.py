@@ -35,5 +35,11 @@ class Settings(BaseSettings):
     oanda_account_id: str = ""
     oanda_env: str = "practice"
 
+    # MT4 Files sandbox (Wine). Inbox is <this>/sandbox002/{cmd,heartbeat}.json
+    mt4_files_dir: str = (
+        "/home/maxim/.wine/drive_c/Program Files (x86)/"
+        "OANDA - MetaTrader 4/MQL4/Files"
+    )
+
 
 settings = Settings()

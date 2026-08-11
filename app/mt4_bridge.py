@@ -1,0 +1,612 @@
+"""Wine-safe MT4 chart-object bridge (file inbox, no orders).
+
+Python writes ``cmd.json`` under ``MQL4/Files/sandbox002/``; the
+``SandboxChartBridge`` EA polls it and draws ``OBJ_*`` objects. Heartbeat
+from the EA supplies chart symbol/period and ``TimeCurrent`` vs ``TimeGMT``
+so OANDA RFC3339 timestamps can be shifted to broker time.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from app.config import settings
+
+INBOX_SUBDIR = "sandbox002"
+CMD_NAME = "cmd.json"
+HEARTBEAT_NAME = "heartbeat.json"
+DEFAULT_PREFIX = "sbox."
+FORMATION_PREFIX = "sbox.formation."
+HEARTBEAT_STALE_SEC = 10.0
+
+OBJECT_TYPES = frozenset(
+    {"trend", "hline", "text", "arrow", "rectangle", "label"}
+)
+STYLE_NAMES = frozenset({"solid", "dash", "dot", "dashdot"})
+
+GRANULARITY_TO_PERIOD: dict[str, tuple[str, int]] = {
+    "M1": ("M1", 1),
+    "M5": ("M5", 5),
+    "M15": ("M15", 15),
+    "M30": ("M30", 30),
+    "H1": ("H1", 60),
+    "H4": ("H4", 240),
+    "D": ("D1", 1440),
+    "D1": ("D1", 1440),
+    "W": ("W1", 10080),
+    "W1": ("W1", 10080),
+    "MN": ("MN1", 43200),
+    "MN1": ("MN1", 43200),
+}
+
+PERIOD_TO_TF = {v[1]: v[0] for v in GRANULARITY_TO_PERIOD.values()}
+
+
+class Mt4BridgeError(RuntimeError):
+    """Raised when the MT4 inbox/chart cannot accept a command."""
+
+
+def files_dir() -> Path:
+    return Path(settings.mt4_files_dir).expanduser()
+
+
+def inbox_dir() -> Path:
+    return files_dir() / INBOX_SUBDIR
+
+
+def ensure_inbox() -> Path:
+    path = inbox_dir()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def map_symbol(instrument: str) -> str:
+    """OANDA ``GBP_USD`` → MT4 ``GBPUSD``."""
+    return instrument.replace("_", "").replace("/", "").strip().upper()
+
+
+def map_timeframe(granularity: str) -> tuple[str, int]:
+    key = granularity.strip().upper()
+    if key not in GRANULARITY_TO_PERIOD:
+        raise Mt4BridgeError(
+            f"Unsupported timeframe '{granularity}'; "
+            f"expected one of {sorted(GRANULARITY_TO_PERIOD)}."
+        )
+    return GRANULARITY_TO_PERIOD[key]
+
+
+def parse_rfc3339_utc(value: str | None) -> int | None:
+    """Parse OANDA RFC3339 (possibly nanosecond) to UTC unix seconds."""
+    if not value or not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    if "." in text:
+        head, rest = text.split(".", 1)
+        tz_sep = "+" if "+" in rest else ("-" if "-" in rest[1:] else "")
+        if tz_sep:
+            idx = rest.find(tz_sep, 1) if tz_sep == "-" else rest.find(tz_sep)
+            frac, tz = rest[:idx], rest[idx:]
+        else:
+            frac, tz = rest, "+00:00"
+        frac = "".join(c for c in frac if c.isdigit())[:6].ljust(6, "0")
+        text = f"{head}.{frac}{tz}"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
+
+
+def broker_time(utc_unix: int, offset_seconds: int) -> int:
+    return int(utc_unix) + int(offset_seconds)
+
+
+def offset_from_heartbeat(heartbeat: dict[str, Any] | None) -> int:
+    if not heartbeat:
+        return 0
+    if heartbeat.get("offset_seconds") is not None:
+        return int(heartbeat["offset_seconds"])
+    tc = heartbeat.get("time_current")
+    tg = heartbeat.get("time_gmt")
+    if tc is None or tg is None:
+        return 0
+    return int(tc) - int(tg)
+
+
+def read_heartbeat() -> dict[str, Any] | None:
+    path = inbox_dir() / HEARTBEAT_NAME
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def heartbeat_age_sec(path: Path | None = None) -> float | None:
+    hb_path = path or (inbox_dir() / HEARTBEAT_NAME)
+    if not hb_path.is_file():
+        return None
+    return max(0.0, time.time() - hb_path.stat().st_mtime)
+
+
+def status() -> dict[str, Any]:
+    inbox = inbox_dir()
+    writable = False
+    try:
+        ensure_inbox()
+        probe = inbox / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        writable = True
+    except OSError:
+        writable = False
+    hb = read_heartbeat()
+    age = heartbeat_age_sec()
+    ea_ok = bool(
+        hb
+        and hb.get("ea_ok", True)
+        and age is not None
+        and age <= HEARTBEAT_STALE_SEC
+    )
+    period = hb.get("period") if hb else None
+    timeframe = None
+    if hb:
+        timeframe = hb.get("timeframe") or PERIOD_TO_TF.get(int(period or 0))
+    return {
+        "inbox_dir": str(inbox),
+        "inbox_writable": writable,
+        "heartbeat": hb,
+        "heartbeat_age_sec": age,
+        "ea_ok": ea_ok,
+        "symbol": (hb or {}).get("symbol"),
+        "period": period,
+        "timeframe": timeframe,
+        "last_cmd_id": (hb or {}).get("last_cmd_id"),
+        "last_error": (hb or {}).get("last_error") or "",
+        "object_count": (hb or {}).get("object_count"),
+        "last_prefix": (hb or {}).get("last_prefix"),
+    }
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    tmp.replace(path)
+
+
+def write_command(payload: dict[str, Any]) -> str:
+    cmd_id = payload.get("id") or str(uuid.uuid4())
+    payload = dict(payload)
+    payload["id"] = cmd_id
+    _atomic_write_json(ensure_inbox() / CMD_NAME, payload)
+    return cmd_id
+
+
+def _normalize_object(obj: dict[str, Any], prefix: str) -> dict[str, Any]:
+    if not isinstance(obj, dict):
+        raise Mt4BridgeError("each object must be a dict")
+    otype = str(obj.get("type") or "").strip().lower()
+    if otype not in OBJECT_TYPES:
+        raise Mt4BridgeError(
+            f"Unsupported object type '{obj.get('type')}'; "
+            f"expected one of {sorted(OBJECT_TYPES)}."
+        )
+    name = str(obj.get("name") or "").strip()
+    if not name:
+        raise Mt4BridgeError("object is missing 'name'")
+    if prefix and not name.startswith(prefix):
+        name = f"{prefix}{name}"
+    style = str(obj.get("style") or "solid").strip().lower()
+    if style not in STYLE_NAMES:
+        raise Mt4BridgeError(f"Unsupported style '{style}'")
+    out: dict[str, Any] = {
+        "name": name,
+        "type": otype,
+        "color": str(obj.get("color") or "white"),
+        "style": style,
+        "width": int(obj.get("width") or 1),
+        "ray": bool(obj.get("ray", False)),
+        "window": int(obj.get("window") or 0),
+    }
+    for key in ("t1", "t2", "x", "y", "arrow_code"):
+        if obj.get(key) is not None:
+            out[key] = int(obj[key])
+    for key in ("p1", "p2"):
+        if obj.get(key) is not None:
+            out[key] = float(obj[key])
+    if obj.get("text") is not None:
+        out["text"] = str(obj["text"])
+    if otype in {"trend", "rectangle"} and ("t1" not in out or "p1" not in out):
+        raise Mt4BridgeError(f"{otype} requires t1 and p1")
+    if otype == "hline" and "p1" not in out:
+        raise Mt4BridgeError("hline requires p1")
+    if otype in {"text", "arrow"} and ("t1" not in out or "p1" not in out):
+        raise Mt4BridgeError(f"{otype} requires t1 and p1")
+    if otype == "label" and ("x" not in out or "y" not in out):
+        raise Mt4BridgeError("label requires x and y")
+    return out
+
+
+def check_chart(
+    symbol: str,
+    timeframe: str,
+    heartbeat: dict[str, Any] | None = None,
+) -> tuple[bool, str]:
+    st = status() if heartbeat is None else None
+    hb = heartbeat if heartbeat is not None else (st or {}).get("heartbeat")
+    ea_ok = True if heartbeat is not None else bool((st or {}).get("ea_ok"))
+    if heartbeat is None and not ea_ok:
+        return False, "EA heartbeat missing or stale; attach SandboxChartBridge."
+    if not hb:
+        return False, "EA heartbeat missing; attach SandboxChartBridge."
+    want_sym = map_symbol(symbol)
+    want_tf, want_period = map_timeframe(timeframe)
+    got_sym = str(hb.get("symbol") or "").replace("_", "").upper()
+    got_period = int(hb.get("period") or 0)
+    got_tf = str(hb.get("timeframe") or PERIOD_TO_TF.get(got_period) or "")
+    if got_sym != want_sym:
+        return False, f"Chart symbol {got_sym or '?'} != {want_sym}."
+    if got_period and got_period != want_period:
+        return False, f"Chart period {got_period} ({got_tf}) != {want_tf} ({want_period})."
+    if not got_period and got_tf and got_tf.upper() != want_tf:
+        return False, f"Chart timeframe {got_tf} != {want_tf}."
+    return True, ""
+
+
+def upsert_objects(
+    symbol: str,
+    timeframe: str,
+    objects: list[dict[str, Any]],
+    prefix: str = DEFAULT_PREFIX,
+    clear_prefix_first: bool = True,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    st = status()
+    if require_chart_match:
+        ok, reason = check_chart(symbol, timeframe, heartbeat=st.get("heartbeat"))
+        if not st.get("ea_ok") or not ok:
+            return {
+                "ok": False,
+                "error": (
+                    "EA heartbeat missing or stale; attach SandboxChartBridge."
+                    if not st.get("ea_ok")
+                    else reason
+                ),
+                "chart_ok": False,
+                "status": st,
+            }
+    tf_name, _period = map_timeframe(timeframe)
+    normalized = [_normalize_object(o, prefix) for o in objects]
+    cmd_id = write_command(
+        {
+            "op": "upsert",
+            "symbol": map_symbol(symbol),
+            "timeframe": tf_name,
+            "prefix": prefix,
+            "clear_prefix_first": clear_prefix_first,
+            "objects": normalized,
+        }
+    )
+    return {
+        "ok": True,
+        "cmd_id": cmd_id,
+        "objects_written": len(normalized),
+        "chart_ok": True if require_chart_match else None,
+        "prefix": prefix,
+        "status": st,
+    }
+
+
+def delete_objects(
+    names: list[str] | None = None,
+    prefix: str = "",
+) -> dict[str, Any]:
+    st = status()
+    if not st.get("ea_ok"):
+        return {
+            "ok": False,
+            "error": "EA heartbeat missing or stale; attach SandboxChartBridge.",
+            "chart_ok": False,
+            "status": st,
+        }
+    cmd_id = write_command(
+        {
+            "op": "delete",
+            "names": list(names or []),
+            "prefix": prefix,
+        }
+    )
+    return {"ok": True, "cmd_id": cmd_id, "status": st}
+
+
+def clear_layer(prefix: str = DEFAULT_PREFIX) -> dict[str, Any]:
+    st = status()
+    if not st.get("ea_ok"):
+        return {
+            "ok": False,
+            "error": "EA heartbeat missing or stale; attach SandboxChartBridge.",
+            "chart_ok": False,
+            "status": st,
+        }
+    cmd_id = write_command({"op": "clear", "prefix": prefix})
+    return {"ok": True, "cmd_id": cmd_id, "prefix": prefix, "status": st}
+
+
+def _bar_broker_time(
+    bars: list[dict[str, Any]], index: int, offset_seconds: int
+) -> int | None:
+    if index < 0 or index >= len(bars):
+        return None
+    utc = parse_rfc3339_utc(bars[index].get("time"))
+    if utc is None:
+        return None
+    return broker_time(utc, offset_seconds)
+
+
+def formation_to_objects(
+    analysis: dict[str, Any],
+    bars: list[dict[str, Any]],
+    offset_seconds: int = 0,
+    prefix: str = FORMATION_PREFIX,
+) -> list[dict[str, Any]]:
+    """Map ``patterns.analyze_bars`` + bars to MT4 object dicts (plot layers)."""
+    objects: list[dict[str, Any]] = []
+    last_i = len(bars) - 1
+    last_t = _bar_broker_time(bars, last_i, offset_seconds)
+
+    for n, swing in enumerate(analysis.get("swings") or []):
+        idx = swing.get("index")
+        price = swing.get("price")
+        if idx is None or price is None:
+            continue
+        t1 = _bar_broker_time(bars, int(idx), offset_seconds)
+        if t1 is None:
+            continue
+        high = swing.get("kind") == "high"
+        objects.append(
+            {
+                "name": f"{prefix}swing.{n}",
+                "type": "arrow",
+                "t1": t1,
+                "p1": float(price),
+                "color": "blue" if high else "orange",
+                "arrow_code": 234 if high else 233,
+                "width": 1,
+            }
+        )
+
+    for n, line in enumerate(analysis.get("trendlines") or []):
+        i0, i1 = line.get("i0"), line.get("i1")
+        p0, p1 = line.get("price0"), line.get("price1")
+        if None in (i0, i1, p0, p1):
+            continue
+        t0 = _bar_broker_time(bars, int(i0), offset_seconds)
+        t1 = _bar_broker_time(bars, int(i1), offset_seconds)
+        if t0 is None or t1 is None:
+            continue
+        color = "green" if line.get("kind") == "support" else "red"
+        objects.append(
+            {
+                "name": f"{prefix}trend.{n}",
+                "type": "trend",
+                "t1": t0,
+                "p1": float(p0),
+                "t2": t1,
+                "p2": float(p1),
+                "color": color,
+                "style": "solid",
+                "width": 1,
+                "ray": False,
+            }
+        )
+        at_last = line.get("price_at_last")
+        if at_last is not None and last_t is not None and int(i1) < last_i:
+            objects.append(
+                {
+                    "name": f"{prefix}trend.{n}.ext",
+                    "type": "trend",
+                    "t1": t1,
+                    "p1": float(p1),
+                    "t2": last_t,
+                    "p2": float(at_last),
+                    "color": color,
+                    "style": "dash",
+                    "width": 1,
+                    "ray": False,
+                }
+            )
+
+    hs = analysis.get("hs") or {}
+    for key, label, color in (
+        ("left_shoulder", "LS", "purple"),
+        ("head", "H", "pink"),
+        ("right_shoulder", "RS", "brown"),
+    ):
+        pt = hs.get(key)
+        if not pt:
+            continue
+        idx, price = pt.get("index"), pt.get("price")
+        if idx is None or price is None:
+            continue
+        t1 = _bar_broker_time(bars, int(idx), offset_seconds)
+        if t1 is None:
+            continue
+        objects.append(
+            {
+                "name": f"{prefix}hs.{key}.arrow",
+                "type": "arrow",
+                "t1": t1,
+                "p1": float(price),
+                "color": color,
+                "arrow_code": 159,
+                "width": 1,
+            }
+        )
+        objects.append(
+            {
+                "name": f"{prefix}hs.{key}.text",
+                "type": "text",
+                "t1": t1,
+                "p1": float(price),
+                "color": color,
+                "text": label,
+                "width": 1,
+            }
+        )
+
+    nl = hs.get("neckline")
+    if nl:
+        i0, i1 = nl.get("i0"), nl.get("i1")
+        p0, p1 = nl.get("price0"), nl.get("price1")
+        if None not in (i0, i1, p0, p1):
+            t0 = _bar_broker_time(bars, int(i0), offset_seconds)
+            t1 = _bar_broker_time(bars, int(i1), offset_seconds)
+            if t0 is not None and t1 is not None:
+                objects.append(
+                    {
+                        "name": f"{prefix}neckline",
+                        "type": "trend",
+                        "t1": t0,
+                        "p1": float(p0),
+                        "t2": t1,
+                        "p2": float(p1),
+                        "color": "cyan",
+                        "style": "solid",
+                        "width": 2,
+                        "ray": False,
+                    }
+                )
+                at_last = nl.get("price_at_last")
+                if at_last is not None and last_t is not None and int(i1) < last_i:
+                    objects.append(
+                        {
+                            "name": f"{prefix}neckline.ext",
+                            "type": "trend",
+                            "t1": t1,
+                            "p1": float(p1),
+                            "t2": last_t,
+                            "p2": float(at_last),
+                            "color": "cyan",
+                            "style": "dash",
+                            "width": 1,
+                            "ray": False,
+                        }
+                    )
+
+    if hs.get("stage") == "confirmed_break" and hs.get("min_target") is not None:
+        objects.append(
+            {
+                "name": f"{prefix}min_target",
+                "type": "hline",
+                "p1": float(hs["min_target"]),
+                "color": "grey",
+                "style": "dot",
+                "width": 1,
+            }
+        )
+
+    stage = hs.get("stage") or "none"
+    objects.append(
+        {
+            "name": f"{prefix}stage",
+            "type": "label",
+            "x": 8,
+            "y": 18,
+            "color": "white",
+            "text": f"stage={stage}",
+        }
+    )
+    return objects
+
+
+def apply_formation(
+    analysis: dict[str, Any],
+    bars: list[dict[str, Any]],
+    instrument: str,
+    granularity: str,
+    prefix: str = FORMATION_PREFIX,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    st = status()
+    offset = offset_from_heartbeat(st.get("heartbeat"))
+    objects = formation_to_objects(analysis, bars, offset, prefix=prefix)
+    result = upsert_objects(
+        instrument,
+        granularity,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=True,
+        require_chart_match=require_chart_match,
+    )
+    result["analysis"] = analysis
+    result["offset_seconds"] = offset
+    return result
+
+
+async def draw_formation(
+    instrument: str,
+    granularity: str = "H1",
+    count: int | None = 200,
+    from_time: str | None = None,
+    to_time: str | None = None,
+    swing_left: int = 3,
+    swing_right: int = 3,
+    max_lines: int = 5,
+    break_frac: float = 0.001,
+    prefix: str = FORMATION_PREFIX,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    """Fetch OANDA candles, analyze, and drop a formation overlay command."""
+    from app import oanda_client, patterns
+
+    use_count = count
+    if from_time and to_time:
+        use_count = None
+    payload = await oanda_client.get_candles(
+        instrument,
+        granularity=granularity,
+        count=use_count,
+        price="M",
+        from_time=from_time,
+        to_time=to_time,
+    )
+    bars = oanda_client.candles_to_bars(payload, prefer="mid")
+    if len(bars) < 20:
+        raise Mt4BridgeError(f"Not enough bars ({len(bars)}); need more history.")
+    analysis = patterns.analyze_bars(
+        bars,
+        swing_left=swing_left,
+        swing_right=swing_right,
+        max_lines=max_lines,
+        break_frac=break_frac,
+    )
+    analysis["instrument"] = instrument
+    analysis["granularity"] = granularity
+    if from_time:
+        analysis["from_time"] = from_time
+    if to_time:
+        analysis["to_time"] = to_time
+    if use_count is not None:
+        analysis["count"] = use_count
+    return apply_formation(
+        analysis,
+        bars,
+        instrument,
+        granularity,
+        prefix=prefix,
+        require_chart_match=require_chart_match,
+    )

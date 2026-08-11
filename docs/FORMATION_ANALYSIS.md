@@ -10,14 +10,16 @@ from live FX bars. Not a signal service and not an execution path.
 | OANDA (`app/oanda_client.py`) | Candles / mid OHLC only |
 | `app/patterns.py` | Swings, candidate trendlines, H&S stage, measured height |
 | `app/formation_plot.py` | Candlestick PNG with overlays (same bars + analysis) |
+| `app/mt4_bridge.py` + `SandboxChartBridge.mq4` | Same overlays as MT4 chart objects (file inbox) |
 | Corpus (`rag-knowledge` / Chroma) | Book rules: confirmation, volume language, measurement |
 | Local LLM (`--brief` only) | Interpret stage JSON against retrieved chunks |
-| Not here | Orders, risk sizing, geometry MCP tools, chart vision by LLM |
+| Not here | Orders, risk sizing, chart vision by LLM |
 
 ```
 OANDA candles → patterns.py → JSON
-       └──────→ formation_plot.py → PNG (--plot)
-                    ↘ --brief → corpus chunks + qwen3:4b brief
+       ├──────→ formation_plot.py → PNG (--plot)
+       ├──────→ mt4_bridge → MQL4/Files/sandbox002/cmd.json → EA objects (--mt4)
+       └──────→ --brief → corpus chunks + qwen3:4b brief
 ```
 
 ## Stage machine (H&S top)
@@ -78,6 +80,31 @@ Candlestick chart with detected overlays (same bars as the analysis):
 Default plot path: `data/plots/{instrument}_{granularity}_{utc}.png` (gitignored).
 The JSON output includes `plot_path` when a chart is written.
 
+### MT4 chart objects
+
+Display only (no orders). Python writes `cmd.json` under `MQL4/Files/sandbox002/`;
+an always-on EA draws `OBJ_*` objects.
+
+1. In MetaEditor, compile `Experts/Custom/SandboxChartBridge.mq4`
+   (it includes `Include/Custom/JsonMini.mqh`).
+2. Attach **SandboxChartBridge** to the chart you want annotated (same
+   symbol/timeframe as the analysis, e.g. GBPUSD H1). AutoTrading can stay off.
+3. Optional: set `MT4_FILES_DIR` in `.env` if the Wine Files path differs.
+4. Check the bridge, then draw:
+
+```bash
+# CLI
+.venv/bin/python scripts/analyze_formation.py --instrument GBP_USD --granularity H1 --mt4
+```
+
+MCP (`oanda-research`): call `mt4_status`, then `mt4_draw_formation` (or
+`mt4_upsert_objects` / `mt4_clear_layer`). The draw tool refuses if the EA
+heartbeat is stale or the chart symbol/timeframe does not match.
+
+Object names use prefix `sbox.formation.` so a clear/redraw does not touch
+hand-drawn objects. Broker time offset comes from the EA heartbeat
+(`TimeCurrent` − `TimeGMT`), not a hardcoded DST rule.
+
 ### Chart layers
 
 | Layer | Visual |
@@ -95,13 +122,12 @@ Plotting needs `matplotlib` (`pip install -r requirements.txt`).
 Unit tests (no network):
 
 ```bash
-.venv/bin/python -m unittest tests.test_patterns tests.test_formation_plot -v
+.venv/bin/python -m unittest tests.test_patterns tests.test_formation_plot tests.test_mt4_bridge -v
 ```
 
 ## Out of scope / later
 
-- Exposing `detect_swings` / `hs_formation_state` as MCP tools
 - Inverse H&S bottoms
 - Live chart vision / Murphy figure comparison / LLM reading the PNG
-- Interactive or web charts
+- `mt4_screenshot` / interactive or web charts
 - Wiring formation state into `app/risk.py` or order placement

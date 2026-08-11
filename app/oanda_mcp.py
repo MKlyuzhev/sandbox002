@@ -2,7 +2,8 @@
 
 Exposes FX market-data and account-context tools over stdio for use as a
 research MCP set in Cursor. Deliberately read-only: no order placement,
-modification, or position-closing tools are defined here.
+modification, or position-closing tools are defined here. MT4 helpers only
+draw chart objects via a file inbox (see ``app.mt4_bridge``).
 
 Run directly (Cursor spawns it this way):
 
@@ -24,7 +25,7 @@ os.chdir(_REPO_ROOT)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-from app import oanda_client  # noqa: E402
+from app import mt4_bridge, oanda_client  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("oanda-research")
@@ -132,6 +133,97 @@ async def get_position_book(instrument: str) -> dict:
     """Get OANDA's position book for an instrument: bucketed open position
     volume (long/short) by price, useful as a crowd-positioning research signal."""
     return await oanda_client.get_position_book(instrument)
+
+
+@mcp.tool()
+async def mt4_status() -> dict:
+    """MT4 bridge status: inbox path/writable, EA heartbeat age, chart
+    symbol/timeframe, last command id, and last EA error.
+
+    Call this before drawing. Requires SandboxChartBridge.mq4 attached to a
+    chart (AutoTrading can stay off — objects only, no orders).
+    """
+    return mt4_bridge.status()
+
+
+@mcp.tool()
+async def mt4_upsert_objects(
+    symbol: str,
+    timeframe: str,
+    objects: list[dict],
+    prefix: str = "sbox.",
+    clear_prefix_first: bool = True,
+) -> dict:
+    """Upsert chart objects on the EA's chart (display only; no orders).
+
+    Args:
+        symbol: OANDA or MT4 symbol (GBP_USD or GBPUSD). Must match the chart.
+        timeframe: Granularity such as H1, M15, D. Must match the chart.
+        objects: List of dicts with name, type (trend|hline|text|arrow|
+            rectangle|label), t1/p1, optional t2/p2, color, style, width,
+            text, ray, arrow_code, x, y.
+        prefix: Prepended to names that do not already start with it.
+        clear_prefix_first: Delete existing objects with this prefix first.
+
+    Refuses if the EA heartbeat is stale or the chart symbol/TF does not match.
+    """
+    return mt4_bridge.upsert_objects(
+        symbol,
+        timeframe,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=clear_prefix_first,
+    )
+
+
+@mcp.tool()
+async def mt4_delete_objects(
+    names: list[str] | None = None,
+    prefix: str = "",
+) -> dict:
+    """Delete chart objects by exact names and/or name prefix (e.g. sbox.formation.)."""
+    return mt4_bridge.delete_objects(names=names or [], prefix=prefix)
+
+
+@mcp.tool()
+async def mt4_clear_layer(prefix: str = "sbox.") -> dict:
+    """Remove all sandbox chart objects whose names start with prefix."""
+    return mt4_bridge.clear_layer(prefix=prefix)
+
+
+@mcp.tool()
+async def mt4_draw_formation(
+    instrument: str,
+    granularity: str = "H1",
+    count: int = 200,
+    from_time: str = "",
+    to_time: str = "",
+    swing_left: int = 3,
+    swing_right: int = 3,
+    max_lines: int = 5,
+    break_frac: float = 0.001,
+    prefix: str = "sbox.formation.",
+) -> dict:
+    """Analyze OANDA candles and draw formation overlays on the MT4 chart.
+
+    Same geometry as scripts/analyze_formation.py / formation_plot.py: swings,
+    support/resistance trendlines, H&S LS/H/RS labels, neckline, min_target.
+    Refuses if SandboxChartBridge is not on a matching symbol/timeframe chart.
+
+    Returns analysis JSON plus cmd_id, objects_written, and chart_ok.
+    """
+    return await mt4_bridge.draw_formation(
+        instrument,
+        granularity=granularity,
+        count=count,
+        from_time=from_time or None,
+        to_time=to_time or None,
+        swing_left=swing_left,
+        swing_right=swing_right,
+        max_lines=max_lines,
+        break_frac=break_frac,
+        prefix=prefix,
+    )
 
 
 if __name__ == "__main__":
