@@ -13,6 +13,8 @@ agentic trading on top of this stack, see
 [Agentic Trading Roadmap](docs/AGENTIC_TRADING_ROADMAP.md).
 Early trendline / H&S formation analysis:
 [Formation Analysis](docs/FORMATION_ANALYSIS.md).
+Kathy Lien regime filter and strategy playbook:
+[Lien FX Strategies](docs/LIEN_FX_STRATEGIES.md).
 
 ## Architecture
 
@@ -192,9 +194,10 @@ the `practice` environment.
 
 Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`,
 `get_candles`, `get_open_positions`, `get_open_trades`, `get_order_book`,
-`get_position_book`, plus MT4 display helpers `mt4_status`, `mt4_upsert_objects`,
-`mt4_delete_objects`, `mt4_clear_layer`, `mt4_draw_formation` (chart objects via
-a file inbox; no MT4 orders).
+`get_position_book`, Lien governing-layer helpers `classify_regime`,
+`indicator_snapshot`, `mt4_draw_regime`, plus MT4 display helpers `mt4_status`,
+`mt4_upsert_objects`, `mt4_delete_objects`, `mt4_clear_layer`,
+`mt4_draw_formation` (chart objects via a file inbox; no MT4 orders).
 
 A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
 ingested corpus for retrieval: `search_knowledge`, `get_source_chunk`, and
@@ -278,6 +281,8 @@ app/
   mt4_bridge.py     MT4 chart-object file inbox (Wine Files sandbox)
   rag_mcp.py        read-only corpus retrieval MCP server
   risk.py           deterministic position sizing / risk math
+  indicators.py     SMA, double Bollinger, Wilder ADX, RSI, stoch, MACD
+  regime.py         Lien Ch.7 trend/range checklist
   patterns.py       swings, trendlines, early H&S geometry
   formation_plot.py candlestick chart with formation overlays
   models.py         Pydantic schemas

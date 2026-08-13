@@ -167,5 +167,44 @@ class TestInbox(unittest.TestCase):
         self.assertEqual(cmd["prefix"], "sbox.")
 
 
+class TestRegimeObjects(unittest.TestCase):
+    def test_regime_to_objects_has_bands_mas_and_label(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from app import regime
+        from tests.test_indicators import _trend_bars
+
+        raw = _trend_bars(80, step=0.01)
+        start = datetime(2024, 6, 1, tzinfo=timezone.utc)
+        bars = []
+        for i, b in enumerate(raw):
+            nb = dict(b)
+            ts = start + timedelta(hours=i)
+            nb["time"] = ts.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+            bars.append(nb)
+        analysis = regime.analyze_bars(bars)
+        objects = mt4_bridge.regime_to_objects(analysis, bars, offset_seconds=0)
+        types = {o["type"] for o in objects}
+        self.assertIn("trend", types)
+        self.assertIn("hline", types)
+        self.assertIn("label", types)
+        names = [o["name"] for o in objects]
+        self.assertTrue(any(n.startswith("sbox.regime.sma20.") for n in names))
+        self.assertTrue(any("bb.upper_2" in n for n in names))
+        self.assertTrue(any(n.endswith("high_n") or n.endswith("sbox.regime.high_n") or "high_n" in n for n in names))
+        label = next(o for o in objects if o["type"] == "label")
+        self.assertIn("regime=", label["text"])
+        self.assertIn("ADX=", label["text"])
+        self.assertLessEqual(len(objects), mt4_bridge.REGIME_MAX_OBJECTS + 5)
+        for o in objects:
+            if o["type"] == "trend":
+                self.assertIsInstance(o["t1"], int)
+                self.assertIsInstance(o["p1"], float)
+
+    def test_regime_prefix_does_not_match_formation(self) -> None:
+        self.assertNotEqual(mt4_bridge.REGIME_PREFIX, mt4_bridge.FORMATION_PREFIX)
+        self.assertTrue(mt4_bridge.REGIME_PREFIX.startswith("sbox."))
+
+
 if __name__ == "__main__":
     unittest.main()

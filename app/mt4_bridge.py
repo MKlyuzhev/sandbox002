@@ -22,7 +22,11 @@ CMD_NAME = "cmd.json"
 HEARTBEAT_NAME = "heartbeat.json"
 DEFAULT_PREFIX = "sbox."
 FORMATION_PREFIX = "sbox.formation."
+REGIME_PREFIX = "sbox.regime."
 HEARTBEAT_STALE_SEC = 10.0
+REGIME_LOOKBACK = 80
+REGIME_STRIDE = 2
+REGIME_MAX_OBJECTS = 400
 
 OBJECT_TYPES = frozenset(
     {"trend", "hline", "text", "arrow", "rectangle", "label"}
@@ -603,6 +607,243 @@ async def draw_formation(
     if use_count is not None:
         analysis["count"] = use_count
     return apply_formation(
+        analysis,
+        bars,
+        instrument,
+        granularity,
+        prefix=prefix,
+        require_chart_match=require_chart_match,
+    )
+
+
+def _polyline_segments(
+    bars: list[dict[str, Any]],
+    values: list[float | None],
+    offset_seconds: int,
+    start: int,
+    stride: int,
+    name_prefix: str,
+    color: str,
+    style: str = "solid",
+    width: int = 1,
+) -> list[dict[str, Any]]:
+    """Connected trend segments over valid (non-None) values."""
+    objects: list[dict[str, Any]] = []
+    n = len(bars)
+    if stride < 1:
+        stride = 1
+    i = start
+    seg = 0
+    while i < n:
+        if i >= len(values) or values[i] is None:
+            i += 1
+            continue
+        j = min(i + stride, n - 1)
+        while j < n and (j >= len(values) or values[j] is None):
+            j += 1
+        if j >= n or values[j] is None or j == i:
+            break
+        t1 = _bar_broker_time(bars, i, offset_seconds)
+        t2 = _bar_broker_time(bars, j, offset_seconds)
+        p1, p2 = values[i], values[j]
+        if t1 is not None and t2 is not None and p1 is not None and p2 is not None:
+            objects.append(
+                {
+                    "name": f"{name_prefix}.{seg}",
+                    "type": "trend",
+                    "t1": t1,
+                    "p1": float(p1),
+                    "t2": t2,
+                    "p2": float(p2),
+                    "color": color,
+                    "style": style,
+                    "width": width,
+                    "ray": False,
+                }
+            )
+            seg += 1
+        i = j
+    return objects
+
+
+def regime_to_objects(
+    analysis: dict[str, Any],
+    bars: list[dict[str, Any]],
+    offset_seconds: int = 0,
+    prefix: str = REGIME_PREFIX,
+    lookback: int = REGIME_LOOKBACK,
+    stride: int = REGIME_STRIDE,
+) -> list[dict[str, Any]]:
+    """Map Lien regime snapshot to MT4 price-pane objects (no oscillator panes)."""
+    from app import indicators
+
+    series = indicators.plot_series(bars, lookback=lookback)
+    start = int(series["start_index"])
+    objects: list[dict[str, Any]] = []
+
+    sma_spec = (
+        ("10", "white", "solid", 1),
+        ("20", "orange", "solid", 1),
+        ("50", "red", "solid", 1),
+        ("100", "blue", "dash", 1),
+        ("200", "purple", "dash", 1),
+    )
+    for period, color, style, width in sma_spec:
+        objects.extend(
+            _polyline_segments(
+                bars,
+                series["sma"][period],
+                offset_seconds,
+                start,
+                stride,
+                f"{prefix}sma{period}",
+                color,
+                style,
+                width,
+            )
+        )
+
+    bb_spec = (
+        ("upper_2", "grey", "solid"),
+        ("upper_1", "cyan", "dash"),
+        ("lower_1", "cyan", "dash"),
+        ("lower_2", "grey", "solid"),
+    )
+    for key, color, style in bb_spec:
+        objects.extend(
+            _polyline_segments(
+                bars,
+                series["bollinger"][key],
+                offset_seconds,
+                start,
+                stride,
+                f"{prefix}bb.{key}",
+                color,
+                style,
+                1,
+            )
+        )
+
+    # If the overlay is too heavy, rebuild with a wider stride.
+    overlay_n = len(objects)
+    if overlay_n > REGIME_MAX_OBJECTS and stride < 8:
+        return regime_to_objects(
+            analysis,
+            bars,
+            offset_seconds=offset_seconds,
+            prefix=prefix,
+            lookback=lookback,
+            stride=stride + 2,
+        )
+
+    snap = analysis.get("snapshot") or {}
+    hi_n, lo_n = snap.get("high_n"), snap.get("low_n")
+    if hi_n is not None:
+        objects.append(
+            {
+                "name": f"{prefix}high_n",
+                "type": "hline",
+                "p1": float(hi_n),
+                "color": "green",
+                "style": "dot",
+                "width": 1,
+            }
+        )
+    if lo_n is not None:
+        objects.append(
+            {
+                "name": f"{prefix}low_n",
+                "type": "hline",
+                "p1": float(lo_n),
+                "color": "orange",
+                "style": "dot",
+                "width": 1,
+            }
+        )
+
+    adx = (snap.get("adx") or {})
+    plays = analysis.get("allowed_play_classes") or []
+    plays_txt = ",".join(str(p) for p in plays)
+    slope = adx.get("slope")
+    slope_txt = "rising" if adx.get("rising") else ("falling" if slope is not None else "?")
+    label = (
+        f"regime={analysis.get('regime', '?')} "
+        f"ADX={adx.get('adx', '?')} {slope_txt} "
+        f"perfect_order={analysis.get('ma_perfect_order')} "
+        f"plays={plays_txt}"
+    )
+    objects.append(
+        {
+            "name": f"{prefix}label",
+            "type": "label",
+            "x": 8,
+            "y": 18,
+            "color": "white",
+            "text": label,
+        }
+    )
+    return objects
+
+
+def apply_regime(
+    analysis: dict[str, Any],
+    bars: list[dict[str, Any]],
+    instrument: str,
+    granularity: str,
+    prefix: str = REGIME_PREFIX,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    st = status()
+    offset = offset_from_heartbeat(st.get("heartbeat"))
+    objects = regime_to_objects(analysis, bars, offset, prefix=prefix)
+    result = upsert_objects(
+        instrument,
+        granularity,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=True,
+        require_chart_match=require_chart_match,
+    )
+    result["analysis"] = analysis
+    result["offset_seconds"] = offset
+    result["objects_drawn"] = len(objects)
+    return result
+
+
+async def draw_regime(
+    instrument: str,
+    granularity: str = "D",
+    count: int | None = 250,
+    from_time: str | None = None,
+    to_time: str | None = None,
+    prefix: str = REGIME_PREFIX,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    """Fetch OANDA candles, classify Lien regime, and draw the overlay."""
+    from app import oanda_client, regime
+
+    use_count = count
+    if from_time and to_time:
+        use_count = None
+    payload = await oanda_client.get_candles(
+        instrument,
+        granularity=granularity,
+        count=use_count,
+        price="M",
+        from_time=from_time,
+        to_time=to_time,
+    )
+    bars = oanda_client.candles_to_bars(payload, prefer="mid")
+    analysis = regime.analyze_bars(bars)
+    analysis["instrument"] = instrument
+    analysis["granularity"] = granularity
+    if from_time:
+        analysis["from_time"] = from_time
+    if to_time:
+        analysis["to_time"] = to_time
+    if use_count is not None:
+        analysis["count"] = use_count
+    return apply_regime(
         analysis,
         bars,
         instrument,

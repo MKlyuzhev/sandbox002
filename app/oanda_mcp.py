@@ -226,6 +226,136 @@ async def mt4_draw_formation(
     )
 
 
+async def _analyze_regime(
+    instrument: str,
+    granularity: str,
+    count: int,
+    from_time: str,
+    to_time: str,
+) -> tuple[list[dict], dict]:
+    from app import regime
+
+    use_count: int | None = count
+    if from_time and to_time:
+        use_count = None
+    payload = await oanda_client.get_candles(
+        instrument,
+        granularity=granularity,
+        count=use_count,
+        price="M",
+        from_time=from_time or None,
+        to_time=to_time or None,
+    )
+    bars = oanda_client.candles_to_bars(payload, prefer="mid")
+    analysis = regime.analyze_bars(bars)
+    analysis["instrument"] = instrument
+    analysis["granularity"] = granularity
+    if from_time:
+        analysis["from_time"] = from_time
+    if to_time:
+        analysis["to_time"] = to_time
+    if use_count is not None:
+        analysis["count"] = use_count
+    return bars, analysis
+
+
+@mcp.tool()
+async def classify_regime(
+    instrument: str,
+    granularity: str = "D",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+) -> dict:
+    """Lien Ch.7 trend/range checklist from OANDA candles (deterministic).
+
+    Computes ADX, double Bollinger, SMA stack, RSI/stoch/MACD in code — do not
+    recompute those in the model. Default granularity D (Lien's journal).
+    count=250 covers the 200-SMA. Risk reversals and implied vol are marked
+    unavailable. Research only; no orders.
+
+    Returns regime (trend|range|mixed), direction, checklist X-counts,
+    allowed_play_classes, last-bar snapshot, and notes. On too few bars,
+    returns an ``error`` field.
+    """
+    from app import indicators
+
+    try:
+        _bars, analysis = await _analyze_regime(
+            instrument, granularity, count, from_time, to_time
+        )
+    except indicators.IndicatorError as exc:
+        return {"error": str(exc), "instrument": instrument, "granularity": granularity}
+    return analysis
+
+
+@mcp.tool()
+async def indicator_snapshot(
+    instrument: str,
+    granularity: str = "D",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+) -> dict:
+    """Last-bar SMA / double Bollinger / ADX / RSI / stoch / MACD snapshot.
+
+    Same numbers as classify_regime without Lien regime labels. Useful for
+    debugging or later strategy chapters. Raises if fewer than 30 bars.
+    """
+    from app import indicators
+
+    use_count: int | None = count
+    if from_time and to_time:
+        use_count = None
+    payload = await oanda_client.get_candles(
+        instrument,
+        granularity=granularity,
+        count=use_count,
+        price="M",
+        from_time=from_time or None,
+        to_time=to_time or None,
+    )
+    bars = oanda_client.candles_to_bars(payload, prefer="mid")
+    try:
+        snap = indicators.snapshot(bars)
+    except indicators.IndicatorError as exc:
+        return {
+            "error": str(exc),
+            "instrument": instrument,
+            "granularity": granularity,
+            "bar_count": len(bars),
+        }
+    snap["instrument"] = instrument
+    snap["granularity"] = granularity
+    return snap
+
+
+@mcp.tool()
+async def mt4_draw_regime(
+    instrument: str,
+    granularity: str = "D",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+    prefix: str = "sbox.regime.",
+) -> dict:
+    """Classify Lien regime and draw bands / SMA stack on the MT4 chart.
+
+    Price pane only: double Bollinger, SMA 10/20/50 (100/200 dashed), 10-bar
+    high/low, corner label. Does not draw ADX/RSI/MACD panes. Prefix
+    sbox.regime. does not clear sbox.formation. Refuses if the EA chart
+    symbol/timeframe does not match (Daily classification needs D1).
+    """
+    return await mt4_bridge.draw_regime(
+        instrument,
+        granularity=granularity,
+        count=count,
+        from_time=from_time or None,
+        to_time=to_time or None,
+        prefix=prefix,
+    )
+
+
 if __name__ == "__main__":
     logger.info(
         "Starting oanda-research MCP server (env=%s, account_set=%s)",

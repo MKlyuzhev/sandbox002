@@ -184,6 +184,12 @@ Serialize GPU work: do not embed + vision + chat concurrently.
 - **Output:** "setup yes/no" + Murphy citations
 - **Still no** orders
 
+**First encoded playbook (Lien Ch. 7):** `app/indicators.py` + `app/regime.py`
+compute ADX / double Bollinger / MA stack in code. MCP tools
+`classify_regime`, `indicator_snapshot`, and `mt4_draw_regime` on
+`oanda-research`. See [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
+Named entry engines (Ch. 8–16) remain documentation-only.
+
 ### Phase C — Paper execution
 
 - **Add:** paper broker API + risk module
@@ -255,6 +261,7 @@ Ordered suggestions for future work:
 5. Paper broker integration behind a risk gate
 
 Early formation analysis (trendlines / H&S): see [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
+Lien governing layer (regime vs range): see [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 
 See also: [RAG User Guide](RAG_USER_GUIDE.md) for current API usage.
 
@@ -268,7 +275,7 @@ any UI:
 
 ```
 core (this repo)
-├── libraries        app/rag.py, app/risk.py, app/patterns.py (deterministic)
+├── libraries        app/rag.py, app/risk.py, app/indicators.py, app/regime.py, app/patterns.py (deterministic)
 ├── MCP servers      app/oanda_mcp.py (FX data), app/rag_mcp.py (corpus retrieval)
 └── HTTP API         FastAPI /ingest, /query, /health
 
@@ -287,6 +294,11 @@ clients (interchangeable, own no logic)
   math") as a library: the model decides *which* rule; the numbers are computed
   here. Not an MCP tool yet — the autonomous loop (Phase C) or a later `risk`
   MCP wrapper plugs in here.
+- **`app/indicators.py` / `app/regime.py`** — Lien Ch. 7 governing layer:
+  Wilder ADX, double Bollinger, MA stack, oscillators in code; checklist
+  classifier (trend / range / mixed). MCP: `classify_regime`,
+  `indicator_snapshot`, `mt4_draw_regime`. See
+  [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 - **`app/patterns.py`** — early formation geometry; see
   [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
 
