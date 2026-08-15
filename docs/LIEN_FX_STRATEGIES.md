@@ -101,6 +101,26 @@ Geometry / checklist only (practice OANDA):
 .venv/bin/python scripts/classify_regime.py --granularity H1 --mt4
 ```
 
+Walk-forward test over a date range (**no look-forward**: each step uses only
+`bars[:i+1][-lookback:]`). Warmup is fetched before `--from`. `--mt4` paints
+collapsed runs with prefix `sbox.regime.walk.` (does not clear `sbox.regime.`).
+`--horizon` / `--min-n` attach a causal instability score and empirical `p_hat`
+(same-bucket frequency of a regime flip over the next `h` completed steps).
+`--mt4-show ranges|markers|both` (default `both`) selects run rectangles,
+change-watch arrows, or both. Markers appear when `p_hat` or instability
+exceed `--phat-watch` / `--instability-watch`.
+
+`p_hat` is **frequency in a coarse state bucket**, not a priced probability of a
+trade outcome. Lien’s Ch. 7 filter remains heuristic; Brier in the summary
+scores only forecasts whose horizon has already elapsed (never the live
+`p_hat` against future bars).
+
+```bash
+.venv/bin/python scripts/walk_regime.py \
+  --instrument GBP_USD --granularity D \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z --mt4
+```
+
 `--mt4` requires `SandboxChartBridge.mq4` on a matching symbol/timeframe chart
 (AutoTrading can stay off). Overlay prefix: `sbox.regime.` (does not clear
 `sbox.formation.`).
@@ -111,7 +131,7 @@ MCP (`oanda-research`): `classify_regime`, `indicator_snapshot`,
 Unit tests (no network):
 
 ```bash
-.venv/bin/python -m unittest tests.test_indicators tests.test_regime tests.test_mt4_bridge -v
+.venv/bin/python -m unittest tests.test_indicators tests.test_regime tests.test_regime_walk tests.test_mt4_bridge -v
 ```
 
 ---

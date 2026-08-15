@@ -23,6 +23,11 @@ HEARTBEAT_NAME = "heartbeat.json"
 DEFAULT_PREFIX = "sbox."
 FORMATION_PREFIX = "sbox.formation."
 REGIME_PREFIX = "sbox.regime."
+REGIME_WALK_PREFIX = "sbox.regime.walk."
+WALK_SHOW_RANGES = "ranges"
+WALK_SHOW_MARKERS = "markers"
+WALK_SHOW_BOTH = "both"
+WALK_SHOW_CHOICES = (WALK_SHOW_RANGES, WALK_SHOW_MARKERS, WALK_SHOW_BOTH)
 HEARTBEAT_STALE_SEC = 10.0
 REGIME_LOOKBACK = 80
 REGIME_STRIDE = 2
@@ -851,3 +856,197 @@ async def draw_regime(
         prefix=prefix,
         require_chart_match=require_chart_match,
     )
+
+
+def _run_color(run: dict[str, Any]) -> str:
+    if run.get("trend_waning"):
+        return "purple"
+    regime = run.get("regime")
+    direction = run.get("direction")
+    if regime == "trend" and direction == "up":
+        return "green"
+    if regime == "trend" and direction == "down":
+        return "red"
+    if regime == "range":
+        return "orange"
+    return "grey"
+
+
+def _run_label(run: dict[str, Any]) -> str:
+    regime = run.get("regime") or "?"
+    direction = run.get("direction")
+    if run.get("trend_waning"):
+        return f"{regime}/waning"
+    if direction:
+        return f"{regime}/{direction}"
+    return str(regime)
+
+
+def _normalize_walk_show(show: str | None) -> str:
+    value = (show or WALK_SHOW_BOTH).strip().lower()
+    if value not in WALK_SHOW_CHOICES:
+        raise Mt4BridgeError(
+            f"Unsupported walk show {show!r}; expected one of {WALK_SHOW_CHOICES}."
+        )
+    return value
+
+
+def regime_walk_to_objects(
+    result: dict[str, Any],
+    offset_seconds: int = 0,
+    prefix: str = REGIME_WALK_PREFIX,
+    phat_watch: float | None = None,
+    instability_watch: float | None = None,
+    show: str = WALK_SHOW_BOTH,
+) -> list[dict[str, Any]]:
+    """Map collapsed causal runs and/or change-watch marks (no BB/SMA).
+
+    ``show`` is ``ranges``, ``markers``, or ``both``. Change-watch arrows only
+    when ``p_hat`` or ``instability`` exceed thresholds.
+    """
+    show = _normalize_walk_show(show)
+    draw_ranges = show in (WALK_SHOW_RANGES, WALK_SHOW_BOTH)
+    draw_markers = show in (WALK_SHOW_MARKERS, WALK_SHOW_BOTH)
+    objects: list[dict[str, Any]] = []
+    runs = result.get("runs") or []
+    if draw_ranges:
+        for n, run in enumerate(runs):
+            t1 = parse_rfc3339_utc(run.get("start_time"))
+            t2 = parse_rfc3339_utc(run.get("end_time"))
+            high, low = run.get("high"), run.get("low")
+            if t1 is None or t2 is None or high is None or low is None:
+                continue
+            bt1 = broker_time(t1, offset_seconds)
+            bt2 = broker_time(t2, offset_seconds)
+            if bt1 == bt2:
+                bt2 = bt1 + 1
+            color = _run_color(run)
+            objects.append(
+                {
+                    "name": f"{prefix}run.{n}",
+                    "type": "rectangle",
+                    "t1": bt1,
+                    "p1": float(low),
+                    "t2": bt2,
+                    "p2": float(high),
+                    "color": color,
+                    "style": "solid",
+                    "width": 1,
+                }
+            )
+            objects.append(
+                {
+                    "name": f"{prefix}run.{n}.text",
+                    "type": "text",
+                    "t1": bt1,
+                    "p1": float(high),
+                    "color": color,
+                    "text": _run_label(run),
+                    "width": 1,
+                }
+            )
+
+    summary = result.get("summary") or {}
+    counts = summary.get("regime_counts") or {}
+    counts_txt = " ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+    last_p = summary.get("last_p_hat")
+    brier = summary.get("brier")
+    objects.append(
+        {
+            "name": f"{prefix}label",
+            "type": "label",
+            "x": 8,
+            "y": 18,
+            "color": "white",
+            "text": (
+                f"walk steps={summary.get('step_count', 0)} "
+                f"runs={summary.get('run_count', 0)} {counts_txt} "
+                f"p_hat={last_p if last_p is not None else 'na'} "
+                f"brier={brier if brier is not None else 'na'} "
+                f"show={show}"
+            ),
+        }
+    )
+
+    if draw_markers:
+        if phat_watch is None:
+            phat_watch = float(result.get("phat_watch", 0.5))
+        if instability_watch is None:
+            instability_watch = float(result.get("instability_watch", 0.6))
+        phat_watch = float(phat_watch)
+        inst_watch = float(instability_watch)
+        watch_n = 0
+        for step in result.get("steps") or []:
+            p_hat = step.get("p_hat")
+            instability = step.get("instability")
+            watch = (p_hat is not None and float(p_hat) >= phat_watch) or (
+                instability is not None and float(instability) >= inst_watch
+            )
+            if not watch:
+                continue
+            t1 = parse_rfc3339_utc(step.get("time"))
+            if t1 is None:
+                continue
+            bt1 = broker_time(t1, offset_seconds)
+            high = step.get("high")
+            if high is None:
+                continue
+            p_txt = f"{p_hat:.2f}" if p_hat is not None else "na"
+            i_txt = f"{instability:.2f}" if instability is not None else "na"
+            objects.append(
+                {
+                    "name": f"{prefix}watch.{watch_n}",
+                    "type": "arrow",
+                    "t1": bt1,
+                    "p1": float(high),
+                    "color": "yellow",
+                    "arrow_code": 241,
+                    "width": 1,
+                }
+            )
+            objects.append(
+                {
+                    "name": f"{prefix}watch.{watch_n}.text",
+                    "type": "text",
+                    "t1": bt1,
+                    "p1": float(high),
+                    "color": "yellow",
+                    "text": f"p={p_txt}  i={i_txt}",
+                    "width": 1,
+                }
+            )
+            watch_n += 1
+    return objects
+
+
+def apply_regime_walk(
+    result: dict[str, Any],
+    instrument: str,
+    granularity: str,
+    prefix: str = REGIME_WALK_PREFIX,
+    require_chart_match: bool = True,
+    phat_watch: float = 0.5,
+    instability_watch: float = 0.6,
+    show: str = WALK_SHOW_BOTH,
+) -> dict[str, Any]:
+    st = status()
+    offset = offset_from_heartbeat(st.get("heartbeat"))
+    objects = regime_walk_to_objects(
+        result,
+        offset,
+        prefix=prefix,
+        phat_watch=phat_watch,
+        instability_watch=instability_watch,
+        show=show,
+    )
+    drawn = upsert_objects(
+        instrument,
+        granularity,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=True,
+        require_chart_match=require_chart_match,
+    )
+    drawn["offset_seconds"] = offset
+    drawn["objects_drawn"] = len(objects)
+    return drawn

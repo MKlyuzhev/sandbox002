@@ -283,6 +283,7 @@ app/
   risk.py           deterministic position sizing / risk math
   indicators.py     SMA, double Bollinger, Wilder ADX, RSI, stoch, MACD
   regime.py         Lien Ch.7 trend/range checklist
+  regime_walk.py    causal walk-forward regime labels (no look-forward)
   patterns.py       swings, trendlines, early H&S geometry
   formation_plot.py candlestick chart with formation overlays
   models.py         Pydantic schemas

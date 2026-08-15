@@ -174,6 +174,7 @@ def candles_to_bars(payload: dict, prefer: str = "mid") -> list[dict]:
                 "low": float(component["l"]),
                 "close": float(component["c"]),
                 "volume": c.get("volume"),
+                "complete": bool(c.get("complete", True)),
             }
         )
     return bars
