@@ -5,9 +5,10 @@ the Currency Market*, 3rd ed.). Evidence level in the corpus: **heuristic**.
 Not a signal service and not an execution path.
 
 **Governing layer in this repo:** deterministic regime classification from OHLC
-(`app/indicators.py`, `app/regime.py`) plus MCP/CLI/MT4 wrappers. Named
-entry engines (Ch. 8–16) are documented here for later iterations and are
-**not** encoded as trade logic yet.
+(`app/indicators.py`, `app/regime.py`) plus MCP/CLI/MT4 wrappers. After
+classification, `agent/levels.py` maps the snapshot to a ticket (last close,
+10-bar high/low, 10-pip buffer, 2R target). Named entry engines (Ch. 8–16) are
+documented here for later iterations and are **not** encoded as trade logic yet.
 
 ```
 OANDA candles → indicators.py → regime.py → JSON
@@ -16,6 +17,9 @@ OANDA candles → indicators.py → regime.py → JSON
 
 Cite book text via `rag-knowledge` (`search_knowledge` / `get_source_chunk` on
 source `lien-fx`). Do not invent ADX, Bollinger, or MA values in the model.
+
+Headless loop (regime → retrieve → propose → policy → journal):
+[AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
 
 ---
 
@@ -123,10 +127,12 @@ scores only forecasts whose horizon has already elapsed (never the live
 
 `--mt4` requires `SandboxChartBridge.mq4` on a matching symbol/timeframe chart
 (AutoTrading can stay off). Overlay prefix: `sbox.regime.` (does not clear
-`sbox.formation.`).
+`sbox.formation.`). Corner labels: regime/ADX status plus a color legend
+(SMA 10/20/50/100/200, BB 1sd/2sd, 10-bar high/low).
 
 MCP (`oanda-research`): `classify_regime`, `indicator_snapshot`,
-`mt4_draw_regime`. Same heartbeat / symbol / TF gate as formation drawing.
+`mt4_draw_regime`, `mt4_draw_ticket`. Same heartbeat / symbol / TF gate as
+formation drawing.
 
 Unit tests (no network):
 

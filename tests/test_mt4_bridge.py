@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -83,10 +85,13 @@ class TestFormationObjects(unittest.TestCase):
 class TestInbox(unittest.TestCase):
     def setUp(self) -> None:
         self._prev = settings.mt4_files_dir
+        self._prev_ack = mt4_bridge.WAIT_FOR_ACK
         self._tmp = tempfile.TemporaryDirectory()
         settings.mt4_files_dir = self._tmp.name
+        mt4_bridge.WAIT_FOR_ACK = False
 
     def tearDown(self) -> None:
+        mt4_bridge.WAIT_FOR_ACK = self._prev_ack
         settings.mt4_files_dir = self._prev
         self._tmp.cleanup()
 
@@ -166,6 +171,54 @@ class TestInbox(unittest.TestCase):
         self.assertEqual(cmd["op"], "clear")
         self.assertEqual(cmd["prefix"], "sbox.")
 
+    def test_wait_for_cmd_ack_without_ea(self) -> None:
+        self.assertTrue(mt4_bridge.wait_for_cmd_ack("x", timeout=0.2))
+
+    def test_wait_for_cmd_ack_matches_heartbeat(self) -> None:
+        self._write_heartbeat()
+        mt4_bridge.WAIT_FOR_ACK = True
+        cmd_id = "ack-test-id"
+
+        def _ack() -> None:
+            time.sleep(0.08)
+            path = mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME
+            hb = json.loads(path.read_text(encoding="utf-8"))
+            hb["last_cmd_id"] = cmd_id
+            path.write_text(json.dumps(hb), encoding="utf-8")
+
+        threading.Thread(target=_ack, daemon=True).start()
+        self.assertTrue(mt4_bridge.wait_for_cmd_ack(cmd_id, timeout=2.0))
+
+    def test_write_command_waits_for_ack_before_return(self) -> None:
+        self._write_heartbeat()
+        mt4_bridge.WAIT_FOR_ACK = True
+        seen: list[str] = []
+
+        def _ack() -> None:
+            time.sleep(0.08)
+            cmd = json.loads(
+                (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(
+                    encoding="utf-8"
+                )
+            )
+            seen.append(cmd["id"])
+            path = mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME
+            hb = json.loads(path.read_text(encoding="utf-8"))
+            hb["last_cmd_id"] = cmd["id"]
+            path.write_text(json.dumps(hb), encoding="utf-8")
+
+        threading.Thread(target=_ack, daemon=True).start()
+        cmd_id = mt4_bridge.write_command({"op": "clear", "prefix": "sbox."})
+        self.assertEqual(seen, [cmd_id])
+        self.assertEqual(
+            json.loads(
+                (mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME).read_text(
+                    encoding="utf-8"
+                )
+            )["last_cmd_id"],
+            cmd_id,
+        )
+
 
 class TestRegimeObjects(unittest.TestCase):
     def test_regime_to_objects_has_bands_mas_and_label(self) -> None:
@@ -192,10 +245,14 @@ class TestRegimeObjects(unittest.TestCase):
         self.assertTrue(any(n.startswith("sbox.regime.sma20.") for n in names))
         self.assertTrue(any("bb.upper_2" in n for n in names))
         self.assertTrue(any(n.endswith("high_n") or n.endswith("sbox.regime.high_n") or "high_n" in n for n in names))
-        label = next(o for o in objects if o["type"] == "label")
+        label = next(o for o in objects if o["name"].endswith("label") and "legend" not in o["name"])
         self.assertIn("regime=", label["text"])
         self.assertIn("ADX=", label["text"])
-        self.assertLessEqual(len(objects), mt4_bridge.REGIME_MAX_OBJECTS + 5)
+        legend = [o for o in objects if ".legend." in o["name"]]
+        self.assertEqual(len(legend), len(mt4_bridge.REGIME_LEGEND))
+        self.assertTrue(any("SMA 20" in o["text"] for o in legend))
+        self.assertTrue(any("BB 2sd" in o["text"] for o in legend))
+        self.assertLessEqual(len(objects), mt4_bridge.REGIME_MAX_OBJECTS + 20)
         for o in objects:
             if o["type"] == "trend":
                 self.assertIsInstance(o["t1"], int)
@@ -204,6 +261,126 @@ class TestRegimeObjects(unittest.TestCase):
     def test_regime_prefix_does_not_match_formation(self) -> None:
         self.assertNotEqual(mt4_bridge.REGIME_PREFIX, mt4_bridge.FORMATION_PREFIX)
         self.assertTrue(mt4_bridge.REGIME_PREFIX.startswith("sbox."))
+
+
+class TestTicketObjects(unittest.TestCase):
+    def test_ticket_to_objects_hlines_and_label(self) -> None:
+        objs = mt4_bridge.ticket_to_objects(
+            1.2700, 1.2680, 1.2740, side="long"
+        )
+        names = {o["name"]: o for o in objs}
+        self.assertIn("sbox.ticket.entry", names)
+        self.assertIn("sbox.ticket.stop", names)
+        self.assertIn("sbox.ticket.target", names)
+        self.assertIn("sbox.ticket.label", names)
+        self.assertEqual(names["sbox.ticket.entry"]["type"], "hline")
+        self.assertAlmostEqual(names["sbox.ticket.entry"]["p1"], 1.2700)
+        self.assertAlmostEqual(names["sbox.ticket.stop"]["p1"], 1.2680)
+        self.assertEqual(names["sbox.ticket.stop"]["color"], "red")
+        self.assertEqual(names["sbox.ticket.target"]["color"], "green")
+        self.assertIn("ticket long", names["sbox.ticket.label"]["text"])
+        self.assertNotIn("sbox.ticket.time", names)
+
+    def test_ticket_marks_timestamp(self) -> None:
+        t1 = 1717200000
+        objs = mt4_bridge.ticket_to_objects(
+            1.2700,
+            1.2680,
+            1.2740,
+            side="long",
+            at_time=t1,
+            time_label="2024-06-01 00:00 UTC",
+        )
+        names = {o["name"]: o for o in objs}
+        self.assertEqual(names["sbox.ticket.time"]["type"], "vline")
+        self.assertEqual(names["sbox.ticket.time"]["t1"], t1)
+        self.assertEqual(names["sbox.ticket.time.arrow"]["type"], "arrow")
+        self.assertEqual(names["sbox.ticket.time.arrow"]["arrow_code"], 233)
+        self.assertEqual(names["sbox.ticket.time.text"]["type"], "text")
+        self.assertIn("2024-06-01", names["sbox.ticket.time.text"]["text"])
+        self.assertIn("@ 2024-06-01", names["sbox.ticket.label"]["text"])
+
+    def test_ticket_prefix_distinct(self) -> None:
+        self.assertNotEqual(mt4_bridge.TICKET_PREFIX, mt4_bridge.REGIME_PREFIX)
+        self.assertNotEqual(mt4_bridge.TICKET_PREFIX, mt4_bridge.FORMATION_PREFIX)
+        self.assertTrue(mt4_bridge.TICKET_PREFIX.startswith("sbox."))
+
+    def test_ticket_rejects_incomplete(self) -> None:
+        with self.assertRaises(mt4_bridge.Mt4BridgeError):
+            mt4_bridge.ticket_to_objects(1.27, 1.27, 1.29)
+        with self.assertRaises(mt4_bridge.Mt4BridgeError):
+            mt4_bridge.ticket_to_objects(0, 1.26, 1.29)
+
+
+class TestTicketInbox(unittest.TestCase):
+    def setUp(self) -> None:
+        self._prev = settings.mt4_files_dir
+        self._prev_ack = mt4_bridge.WAIT_FOR_ACK
+        self._tmp = tempfile.TemporaryDirectory()
+        settings.mt4_files_dir = self._tmp.name
+        mt4_bridge.WAIT_FOR_ACK = False
+
+    def tearDown(self) -> None:
+        mt4_bridge.WAIT_FOR_ACK = self._prev_ack
+        settings.mt4_files_dir = self._prev
+        self._tmp.cleanup()
+
+    def _write_heartbeat(self, symbol: str = "GBPUSD", period: int = 1440) -> None:
+        inbox = mt4_bridge.ensure_inbox()
+        payload = {
+            "symbol": symbol,
+            "period": period,
+            "timeframe": "D1",
+            "time_current": 1_000_000,
+            "time_gmt": 1_000_000,
+            "offset_seconds": 0,
+            "ea_ok": True,
+            "last_cmd_id": "",
+            "last_error": "",
+            "object_count": 0,
+            "last_prefix": "",
+        }
+        (inbox / mt4_bridge.HEARTBEAT_NAME).write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+
+    def test_apply_ticket_writes_cmd(self) -> None:
+        self._write_heartbeat()
+        result = mt4_bridge.apply_ticket(
+            "GBP_USD", "D", 1.27, 1.26, 1.29, side="long"
+        )
+        self.assertTrue(result["ok"], result)
+        cmd = json.loads(
+            (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(encoding="utf-8")
+        )
+        self.assertEqual(cmd["op"], "upsert")
+        self.assertEqual(cmd["prefix"], "sbox.ticket.")
+        names = [o["name"] for o in cmd["objects"]]
+        self.assertIn("sbox.ticket.entry", names)
+        self.assertTrue(cmd["clear_prefix_first"])
+
+    def test_apply_ticket_converts_rfc3339_to_broker_time(self) -> None:
+        self._write_heartbeat()
+        inbox = mt4_bridge.ensure_inbox()
+        hb = json.loads((inbox / mt4_bridge.HEARTBEAT_NAME).read_text(encoding="utf-8"))
+        hb["offset_seconds"] = 3600
+        (inbox / mt4_bridge.HEARTBEAT_NAME).write_text(json.dumps(hb), encoding="utf-8")
+        result = mt4_bridge.apply_ticket(
+            "GBP_USD",
+            "D",
+            1.27,
+            1.26,
+            1.29,
+            side="long",
+            at_time="2024-06-01T00:00:00Z",
+        )
+        self.assertTrue(result["ok"], result)
+        cmd = json.loads(
+            (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(encoding="utf-8")
+        )
+        vline = next(o for o in cmd["objects"] if o["type"] == "vline")
+        self.assertEqual(vline["t1"], 1717200000 + 3600)
+        self.assertIn("sbox.ticket.time", vline["name"])
 
 
 if __name__ == "__main__":

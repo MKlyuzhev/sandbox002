@@ -83,7 +83,8 @@ The JSON output includes `plot_path` when a chart is written.
 ### MT4 chart objects
 
 Display only (no orders). Python writes `cmd.json` under `MQL4/Files/sandbox002/`;
-an always-on EA draws `OBJ_*` objects.
+an always-on EA draws `OBJ_*` objects. Sequential writes wait for heartbeat
+`last_cmd_id` so a later command does not replace an unread `cmd.json`.
 
 1. In MetaEditor, compile `Experts/Custom/SandboxChartBridge.mq4`
    (it includes `Include/Custom/JsonMini.mqh`).

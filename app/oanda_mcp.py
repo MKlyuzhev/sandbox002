@@ -159,7 +159,7 @@ async def mt4_upsert_objects(
     Args:
         symbol: OANDA or MT4 symbol (GBP_USD or GBPUSD). Must match the chart.
         timeframe: Granularity such as H1, M15, D. Must match the chart.
-        objects: List of dicts with name, type (trend|hline|text|arrow|
+        objects: List of dicts with name, type (trend|hline|vline|text|arrow|
             rectangle|label), t1/p1, optional t2/p2, color, style, width,
             text, ray, arrow_code, x, y.
         prefix: Prepended to names that do not already start with it.
@@ -342,9 +342,10 @@ async def mt4_draw_regime(
     """Classify Lien regime and draw bands / SMA stack on the MT4 chart.
 
     Price pane only: double Bollinger, SMA 10/20/50 (100/200 dashed), 10-bar
-    high/low, corner label. Does not draw ADX/RSI/MACD panes. Prefix
-    sbox.regime. does not clear sbox.formation. Refuses if the EA chart
-    symbol/timeframe does not match (Daily classification needs D1).
+    high/low, corner regime label, and a color legend. Does not draw
+    ADX/RSI/MACD panes. Prefix sbox.regime. does not clear sbox.formation.
+    Refuses if the EA chart symbol/timeframe does not match (Daily
+    classification needs D1).
     """
     return await mt4_bridge.draw_regime(
         instrument,
@@ -353,6 +354,67 @@ async def mt4_draw_regime(
         from_time=from_time or None,
         to_time=to_time or None,
         prefix=prefix,
+    )
+
+
+@mcp.tool()
+async def mt4_draw_ticket(
+    instrument: str = "",
+    granularity: str = "D",
+    side: str = "none",
+    entry: float = 0.0,
+    stop: float = 0.0,
+    target: float = 0.0,
+    prefix: str = "sbox.ticket.",
+    run_id: str = "",
+    at_time: str = "",
+) -> dict:
+    """Draw a paper/signal ticket on MT4 (entry/stop/target hlines). No orders.
+
+    Pass explicit prices, or ``run_id`` to load the proposal from the agent
+    journal. ``at_time`` is RFC3339 for the decision bar (vline + arrow);
+    ``run_id`` defaults to the run's ``regime.last_time``. Prefix
+    ``sbox.ticket.`` does not clear ``sbox.regime.``. Refuses if the EA chart
+    symbol/timeframe does not match. Display only.
+    """
+    inst = instrument
+    gran = granularity
+    ticket_side = side
+    ticket_entry, ticket_stop, ticket_target = entry, stop, target
+    ticket_at = at_time.strip() or None
+    if run_id.strip():
+        from agent.journal import Journal
+
+        record = Journal().get_run(run_id.strip())
+        if record is None:
+            return {"ok": False, "error": f"run not found: {run_id}"}
+        proposal = record.proposal
+        if proposal is None or proposal.entry is None or proposal.stop is None or proposal.target is None:
+            return {
+                "ok": False,
+                "error": "run has no complete ticket (entry/stop/target)",
+                "run_id": record.run_id,
+                "action": record.action,
+            }
+        inst = instrument.strip() or record.instrument
+        gran = granularity if instrument.strip() else record.granularity
+        ticket_side = side if side not in ("", "none") else proposal.side
+        ticket_entry = proposal.entry
+        ticket_stop = proposal.stop
+        ticket_target = proposal.target
+        if not ticket_at:
+            ticket_at = (record.regime or {}).get("last_time") or record.ts
+    if not inst:
+        return {"ok": False, "error": "instrument is required (or pass run_id)"}
+    return mt4_bridge.apply_ticket(
+        inst,
+        gran,
+        ticket_entry,
+        ticket_stop,
+        ticket_target,
+        side=ticket_side,
+        prefix=prefix,
+        at_time=ticket_at,
     )
 
 

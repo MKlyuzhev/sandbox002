@@ -186,9 +186,10 @@ Serialize GPU work: do not embed + vision + chat concurrently.
 
 **First encoded playbook (Lien Ch. 7):** `app/indicators.py` + `app/regime.py`
 compute ADX / double Bollinger / MA stack in code. MCP tools
-`classify_regime`, `indicator_snapshot`, and `mt4_draw_regime` on
-`oanda-research`. See [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
-Named entry engines (Ch. 8–16) remain documentation-only.
+`classify_regime`, `indicator_snapshot`, `mt4_draw_regime`, and
+`mt4_draw_ticket` on `oanda-research`. See [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
+Named entry engines (Ch. 8–16) remain documentation-only. Paper tickets use
+Ch. 7 geometry (`agent/levels.py`), not those chapter engines.
 
 ### Phase C — Paper execution
 
@@ -210,17 +211,21 @@ Named entry engines (Ch. 8–16) remain documentation-only.
 ```
 Cursor / CLI / small web UI
         ↓
-Agent orchestrator (Python — LangGraph or custom loop)
+Agent orchestrator (`python -m agent.run` — custom graph, not LangGraph)
         ↓
-├── Local RAG API (localhost:8000)  — book knowledge
-├── Market module (yfinance, Alpaca paper, etc.)
-├── Indicator library (code)
-├── Risk engine (pure Python, no LLM)
-└── Trade journal (SQLite or files)
+├── Local RAG API / Chroma (`agent/retrieve.py`)  — book knowledge
+├── OANDA client (read-only candles / account)
+├── Indicator + regime libraries (code)
+├── Risk engine (`app/risk.py` via `agent/policy.py`)
+└── Trade journal (`data/journal/runs.sqlite`)
+        ↓
+Stub executor (`python -m agent.executor`) — simulated fills only
 ```
 
 Keep the **agent orchestrator** separate from the **RAG server** so either can
-be restarted or upgraded independently.
+be restarted or upgraded independently. The graph is a fixed node sequence
+(regime → retrieve → propose → policy → journal). The LLM cannot skip the
+policy node. HTTP `/agent/run` is still later.
 
 ---
 
@@ -256,12 +261,18 @@ Ordered suggestions for future work:
 
 1. `GET /figures/{id}` or static file serving for `data/figures/`
 2. `search_knowledge` tool wrapping Chroma (filter by `source`, `chunk_type`) — **done** (`app/rag_mcp.py`)
-3. Minimal `/agent/run` endpoint with tool loop
-4. Separate `agent/` package or script calling RAG + market stubs
-5. Paper broker integration behind a risk gate
+3. Minimal `/agent/run` HTTP endpoint wrapping the same graph — later
+4. Separate `agent/` package — **done** (`python -m agent.run`)
+5. Decision journal + stub paper executor — **done** (`python -m agent.executor`);
+   no broker orders. Real paper-broker integration remains gated and separate.
+6. Ops dashboard first slice — **done** (`python -m dashboard`, port 8001):
+   status strip, command-runner terminal, journal explorer, GPU/host.
+   See [DASHBOARD.md](DASHBOARD.md).
 
 Early formation analysis (trendlines / H&S): see [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
 Lien governing layer (regime vs range): see [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
+Orchestrator CLI / journal / stub executor: see [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
+Ops dashboard: see [DASHBOARD.md](DASHBOARD.md).
 
 See also: [RAG User Guide](RAG_USER_GUIDE.md) for current API usage.
 
@@ -276,12 +287,14 @@ any UI:
 ```
 core (this repo)
 ├── libraries        app/rag.py, app/risk.py, app/indicators.py, app/regime.py, app/patterns.py (deterministic)
+├── orchestrator     agent/ graph, policy, journal, stub executor (CLI)
+├── dashboard        python -m dashboard (port 8001; thin UI)
 ├── MCP servers      app/oanda_mcp.py (FX data), app/rag_mcp.py (corpus retrieval)
 └── HTTP API         FastAPI /ingest, /query, /health
 
 clients (interchangeable, own no logic)
 ├── Cursor Agent     frontier or local model, via .cursor/mcp.json
-├── CLI / scripts    deterministic automation
+├── CLI / scripts    python -m agent.run, classify_regime, …
 └── future dashboard positions, P&L, signals, kill switch (Phase B/C)
 ```
 
@@ -292,12 +305,14 @@ clients (interchangeable, own no logic)
 - **`app/risk.py`** — `position_size`, `r_multiple`, `expectancy`,
   `max_exposure_ok`. This is the section 4 rule ("deterministic code, not LLM
   math") as a library: the model decides *which* rule; the numbers are computed
-  here. Not an MCP tool yet — the autonomous loop (Phase C) or a later `risk`
-  MCP wrapper plugs in here.
+  here. Not an MCP tool — `agent/policy.py` imports it in-process.
+- **`agent/`** — bounded analysis graph (`python -m agent.run`), SQLite
+  journal, and stub executor (`python -m agent.executor`) that records
+  simulated fills only. Default `--mode signal` never enqueues fills.
 - **`app/indicators.py` / `app/regime.py`** — Lien Ch. 7 governing layer:
   Wilder ADX, double Bollinger, MA stack, oscillators in code; checklist
   classifier (trend / range / mixed). MCP: `classify_regime`,
-  `indicator_snapshot`, `mt4_draw_regime`. See
+  `indicator_snapshot`, `mt4_draw_regime`, `mt4_draw_ticket`. See
   [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 - **`app/patterns.py`** — early formation geometry; see
   [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).

@@ -9,6 +9,7 @@ so OANDA RFC3339 timestamps can be shifted to broker time.
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
@@ -17,6 +18,8 @@ from typing import Any
 
 from app.config import settings
 
+logger = logging.getLogger("mt4_bridge")
+
 INBOX_SUBDIR = "sandbox002"
 CMD_NAME = "cmd.json"
 HEARTBEAT_NAME = "heartbeat.json"
@@ -24,17 +27,41 @@ DEFAULT_PREFIX = "sbox."
 FORMATION_PREFIX = "sbox.formation."
 REGIME_PREFIX = "sbox.regime."
 REGIME_WALK_PREFIX = "sbox.regime.walk."
+TICKET_PREFIX = "sbox.ticket."
 WALK_SHOW_RANGES = "ranges"
 WALK_SHOW_MARKERS = "markers"
 WALK_SHOW_BOTH = "both"
 WALK_SHOW_CHOICES = (WALK_SHOW_RANGES, WALK_SHOW_MARKERS, WALK_SHOW_BOTH)
 HEARTBEAT_STALE_SEC = 10.0
+CMD_ACK_TIMEOUT_SEC = 8.0
+CMD_ACK_POLL_SEC = 0.05
+# Unit tests set this False so a static fake heartbeat does not block.
+WAIT_FOR_ACK = True
 REGIME_LOOKBACK = 80
 REGIME_STRIDE = 2
 REGIME_MAX_OBJECTS = 400
 
+# Color/style must match the polylines in regime_to_objects (price pane only).
+REGIME_LEGEND = (
+    ("sma10", "white", "SMA 10"),
+    ("sma20", "orange", "SMA 20"),
+    ("sma50", "red", "SMA 50"),
+    ("sma100", "blue", "SMA 100 dash"),
+    ("sma200", "purple", "SMA 200 dash"),
+    ("bb2", "grey", "BB 2sd"),
+    ("bb1", "cyan", "BB 1sd dash"),
+    ("high_n", "green", "10-bar high dot"),
+    ("low_n", "orange", "10-bar low dot"),
+)
+REGIME_LABEL_X = 8
+REGIME_LABEL_Y = 18
+REGIME_LEGEND_Y0 = 36
+REGIME_LEGEND_DY = 14
+TICKET_LABEL_X = 8
+TICKET_LABEL_Y = 170
+
 OBJECT_TYPES = frozenset(
-    {"trend", "hline", "text", "arrow", "rectangle", "label"}
+    {"trend", "hline", "vline", "text", "arrow", "rectangle", "label"}
 )
 STYLE_NAMES = frozenset({"solid", "dash", "dot", "dashdot"})
 
@@ -197,11 +224,39 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def wait_for_cmd_ack(cmd_id: str, timeout: float = CMD_ACK_TIMEOUT_SEC) -> bool:
+    """Block until the EA heartbeat reports ``last_cmd_id``.
+
+    Returns True if acked, if there is no live EA, or if waiting is disabled.
+    The inbox is a single ``cmd.json``; callers must wait before the next write
+    or the EA will only see the last command (regime overlay lost to ticket).
+    """
+    if not WAIT_FOR_ACK or not cmd_id:
+        return True
+    st = status()
+    if not st.get("ea_ok"):
+        return True
+    deadline = time.monotonic() + max(0.05, float(timeout))
+    while time.monotonic() < deadline:
+        hb = read_heartbeat() or {}
+        if hb.get("last_cmd_id") == cmd_id:
+            return True
+        time.sleep(CMD_ACK_POLL_SEC)
+    logger.warning(
+        "MT4 EA did not ack cmd %s within %.1fs (last_cmd_id=%r)",
+        cmd_id,
+        timeout,
+        (read_heartbeat() or {}).get("last_cmd_id"),
+    )
+    return False
+
+
 def write_command(payload: dict[str, Any]) -> str:
     cmd_id = payload.get("id") or str(uuid.uuid4())
     payload = dict(payload)
     payload["id"] = cmd_id
     _atomic_write_json(ensure_inbox() / CMD_NAME, payload)
+    wait_for_cmd_ack(cmd_id)
     return cmd_id
 
 
@@ -243,6 +298,8 @@ def _normalize_object(obj: dict[str, Any], prefix: str) -> dict[str, Any]:
         raise Mt4BridgeError(f"{otype} requires t1 and p1")
     if otype == "hline" and "p1" not in out:
         raise Mt4BridgeError("hline requires p1")
+    if otype == "vline" and "t1" not in out:
+        raise Mt4BridgeError("vline requires t1")
     if otype in {"text", "arrow"} and ("t1" not in out or "p1" not in out):
         raise Mt4BridgeError(f"{otype} requires t1 and p1")
     if otype == "label" and ("x" not in out or "y" not in out):
@@ -671,6 +728,23 @@ def _polyline_segments(
     return objects
 
 
+def _regime_legend_objects(prefix: str) -> list[dict[str, Any]]:
+    """Corner labels mapping overlay colors to SMA / Bollinger / 10-bar levels."""
+    objects: list[dict[str, Any]] = []
+    for i, (key, color, text) in enumerate(REGIME_LEGEND):
+        objects.append(
+            {
+                "name": f"{prefix}legend.{key}",
+                "type": "label",
+                "x": REGIME_LABEL_X,
+                "y": REGIME_LEGEND_Y0 + i * REGIME_LEGEND_DY,
+                "color": color,
+                "text": text,
+            }
+        )
+    return objects
+
+
 def regime_to_objects(
     analysis: dict[str, Any],
     bars: list[dict[str, Any]],
@@ -781,12 +855,13 @@ def regime_to_objects(
         {
             "name": f"{prefix}label",
             "type": "label",
-            "x": 8,
-            "y": 18,
+            "x": REGIME_LABEL_X,
+            "y": REGIME_LABEL_Y,
             "color": "white",
             "text": label,
         }
     )
+    objects.extend(_regime_legend_objects(prefix))
     return objects
 
 
@@ -812,6 +887,167 @@ def apply_regime(
     result["analysis"] = analysis
     result["offset_seconds"] = offset
     result["objects_drawn"] = len(objects)
+    return result
+
+
+def _format_ticket_ts(at_time: str | int) -> str:
+    if isinstance(at_time, str):
+        text = at_time.strip()
+        if not text:
+            return ""
+        if text.endswith("Z"):
+            text = text[:-1]
+        return text.replace("T", " ").split("+")[0][:19] + " UTC"
+    dt = datetime.fromtimestamp(int(at_time), tz=timezone.utc)
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _ticket_broker_time(
+    at_time: str | int | None, offset_seconds: int
+) -> tuple[int | None, str]:
+    if at_time is None or at_time == "":
+        return None, ""
+    if isinstance(at_time, str):
+        utc = parse_rfc3339_utc(at_time)
+        if utc is None:
+            return None, ""
+        return broker_time(utc, offset_seconds), _format_ticket_ts(at_time)
+    utc = int(at_time)
+    return broker_time(utc, offset_seconds), _format_ticket_ts(utc)
+
+
+def ticket_to_objects(
+    entry: float,
+    stop: float,
+    target: float,
+    side: str = "none",
+    prefix: str = TICKET_PREFIX,
+    at_time: int | None = None,
+    time_label: str = "",
+) -> list[dict[str, Any]]:
+    """Horizontal entry / stop / target, optional time marker. Display only."""
+    try:
+        entry_f, stop_f, target_f = float(entry), float(stop), float(target)
+    except (TypeError, ValueError) as exc:
+        raise Mt4BridgeError("ticket requires numeric entry, stop, and target") from exc
+    if min(entry_f, stop_f, target_f) <= 0:
+        raise Mt4BridgeError("ticket prices must be positive")
+    if entry_f == stop_f:
+        raise Mt4BridgeError("entry and stop must differ")
+    side_txt = (side or "none").strip().lower() or "none"
+    lines = (
+        ("entry", entry_f, "orange", "solid", 2),
+        ("stop", stop_f, "red", "dash", 1),
+        ("target", target_f, "green", "dash", 1),
+    )
+    objects: list[dict[str, Any]] = []
+    for name, price, color, style, width in lines:
+        objects.append(
+            {
+                "name": f"{prefix}{name}",
+                "type": "hline",
+                "p1": price,
+                "color": color,
+                "style": style,
+                "width": width,
+            }
+        )
+    stamp = time_label.strip()
+    if at_time is not None:
+        objects.append(
+            {
+                "name": f"{prefix}time",
+                "type": "vline",
+                "t1": int(at_time),
+                "color": "orange",
+                "style": "dash",
+                "width": 1,
+            }
+        )
+        objects.append(
+            {
+                "name": f"{prefix}time.arrow",
+                "type": "arrow",
+                "t1": int(at_time),
+                "p1": entry_f,
+                "color": "orange",
+                "arrow_code": 233 if side_txt == "long" else 234,
+                "width": 2,
+            }
+        )
+        objects.append(
+            {
+                "name": f"{prefix}time.text",
+                "type": "text",
+                "t1": int(at_time),
+                "p1": entry_f,
+                "color": "orange",
+                "text": stamp or "ticket",
+            }
+        )
+    label = (
+        f"ticket {side_txt} "
+        f"entry={entry_f} stop={stop_f} target={target_f}"
+    )
+    if stamp:
+        label = f"{label} @ {stamp}"
+    objects.append(
+        {
+            "name": f"{prefix}label",
+            "type": "label",
+            "x": TICKET_LABEL_X,
+            "y": TICKET_LABEL_Y,
+            "color": "white",
+            "text": label,
+        }
+    )
+    return objects
+
+
+def apply_ticket(
+    instrument: str,
+    granularity: str,
+    entry: float,
+    stop: float,
+    target: float,
+    side: str = "none",
+    prefix: str = TICKET_PREFIX,
+    require_chart_match: bool = True,
+    at_time: str | int | None = None,
+) -> dict[str, Any]:
+    """Draw a paper/signal ticket on the EA chart. No orders.
+
+    ``at_time`` is UTC unix seconds or RFC3339 (the decision bar). Broker
+    offset comes from the EA heartbeat.
+    """
+    st = status()
+    offset = offset_from_heartbeat(st.get("heartbeat"))
+    broker_t, time_label = _ticket_broker_time(at_time, offset)
+    try:
+        objects = ticket_to_objects(
+            entry,
+            stop,
+            target,
+            side=side,
+            prefix=prefix,
+            at_time=broker_t,
+            time_label=time_label,
+        )
+    except Mt4BridgeError as exc:
+        return {"ok": False, "error": str(exc), "chart_ok": False}
+    result = upsert_objects(
+        instrument,
+        granularity,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=True,
+        require_chart_match=require_chart_match,
+    )
+    result["objects_drawn"] = len(objects)
+    result["side"] = (side or "none").strip().lower() or "none"
+    if broker_t is not None:
+        result["at_time"] = broker_t
+        result["time_label"] = time_label
     return result
 
 

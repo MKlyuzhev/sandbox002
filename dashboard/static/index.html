@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandbox ops</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="strip" id="strip">
+    <div class="brand">sandbox002</div>
+    <div class="chip" id="chip-action">action: —</div>
+    <div class="chip" id="chip-ollama">ollama: —</div>
+    <div class="chip" id="chip-gpu">gpu: —</div>
+    <div class="chip" id="chip-mt4">mt4: —</div>
+    <div class="chip" id="chip-job">job: idle</div>
+  </header>
+  <nav class="tabs">
+    <button type="button" data-tab="terminal" class="active">Terminal</button>
+    <button type="button" data-tab="journal">Journal</button>
+    <button type="button" data-tab="gpu">GPU / host</button>
+  </nav>
+  <main>
+    <section id="tab-terminal" class="tab active">
+      <form id="job-form">
+        <div class="job-form" id="job-primary"></div>
+        <details class="more" id="job-more">
+          <summary>More</summary>
+          <div class="job-form" id="job-extra"></div>
+        </details>
+        <div class="job-actions">
+          <button type="submit">Start</button>
+          <button type="button" id="btn-stop">Stop</button>
+        </div>
+      </form>
+      <p class="argv" id="argv-preview">$ …</p>
+      <p class="hint" id="last-result">Last result: —</p>
+      <pre id="log" class="log"></pre>
+    </section>
+    <section id="tab-journal" class="tab">
+      <div class="journal-layout">
+        <table id="runs-table">
+          <thead>
+            <tr>
+              <th>ts</th>
+              <th>instrument</th>
+              <th>action</th>
+              <th>regime</th>
+              <th>error</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="run-detail" class="detail">Select a run.</div>
+      </div>
+    </section>
+    <section id="tab-gpu" class="tab">
+      <div class="meters" id="gpu-panel">
+        <p>Waiting for /api/host …</p>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

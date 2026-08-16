@@ -15,6 +15,10 @@ Early trendline / H&S formation analysis:
 [Formation Analysis](docs/FORMATION_ANALYSIS.md).
 Kathy Lien regime filter and strategy playbook:
 [Lien FX Strategies](docs/LIEN_FX_STRATEGIES.md).
+Agent orchestrator (regime → propose → Ch.7 geometry → journal → stub fill):
+[Agent Orchestrator](docs/AGENT_ORCHESTRATOR.md).
+Ops dashboard (status strip, terminal, journal, GPU):
+[Dashboard](docs/DASHBOARD.md).
 
 ## Architecture
 
@@ -197,7 +201,7 @@ Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`
 `get_position_book`, Lien governing-layer helpers `classify_regime`,
 `indicator_snapshot`, `mt4_draw_regime`, plus MT4 display helpers `mt4_status`,
 `mt4_upsert_objects`, `mt4_delete_objects`, `mt4_clear_layer`,
-`mt4_draw_formation` (chart objects via a file inbox; no MT4 orders).
+`mt4_draw_formation`, `mt4_draw_ticket` (chart objects via a file inbox; no MT4 orders).
 
 A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
 ingested corpus for retrieval: `search_knowledge`, `get_source_chunk`, and
@@ -264,6 +268,26 @@ Caveats:
 - **VRAM:** `qwen3:4b` fits the 6 GB card; `qwen3:8b` will offload to CPU and run
   slower. Only one heavy model resident at a time.
 
+## Agent orchestrator (research / paper journal)
+
+Headless Lien analysis graph: regime → optional RAG → proposal → risk gate →
+journal. No broker orders. Usage, flags, journal, and stub executor:
+[Agent Orchestrator](docs/AGENT_ORCHESTRATOR.md).
+
+```bash
+.venv/bin/python -m agent.run --instrument GBP_USD --granularity D --no-llm
+.venv/bin/python -m agent.executor --once
+```
+
+## Ops dashboard
+
+Status strip, command-runner terminal, journal explorer, GPU/host. Thin client
+on port 8001 (does not replace the RAG server). See [Dashboard](docs/DASHBOARD.md).
+
+```bash
+.venv/bin/python -m dashboard
+```
+
 ## Project Layout
 
 ```
@@ -287,9 +311,12 @@ app/
   patterns.py       swings, trendlines, early H&S geometry
   formation_plot.py candlestick chart with formation overlays
   models.py         Pydantic schemas
+agent/              analysis graph, policy gate, journal, stub executor
+dashboard/          ops UI (status strip, terminal, journal, GPU) on :8001
 data/documents/     drop zone for source files
 data/figures/       extracted figure images (gitignored)
 data/plots/         formation analysis charts (gitignored)
+data/journal/       decision journal SQLite (gitignored)
 chroma_db/          persisted vector store
 scripts/            system setup helpers
 ```

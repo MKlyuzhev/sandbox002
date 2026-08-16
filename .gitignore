@@ -7,3 +7,5 @@ data/figures/
 data/plots/
 data/documents/*
 !data/documents/.gitkeep
+data/journal/*
+!data/journal/.gitkeep
