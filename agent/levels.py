@@ -194,6 +194,7 @@ def apply_geometry(
                 "entry": None,
                 "stop": None,
                 "target": None,
+                "at_time": analysis.get("last_time") or proposal.at_time,
                 "notes": _merge_notes(proposal.notes, reason),
             }
         )
@@ -207,6 +208,7 @@ def apply_geometry(
             "entry": ticket["entry"],
             "stop": ticket["stop"],
             "target": ticket["target"],
+            "at_time": analysis.get("last_time") or proposal.at_time,
             "notes": _merge_notes(proposal.notes, note),
         }
     )

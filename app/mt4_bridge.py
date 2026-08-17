@@ -28,6 +28,7 @@ FORMATION_PREFIX = "sbox.formation."
 REGIME_PREFIX = "sbox.regime."
 REGIME_WALK_PREFIX = "sbox.regime.walk."
 TICKET_PREFIX = "sbox.ticket."
+TICKET_WALK_PREFIX = "sbox.ticket.walk."
 WALK_SHOW_RANGES = "ranges"
 WALK_SHOW_MARKERS = "markers"
 WALK_SHOW_BOTH = "both"
@@ -217,10 +218,16 @@ def status() -> dict[str, Any]:
     }
 
 
-def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+def _atomic_write_json(
+    path: Path, payload: dict[str, Any], *, indent: int | None = None
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    if indent is None:
+        text = json.dumps(payload, separators=(",", ":"))
+    else:
+        text = json.dumps(payload, indent=indent)
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 
@@ -255,7 +262,10 @@ def write_command(payload: dict[str, Any]) -> str:
     cmd_id = payload.get("id") or str(uuid.uuid4())
     payload = dict(payload)
     payload["id"] = cmd_id
-    _atomic_write_json(ensure_inbox() / CMD_NAME, payload)
+    # Pretty JSON: MQL4 FILE_TXT FileReadString stops at '\\n' or 4095 chars.
+    # A compact one-line cmd.json was split mid-number (t1), so SMA/BB trends
+    # landed in 1970 and only corner labels (no t1) stayed visible.
+    _atomic_write_json(ensure_inbox() / CMD_NAME, payload, indent=2)
     wait_for_cmd_ack(cmd_id)
     return cmd_id
 
@@ -1275,6 +1285,128 @@ def apply_regime_walk(
         instability_watch=instability_watch,
         show=show,
     )
+    drawn = upsert_objects(
+        instrument,
+        granularity,
+        objects,
+        prefix=prefix,
+        clear_prefix_first=True,
+        require_chart_match=require_chart_match,
+    )
+    drawn["offset_seconds"] = offset
+    drawn["objects_drawn"] = len(objects)
+    return drawn
+
+
+def paper_walk_to_objects(
+    trades: list[dict[str, Any]],
+    offset_seconds: int = 0,
+    prefix: str = TICKET_WALK_PREFIX,
+) -> list[dict[str, Any]]:
+    """Direction arrow/text plus time-bounded stop and take-profit. No hlines."""
+    objects: list[dict[str, Any]] = []
+    for n, trade in enumerate(trades):
+        entry_t = parse_rfc3339_utc(trade.get("entry_time"))
+        entry = trade.get("entry")
+        if entry_t is None or entry is None:
+            continue
+        bt1 = broker_time(entry_t, offset_seconds)
+        side = str(trade.get("side") or "none").strip().lower()
+        objects.append(
+            {
+                "name": f"{prefix}{n}.arrow",
+                "type": "arrow",
+                "t1": bt1,
+                "p1": float(entry),
+                "color": "orange",
+                "arrow_code": 233 if side == "long" else 234,
+            }
+        )
+        if side in ("long", "short"):
+            objects.append(
+                {
+                    "name": f"{prefix}{n}.side",
+                    "type": "text",
+                    "t1": bt1,
+                    "p1": float(entry),
+                    "color": "orange",
+                    "text": side,
+                }
+            )
+        exit_t = parse_rfc3339_utc(trade.get("exit_time"))
+        if exit_t is None:
+            bt2 = bt1 + 1
+        else:
+            bt2 = broker_time(exit_t, offset_seconds)
+            if bt2 == bt1:
+                bt2 = bt1 + 1
+        stop = trade.get("stop")
+        if stop is not None:
+            objects.append(
+                {
+                    "name": f"{prefix}{n}.stop",
+                    "type": "trend",
+                    "t1": bt1,
+                    "p1": float(stop),
+                    "t2": bt2,
+                    "p2": float(stop),
+                    "color": "red",
+                    "style": "dash",
+                    "width": 1,
+                    "ray": False,
+                }
+            )
+        target = trade.get("target")
+        if target is not None:
+            objects.append(
+                {
+                    "name": f"{prefix}{n}.target",
+                    "type": "trend",
+                    "t1": bt1,
+                    "p1": float(target),
+                    "t2": bt2,
+                    "p2": float(target),
+                    "color": "green",
+                    "style": "dash",
+                    "width": 1,
+                    "ray": False,
+                }
+            )
+        exit_price = trade.get("exit_price")
+        if exit_price is None:
+            continue
+        r_val = trade.get("r_realized")
+        try:
+            won = r_val is not None and float(r_val) > 0
+        except (TypeError, ValueError):
+            won = False
+        objects.append(
+            {
+                "name": f"{prefix}{n}.path",
+                "type": "trend",
+                "t1": bt1,
+                "p1": float(entry),
+                "t2": bt2,
+                "p2": float(exit_price),
+                "color": "green" if won else "red",
+                "style": "solid",
+                "width": 1,
+                "ray": False,
+            }
+        )
+    return objects
+
+
+def apply_paper_walk_tickets(
+    trades: list[dict[str, Any]],
+    instrument: str,
+    granularity: str,
+    prefix: str = TICKET_WALK_PREFIX,
+    require_chart_match: bool = True,
+) -> dict[str, Any]:
+    st = status()
+    offset = offset_from_heartbeat(st.get("heartbeat"))
+    objects = paper_walk_to_objects(trades, offset, prefix=prefix)
     drawn = upsert_objects(
         instrument,
         granularity,

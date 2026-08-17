@@ -52,6 +52,7 @@ def _jobs(request: Request) -> JobManager:
 
 def _run_summary(record: RunRecord) -> dict:
     regime = record.regime or {}
+    proposal = record.proposal
     return {
         "run_id": record.run_id,
         "ts": record.ts,
@@ -61,6 +62,9 @@ def _run_summary(record: RunRecord) -> dict:
         "action": record.action,
         "regime": regime.get("regime"),
         "trend_waning": regime.get("trend_waning"),
+        "side": None if proposal is None else proposal.side,
+        "stop": None if proposal is None else proposal.stop,
+        "target": None if proposal is None else proposal.target,
         "error": record.error,
     }
 
@@ -128,7 +132,10 @@ async def get_run(run_id: str, request: Request) -> dict:
     record = _journal(request).get_run(run_id)
     if record is None:
         raise HTTPException(status_code=404, detail="run not found")
-    return record.model_dump(mode="json")
+    payload = record.model_dump(mode="json")
+    fill = _journal(request).get_fill(run_id)
+    payload["fill"] = None if fill is None else fill.model_dump(mode="json")
+    return payload
 
 
 @app.get("/api/jobs/schema")

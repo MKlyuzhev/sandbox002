@@ -36,13 +36,32 @@ CREATE TABLE IF NOT EXISTS fills (
     fill_price REAL,
     ts TEXT NOT NULL,
     note TEXT,
+    exit_status TEXT,
+    exit_price REAL,
+    exit_ts TEXT,
+    r_realized REAL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
 );
 """
 
+_FILL_EXTRAS = (
+    ("exit_status", "TEXT"),
+    ("exit_price", "REAL"),
+    ("exit_ts", "TEXT"),
+    ("r_realized", "REAL"),
+)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(_SCHEMA)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(fills)")}
+    for name, typ in _FILL_EXTRAS:
+        if name not in cols:
+            conn.execute(f"ALTER TABLE fills ADD COLUMN {name} {typ}")
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -50,7 +69,7 @@ def _connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(_SCHEMA)
+    _ensure_schema(conn)
     return conn
 
 
@@ -58,7 +77,7 @@ class Journal:
     def __init__(self, path: Path | str | None = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_DB_PATH
 
-    def append_run(self, record: RunRecord) -> RunRecord:
+    def append_run(self, record: RunRecord, *, queue_fill: bool = True) -> RunRecord:
         payload = record.model_dump(mode="json")
         with _connect(self.path) as conn:
             conn.execute(
@@ -85,7 +104,7 @@ class Journal:
                     record.error,
                 ),
             )
-            if record.action == "pending_exec":
+            if queue_fill and record.action == "pending_exec":
                 conn.execute(
                     """
                     INSERT INTO fills (run_id, status, fill_price, ts, note)
@@ -111,7 +130,8 @@ class Journal:
         instrument: str | None = None,
         action: str | None = None,
     ) -> list[RunRecord]:
-        """Newest-first run list. ``limit`` is clamped to 1–500."""
+        """Newest writes first (SQLite ``rowid``). Walk ``ts`` is the decision bar,
+        which can be years earlier than wall-clock snapshot runs."""
         limit = max(1, min(int(limit), 500))
         clauses = []
         params: list[object] = []
@@ -123,7 +143,7 @@ class Journal:
             params.append(action)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
-        sql = f"SELECT * FROM runs {where} ORDER BY ts DESC LIMIT ?"
+        sql = f"SELECT * FROM runs {where} ORDER BY rowid DESC LIMIT ?"
         with _connect(self.path) as conn:
             rows = conn.execute(sql, params).fetchall()
         return [_row_to_record(row) for row in rows]
@@ -145,21 +165,79 @@ class Journal:
             cur = conn.execute(
                 """
                 UPDATE fills
-                SET status = ?, fill_price = ?, ts = ?, note = ?
+                SET status = ?, fill_price = ?, ts = ?, note = ?,
+                    exit_status = ?, exit_price = ?, exit_ts = ?, r_realized = ?
                 WHERE run_id = ? AND status = 'pending'
                 """,
-                (fill.status, fill.fill_price, fill.ts, fill.note, fill.run_id),
+                (
+                    fill.status,
+                    fill.fill_price,
+                    fill.ts,
+                    fill.note,
+                    fill.exit_status,
+                    fill.exit_price,
+                    fill.exit_ts,
+                    fill.r_realized,
+                    fill.run_id,
+                ),
             )
             if cur.rowcount == 0:
                 conn.execute(
                     """
-                    INSERT INTO fills (run_id, status, fill_price, ts, note)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO fills (
+                        run_id, status, fill_price, ts, note,
+                        exit_status, exit_price, exit_ts, r_realized
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (fill.run_id, fill.status, fill.fill_price, fill.ts, fill.note),
+                    (
+                        fill.run_id,
+                        fill.status,
+                        fill.fill_price,
+                        fill.ts,
+                        fill.note,
+                        fill.exit_status,
+                        fill.exit_price,
+                        fill.exit_ts,
+                        fill.r_realized,
+                    ),
                 )
             conn.commit()
         return fill
+
+    def record_exit(self, fill: SimFill) -> SimFill:
+        """Attach stop/target/window_end to an already filled_sim walk trade."""
+        with _connect(self.path) as conn:
+            cur = conn.execute(
+                """
+                UPDATE fills
+                SET exit_status = ?, exit_price = ?, exit_ts = ?, r_realized = ?,
+                    note = ?
+                WHERE run_id = ? AND status = 'filled_sim'
+                """,
+                (
+                    fill.exit_status,
+                    fill.exit_price,
+                    fill.exit_ts,
+                    fill.r_realized,
+                    fill.note,
+                    fill.run_id,
+                ),
+            )
+            if cur.rowcount == 0:
+                raise ValueError(f"no filled_sim row for run_id {fill.run_id}")
+            conn.commit()
+        return fill
+
+    def get_fill(self, run_id: str) -> SimFill | None:
+        with _connect(self.path) as conn:
+            row = conn.execute(
+                "SELECT * FROM fills WHERE run_id = ? ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _row_to_fill(row)
 
 
 def _row_to_record(row: sqlite3.Row) -> RunRecord:
@@ -178,4 +256,19 @@ def _row_to_record(row: sqlite3.Row) -> RunRecord:
         citations=json.loads(row["citations_json"] or "[]"),
         tool_trace=json.loads(row["trace_json"] or "[]"),
         error=row["error"],
+    )
+
+
+def _row_to_fill(row: sqlite3.Row) -> SimFill:
+    keys = set(row.keys())
+    return SimFill(
+        run_id=row["run_id"],
+        status=row["status"],
+        fill_price=row["fill_price"],
+        ts=row["ts"],
+        note=row["note"] or "",
+        exit_status=row["exit_status"] if "exit_status" in keys else None,
+        exit_price=row["exit_price"] if "exit_price" in keys else None,
+        exit_ts=row["exit_ts"] if "exit_ts" in keys else None,
+        r_realized=row["r_realized"] if "r_realized" in keys else None,
     )

@@ -77,6 +77,10 @@
           }
         } catch (_) {}
       }
+      if (typeof line === "string" && (line.startsWith("[exit") || line === "[done]")) {
+        refreshStrip();
+        loadJournal();
+      }
     };
   }
 
@@ -87,6 +91,13 @@
     let el;
     if (f.type === "enum" && f.choices) {
       el = document.createElement("select");
+      if (f.default == null) {
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "(default)";
+        blank.selected = true;
+        el.appendChild(blank);
+      }
       f.choices.forEach((c) => {
         const o = document.createElement("option");
         o.value = c;
@@ -130,9 +141,26 @@
     $("job-extra").querySelectorAll("label").forEach((lab) => {
       const el = lab.querySelector("input, select");
       const g = el?.dataset.group;
-      lab.style.display = g === "executor"
-        ? (cmd === "agent.executor" ? "" : "none")
-        : (cmd === "agent.run" ? "" : "none");
+      const name = el?.name || "";
+      if (cmd === "agent.executor") {
+        lab.style.display = g === "executor" ? "" : "none";
+        return;
+      }
+      if (cmd === "agent.walk") {
+        const walkRun = [
+          "from_time",
+          "to_time",
+          "balance",
+          "risk_fraction",
+          "exposure_cap",
+          "mt4_prefix",
+          "quiet",
+          "no_journal",
+        ];
+        lab.style.display = g === "walk" || walkRun.indexOf(name) >= 0 ? "" : "none";
+        return;
+      }
+      lab.style.display = g === "run" ? "" : "none";
     });
   }
 
@@ -239,26 +267,35 @@
     $("run-detail").innerHTML =
       pane("Regime", rec.regime) +
       pane("Proposal", rec.proposal) +
+      pane("Fill", rec.fill) +
       pane("Policy", rec.risk) +
       pane("Trace", rec.tool_trace);
   }
 
   async function loadJournal() {
-    const data = await jget("/api/journal/runs?limit=80");
     const tb = document.querySelector("#runs-table tbody");
-    tb.innerHTML = "";
-    (data.runs || []).forEach((r) => {
-      const tr = document.createElement("tr");
-      if (r.run_id === selectedRun) tr.className = "sel";
-      tr.innerHTML =
-        "<td>" + fmtTs(r.ts) + "</td>" +
-        "<td>" + (r.instrument || "") + " " + (r.granularity || "") + "</td>" +
-        "<td>" + (r.action || "") + "</td>" +
-        "<td>" + (r.regime || "") + (r.trend_waning ? " waning" : "") + "</td>" +
-        "<td>" + (r.error ? "yes" : "") + "</td>";
-      tr.addEventListener("click", () => showRun(r.run_id));
-      tb.appendChild(tr);
-    });
+    if (!tb) return;
+    try {
+      const data = await jget("/api/journal/runs?limit=80");
+      tb.innerHTML = "";
+      (data.runs || []).forEach((r) => {
+        const tr = document.createElement("tr");
+        if (r.run_id === selectedRun) tr.className = "sel";
+        tr.innerHTML =
+          "<td>" + fmtTs(r.ts) + "</td>" +
+          "<td>" + (r.instrument || "") + " " + (r.granularity || "") + "</td>" +
+          "<td>" + (r.action || "") + "</td>" +
+          "<td>" + (r.side || "") + "</td>" +
+          "<td>" + (r.stop != null ? r.stop : "") + "</td>" +
+          "<td>" + (r.target != null ? r.target : "") + "</td>" +
+          "<td>" + (r.regime || "") + (r.trend_waning ? " waning" : "") + "</td>" +
+          "<td>" + (r.error ? "yes" : "") + "</td>";
+        tr.addEventListener("click", () => showRun(r.run_id));
+        tb.appendChild(tr);
+      });
+    } catch (err) {
+      tb.innerHTML = "<tr><td colspan=\"8\">journal load failed</td></tr>";
+    }
   }
 
   function bar(pct) {

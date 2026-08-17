@@ -1,4 +1,4 @@
-"""Whitelist subprocess runner: agent.run / agent.executor only. No shell."""
+"""Whitelist subprocess runner: agent.run / agent.walk / agent.executor. No shell."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _GRANULARITIES = frozenset(
@@ -35,7 +35,7 @@ _GRANULARITIES = frozenset(
         "M",
     }
 )
-ALLOWED_CMDS = ("agent.run", "agent.executor")
+ALLOWED_CMDS = ("agent.run", "agent.walk", "agent.executor")
 _RFC3339 = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$"
 )
@@ -75,6 +75,23 @@ SCHEMA_FIELDS: list[dict[str, Any]] = [
     {"name": "mt4_prefix", "type": "string", "group": "run", "label": "mt4-prefix", "flag": "--mt4-prefix", "placeholder": "sbox.regime."},
     {"name": "quiet", "type": "bool", "group": "run", "label": "quiet", "flag": "--quiet"},
     {"name": "no_journal", "type": "bool", "group": "run", "label": "no-journal", "flag": "--no-journal"},
+    {"name": "lookback", "type": "int", "group": "walk", "label": "lookback", "flag": "--lookback", "placeholder": "250"},
+    {
+        "name": "mt4_show",
+        "type": "enum",
+        "choices": ["ranges", "markers", "both"],
+        "group": "walk",
+        "label": "mt4-show",
+        "flag": "--mt4-show",
+    },
+    {
+        "name": "mt4_ticket_prefix",
+        "type": "string",
+        "group": "walk",
+        "label": "mt4-ticket-prefix",
+        "flag": "--mt4-ticket-prefix",
+        "placeholder": "sbox.ticket.walk.",
+    },
     {"name": "watch", "type": "bool", "group": "executor", "label": "watch", "flag": "--watch"},
     {"name": "interval", "type": "float", "group": "executor", "label": "interval", "flag": "--interval", "placeholder": "5"},
 ]
@@ -93,7 +110,7 @@ def _blank_none(value: Any) -> Any:
 
 
 class JobSpec(BaseModel):
-    cmd: Literal["agent.run", "agent.executor"] = "agent.run"
+    cmd: Literal["agent.run", "agent.walk", "agent.executor"] = "agent.run"
     instrument: str = "EUR_USD"
     granularity: str = "D"
     mode: Literal["signal", "paper"] = "signal"
@@ -112,6 +129,9 @@ class JobSpec(BaseModel):
     mt4_prefix: str | None = None
     quiet: bool = False
     no_journal: bool = False
+    lookback: int | None = Field(default=None, ge=30, le=5000)
+    mt4_show: Literal["ranges", "markers", "both"] | None = None
+    mt4_ticket_prefix: str | None = None
     watch: bool = False
     interval: float | None = Field(default=None, ge=0.5, le=3600)
 
@@ -131,7 +151,7 @@ class JobSpec(BaseModel):
             raise ValueError(f"unsupported granularity {value!r}")
         return text
 
-    @field_validator("from_time", "to_time", "source", "mt4_prefix", mode="before")
+    @field_validator("from_time", "to_time", "source", "mt4_prefix", "mt4_ticket_prefix", mode="before")
     @classmethod
     def _empty_str(cls, value: Any) -> Any:
         return _blank_none(value)
@@ -155,7 +175,7 @@ class JobSpec(BaseModel):
             raise ValueError("source must be alphanumeric, underscore, or hyphen")
         return text
 
-    @field_validator("mt4_prefix")
+    @field_validator("mt4_prefix", "mt4_ticket_prefix")
     @classmethod
     def _prefix(cls, value: str | None) -> str | None:
         if value is None:
@@ -164,6 +184,12 @@ class JobSpec(BaseModel):
         if not _PREFIX.match(text):
             raise ValueError("mt4-prefix must start with sbox.")
         return text
+
+    @model_validator(mode="after")
+    def _walk_window(self) -> JobSpec:
+        if self.cmd == "agent.walk" and (not self.from_time or not self.to_time):
+            raise ValueError("agent.walk requires from and to")
+        return self
 
 
 def job_schema() -> dict[str, Any]:
@@ -189,6 +215,41 @@ def build_argv(spec: JobSpec, python: str | None = None) -> list[str]:
                 argv.extend(["--interval", str(spec.interval)])
         else:
             argv.append("--once")
+        return argv
+    if spec.cmd == "agent.walk":
+        argv = [
+            py,
+            "-m",
+            "agent.walk",
+            "--instrument",
+            spec.instrument,
+            "--granularity",
+            spec.granularity,
+            "--from",
+            spec.from_time or "",
+            "--to",
+            spec.to_time or "",
+        ]
+        if spec.mt4:
+            argv.append("--mt4")
+        if spec.lookback is not None:
+            argv.extend(["--lookback", str(spec.lookback)])
+        if spec.balance is not None:
+            argv.extend(["--balance", str(spec.balance)])
+        if spec.risk_fraction is not None:
+            argv.extend(["--risk-fraction", str(spec.risk_fraction)])
+        if spec.exposure_cap is not None:
+            argv.extend(["--exposure-cap", str(spec.exposure_cap)])
+        if spec.mt4_show:
+            argv.extend(["--mt4-show", spec.mt4_show])
+        if spec.mt4_prefix:
+            argv.extend(["--mt4-prefix", spec.mt4_prefix])
+        if spec.mt4_ticket_prefix:
+            argv.extend(["--mt4-ticket-prefix", spec.mt4_ticket_prefix])
+        if spec.quiet:
+            argv.append("--quiet")
+        if spec.no_journal:
+            argv.append("--no-journal")
         return argv
     argv = [
         py,

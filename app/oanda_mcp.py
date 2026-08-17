@@ -86,7 +86,8 @@ async def get_candles(
         instrument: Instrument name, e.g. "EUR_USD".
         granularity: Candle size, e.g. "S5", "M1", "M5", "M15", "H1", "H4",
             "D", "W". Defaults to "H1".
-        count: Number of candles (max 5000). Defaults to 100. Omit-style
+        count: Number of candles. Defaults to 100. Windows larger than
+            5000 bars are fetched in pages automatically. Omit-style
             historical windows: use from_time+to_time without relying on all
             three together (OANDA forbids from+to+count).
         price: Which price components: "M" (mid), "B" (bid), "A" (ask), or

@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from agent.journal import Journal
+from agent.schema import SimFill
 from dashboard.gpu import parse_nvidia_smi_csv, read_meminfo
 from dashboard.jobs import JobSpec, build_argv, job_schema
 from tests.test_agent_journal import _record
@@ -127,12 +128,40 @@ class TestJobArgv(unittest.TestCase):
         with self.assertRaises(ValidationError):
             JobSpec(cmd="bash")  # type: ignore[arg-type]
 
+    def test_walk_argv_requires_from_to(self) -> None:
+        with self.assertRaises(ValidationError):
+            JobSpec(cmd="agent.walk", instrument="GBP_USD")
+        spec = JobSpec(
+            cmd="agent.walk",
+            instrument="GBP_USD",
+            from_time="2024-01-01T00:00:00Z",
+            to_time="2024-06-01T00:00:00Z",
+            lookback=200,
+            mt4=True,
+            mt4_show="ranges",
+            mt4_ticket_prefix="sbox.ticket.walk.",
+        )
+        argv = build_argv(spec, python="/opt/py")
+        self.assertEqual(argv[argv.index("-m") + 1], "agent.walk")
+        self.assertEqual(argv[argv.index("--from") + 1], "2024-01-01T00:00:00Z")
+        self.assertEqual(argv[argv.index("--to") + 1], "2024-06-01T00:00:00Z")
+        self.assertEqual(argv[argv.index("--lookback") + 1], "200")
+        self.assertIn("--mt4", argv)
+        self.assertEqual(argv[argv.index("--mt4-show") + 1], "ranges")
+        self.assertEqual(
+            argv[argv.index("--mt4-ticket-prefix") + 1], "sbox.ticket.walk."
+        )
+        self.assertNotIn("--mode", argv)
+        self.assertNotIn("--no-llm", argv)
+
     def test_schema_lists_fields(self) -> None:
         schema = job_schema()
         names = [f["name"] for f in schema["fields"]]
         self.assertIn("count", names)
         self.assertIn("watch", names)
+        self.assertIn("lookback", names)
         self.assertNotIn("extra_args", names)
+        self.assertIn("agent.walk", schema["cmds"])
 
 
 class TestDashboardApi(unittest.TestCase):
@@ -165,11 +194,40 @@ class TestDashboardApi(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["run_id"], "abc")
         self.assertEqual(rows[0]["action"], "log_setup")
+        self.assertEqual(rows[0]["side"], "long")
+        self.assertEqual(rows[0]["stop"], 1.268)
+        self.assertEqual(rows[0]["target"], 1.274)
         got = self.client.get("/api/journal/runs/abc")
         self.assertEqual(got.status_code, 200)
         self.assertEqual(got.json()["proposal"]["play_class"], "join_trend")
+        self.assertIsNone(got.json()["fill"])
         missing = self.client.get("/api/journal/runs/nope")
         self.assertEqual(missing.status_code, 404)
+
+    def test_get_run_includes_fill(self) -> None:
+        self.journal.append_run(
+            _record(action="pending_exec", run_id="walk1"), queue_fill=False
+        )
+        self.journal.record_fill(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00Z",
+                note="walk fill",
+                exit_status="stop",
+                exit_price=1.268,
+                exit_ts="2024-01-02T00:00:00Z",
+                r_realized=-1.0,
+            )
+        )
+        got = self.client.get("/api/journal/runs/walk1")
+        self.assertEqual(got.status_code, 200)
+        fill = got.json()["fill"]
+        self.assertEqual(fill["status"], "filled_sim")
+        self.assertEqual(fill["exit_status"], "stop")
+        self.assertEqual(fill["exit_price"], 1.268)
+        self.assertEqual(fill["r_realized"], -1.0)
 
     def test_index(self) -> None:
         res = self.client.get("/")
@@ -181,6 +239,7 @@ class TestDashboardApi(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertIn("agent.run", body["cmds"])
+        self.assertIn("agent.walk", body["cmds"])
         names = [f["name"] for f in body["fields"]]
         self.assertIn("from_time", names)
         self.assertIn("interval", names)

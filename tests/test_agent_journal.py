@@ -77,6 +77,49 @@ class TestJournal(unittest.TestCase):
         self.journal.record_fill(fill)
         self.assertEqual(self.journal.list_pending(), [])
 
+    def test_walk_fill_skips_executor_queue_and_records_exit(self) -> None:
+        self.journal.append_run(
+            _record(action="pending_exec", run_id="walk1"), queue_fill=False
+        )
+        self.assertEqual(self.journal.list_pending(), [])
+        fill = SimFill(
+            run_id="walk1",
+            status="filled_sim",
+            fill_price=1.27,
+            ts="2024-01-01T00:00:00+00:00",
+            note="walk fill",
+        )
+        self.journal.record_fill(fill)
+        self.journal.record_exit(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00+00:00",
+                note="walk exit stop",
+                exit_status="stop",
+                exit_price=1.268,
+                exit_ts="2024-01-02T00:00:00+00:00",
+                r_realized=-1.0,
+            )
+        )
+        loaded = self.journal.get_fill("walk1")
+        self.assertEqual(loaded.status, "filled_sim")
+        self.assertEqual(loaded.exit_status, "stop")
+        self.assertEqual(loaded.exit_price, 1.268)
+        self.assertEqual(loaded.r_realized, -1.0)
+        self.assertEqual(self.journal.list_pending(), [])
+
+    def test_list_runs_newest_write_not_oldest_decision_bar(self) -> None:
+        self.journal.append_run(
+            _record(run_id="live", ts="2026-08-16T00:00:00+00:00")
+        )
+        self.journal.append_run(
+            _record(run_id="walk-2024", ts="2024-01-15T00:00:00.000000000Z")
+        )
+        listed = self.journal.list_runs(limit=10)
+        self.assertEqual([r.run_id for r in listed], ["walk-2024", "live"])
+
     def test_list_runs_newest_first_and_filter(self) -> None:
         self.journal.append_run(
             _record(run_id="old", ts="2026-08-01T00:00:00+00:00", instrument="EUR_USD")

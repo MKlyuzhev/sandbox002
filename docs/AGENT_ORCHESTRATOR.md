@@ -18,6 +18,9 @@ Related: [Lien FX Strategies](LIEN_FX_STRATEGIES.md) (Ch. 7 governing layer),
 `python -m agent.run` walks a **fixed graph**. The language model may fill
 thesis and citations; **prices** come from Ch. 7 geometry on the indicator
 snapshot. The model cannot skip the policy node or talk to a broker.
+`python -m agent.walk` is a separate causal paper walk over `--from`/`--to`
+(warmup before `--from`, one position at a time). `agent.run --from/--to`
+still snapshots the **last** bar of that window.
 
 ```mermaid
 flowchart LR
@@ -112,7 +115,7 @@ Failures always become `wait`. `breakout_watch` never becomes `pending_exec`.
 | `--instrument` | `EUR_USD` | OANDA name (`GBP_USD`, not `GBPUSD`) |
 | `--granularity` | `D` | Lien journal default. `H1` / `H4` allowed |
 | `--count` | `250` | Candle count (covers 200-SMA). Ignored if both `--from` and `--to` are set |
-| `--from` / `--to` | unset | RFC3339 window (OANDA: not from+to+count together) |
+| `--from` / `--to` | unset | RFC3339 window (OANDA: not from+to+count together). Snapshot at the **last** bar. |
 | `--mode` | `signal` | `signal` or `paper` |
 | `--balance` | `10000` | Account for `position_size` |
 | `--use-account` | off | Use OANDA practice NAV/balance instead of `--balance` |
@@ -148,7 +151,7 @@ Look at `action` first, then `risk.reasons` if it is `wait`.
 | `run_id` | Journal primary key (hex UUID) |
 | `action` | `wait` / `log_setup` / `pending_exec` |
 | `regime` | Full Ch. 7 checklist (`regime`, `direction`, `trend_waning`, `allowed_play_classes`, snapshot, notes) |
-| `proposal` | Thesis, play class, side, entry/stop/target, citations |
+| `proposal` | Thesis, play class, side, entry/stop/target, **`at_time`** (decision bar), citations |
 | `risk` | `ok`, planned R, `size_units`, `stop_distance`, `reasons` |
 | `citations` | `{source, chunk_index, distance}` from retrieve |
 | `tool_trace` | Node name + latency_ms + short detail |
@@ -202,7 +205,9 @@ Default path: `data/journal/runs.sqlite` (gitignored). Created on first write.
 | `fills` | Stub executor rows: `pending` → `filled_sim` or `rejected` |
 
 `--mode paper` plus `action=pending_exec` inserts a `fills` row with
-`status=pending`. `signal` / `wait` / `log_setup` do not.
+`status=pending`. `signal` / `wait` / `log_setup` do not. Causal
+`python -m agent.walk` writes `filled_sim` immediately (never `pending`)
+and later sets `exit_status` / `exit_price` / `r_realized`.
 
 Inspect:
 
@@ -223,7 +228,8 @@ fill, not a broker order.
 
 ## 9. Stub executor — `python -m agent.executor`
 
-Run in a **separate process**. The orchestrator never fills in-process.
+Run in a **separate process** from `agent.run`. The snapshot orchestrator
+never fills in-process. (`agent.walk` records its own `filled_sim` + exit.)
 
 ```bash
 .venv/bin/python -m agent.executor --once
@@ -242,6 +248,37 @@ OANDA write. Missing both prices → `rejected`.
 
 Stdout is a JSON list of `SimFill` objects (`run_id`, `status`, `fill_price`,
 `ts`, `note`).
+
+---
+
+## 9b. Causal paper walk — `python -m agent.walk`
+
+Same warmup + `[--from, --to]` fetch as `scripts/walk_regime.py`. Each decision
+uses only `bars[:i+1][-lookback:]` (no look-forward). No RAG / LLM.
+
+1. While **flat**, run skeleton + Ch. 7 geometry + policy (`mode=paper`).
+2. First `pending_exec` **fills at that bar’s close**.
+   **Every** fill is journaled (one `runs` row per trade, not only the last).
+   `ts` and `proposal.at_time` are that decision bar, not wall-clock now.
+3. Hold **one** position. From the **next** bar, record stop or target (if both
+   trade in one bar, **stop wins**). Gaps through the stop still exit at the stop.
+4. Still open at `--to` → `window_end` at last close. Then flatten.
+5. Next fill only after flat.
+
+`--mt4` paints walk ranges (`sbox.regime.walk.`) plus, for **every** sequential
+fill, direction (arrow + `long`/`short` text), time-bounded stop (red dash) and
+take-profit (green dash) on `sbox.ticket.walk.`. Not chart-wide hlines. Every
+fill is a journal row; the list shows side / stop / target; detail includes the
+fill exit (`stop` / `target` / `window_end`).
+
+```bash
+.venv/bin/python -m agent.walk \
+  --instrument GBP_USD --granularity D \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z --mt4
+```
+
+Decisions are causal; **outcomes** use later bars by design. Do not use
+`agent.executor` on these rows (they are already `filled_sim`).
 
 ---
 
@@ -269,7 +306,10 @@ decision bar (`regime.last_time`). Each MT4 command waits until the EA
 heartbeat `last_cmd_id` matches, so the ticket write cannot overwrite
 `cmd.json` before the regime overlay is applied. MCP: `mt4_draw_ticket`
 (explicit prices or journal `run_id`). Display only; no MT4 orders.
-Recompile `SandboxChartBridge.mq4` after pulling so `vline` objects draw.
+`cmd.json` is pretty-printed so MQL4 `FileReadString` does not split `t1`
+timestamps (that left only the corner legend visible). Recompile
+`SandboxChartBridge.mq4` after pulling for `vline` support and the binary
+file reader.
 
 **Paper journal loop** (two terminals):
 
@@ -301,5 +341,6 @@ No network. From repo root:
 
 ```bash
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
-  tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels -v
+  tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
+  tests.test_agent_paper_walk -v
 ```

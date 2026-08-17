@@ -76,6 +76,7 @@ class TestPlanTicket(unittest.TestCase):
         self.assertNotAlmostEqual(filled.entry or 0, 9.99)
         self.assertEqual(filled.side, "long")
         self.assertIn("ch7 geometry", filled.notes)
+        self.assertEqual(filled.at_time, analysis["last_time"])
 
     def test_apply_strips_when_no_ticket(self) -> None:
         proposal = Proposal(

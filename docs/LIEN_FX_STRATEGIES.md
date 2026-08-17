@@ -105,9 +105,15 @@ Geometry / checklist only (practice OANDA):
 .venv/bin/python scripts/classify_regime.py --granularity H1 --mt4
 ```
 
-Walk-forward test over a date range (**no look-forward**: each step uses only
-`bars[:i+1][-lookback:]`). Warmup is fetched before `--from`. `--mt4` paints
-collapsed runs with prefix `sbox.regime.walk.` (does not clear `sbox.regime.`).
+Walk-forward **regime labels** over a date range (**no look-forward** on the
+label: each step uses only `bars[:i+1][-lookback:]`). Warmup is fetched before
+`--from`. `--mt4` paints collapsed runs with prefix `sbox.regime.walk.` (does
+not clear `sbox.regime.`).
+
+Causal **paper tickets** over the same window are a different command:
+`python -m agent.walk` (one position, fill at close, stop/target on later bars).
+See [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b. `agent.run --from/--to`
+is still a snapshot at the last bar.
 `--horizon` / `--min-n` attach a causal instability score and empirical `p_hat`
 (same-bucket frequency of a regime flip over the next `h` completed steps).
 `--mt4-show ranges|markers|both` (default `both`) selects run rectangles,

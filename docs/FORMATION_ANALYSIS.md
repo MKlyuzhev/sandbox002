@@ -47,7 +47,8 @@ Geometry only (no local model):
 .venv/bin/python scripts/analyze_formation.py --instrument GBP_USD --granularity H1 --count 200
 ```
 
-Historical window (OANDA `to`+`count` = N candles ending at a date; max count 5000):
+Historical window (OANDA `to`+`count` = N candles ending at a date; requests
+over 5000 bars are paged automatically):
 
 ```bash
 # 2000 H1 bars ending 2024-06-01 UTC
@@ -85,6 +86,9 @@ The JSON output includes `plot_path` when a chart is written.
 Display only (no orders). Python writes `cmd.json` under `MQL4/Files/sandbox002/`;
 an always-on EA draws `OBJ_*` objects. Sequential writes wait for heartbeat
 `last_cmd_id` so a later command does not replace an unread `cmd.json`.
+Commands are pretty-printed so MQL4 `FileReadString` (4095-char chunks) does
+not split timestamps. Recompile `SandboxChartBridge.mq4` after pulling the
+binary file reader change.
 
 1. In MetaEditor, compile `Experts/Custom/SandboxChartBridge.mq4`
    (it includes `Include/Custom/JsonMini.mqh`).

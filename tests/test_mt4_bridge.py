@@ -148,6 +148,36 @@ class TestInbox(unittest.TestCase):
         self.assertEqual(cmd["symbol"], "GBPUSD")
         self.assertEqual(cmd["objects"][0]["name"], "sbox.formation.line1")
         self.assertTrue(cmd["clear_prefix_first"])
+        raw = cmd_path.read_text(encoding="utf-8")
+        self.assertIn("\n", raw)
+        self.assertTrue(all(len(line) < 4095 for line in raw.splitlines()))
+
+    def test_write_command_pretty_prints_under_mql4_line_limit(self) -> None:
+        # Compact one-line JSON >4095 chars is split mid-t1 by FILE_TXT FileReadString.
+        objects = [
+            {
+                "name": f"sbox.regime.sma20.{i}",
+                "type": "trend",
+                "t1": 1_717_200_000 + i * 86400,
+                "p1": 1.27 + i * 0.0001,
+                "t2": 1_717_200_000 + (i + 1) * 86400,
+                "p2": 1.27 + (i + 1) * 0.0001,
+                "color": "cyan",
+                "width": 1,
+            }
+            for i in range(200)
+        ]
+        compact = json.dumps(
+            {"op": "upsert", "objects": objects}, separators=(",", ":")
+        )
+        self.assertGreater(len(compact), 4095)
+        mt4_bridge.write_command({"op": "upsert", "objects": objects})
+        raw = (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("\n", raw)
+        self.assertTrue(all(len(line) < 4095 for line in raw.splitlines()))
+        self.assertIn('"t1": 1717200000', raw)
 
     def test_upsert_refuses_symbol_mismatch(self) -> None:
         self._write_heartbeat("EURUSD", 60)

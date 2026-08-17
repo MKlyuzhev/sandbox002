@@ -20,7 +20,7 @@ The dashboard is an ops console, not a second brain.
 
 | May | Must not |
 |-----|----------|
-| Tail `agent.run` / `agent.executor` | Reimplement `agent/graph.py` |
+| Tail `agent.run` / `agent.walk` / `agent.executor` | Reimplement `agent/graph.py` |
 | Query `data/journal/runs.sqlite` | Change policy gates |
 | Poll `nvidia-smi` and Ollama `/api/ps` | Load extra models itself |
 | Show MT4 EA heartbeat | Draw a second price chart |
@@ -46,6 +46,9 @@ above the log. There is no free-text argv box.
   / `--mt4`; More: `--count`, `--from` / `--to` (`2024-01-01T00:00:00Z`), `--balance`,
   `--risk-fraction`, `--exposure-cap`, `--use-account`, `--source`, `--top-k`,
   `--mt4-prefix` (must start with `sbox.`), `--quiet`, `--no-journal`
+- `python -m agent.walk` — requires `--from` and `--to`; More: `--lookback`,
+  `--mt4-show`, `--mt4-ticket-prefix`, plus the shared from/to/balance/risk/mt4
+  flags. No LLM. One-position paper walk (see [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b).
 - `python -m agent.executor` — `--once` by default; More: `--watch` and
   `--interval`
 
@@ -55,9 +58,10 @@ cannot usefully run two LLM jobs). Stdout and stderr are merged and streamed
 
 ### Journal explorer
 
-List newest runs (instrument, action, regime, error). Detail panes: regime
-checklist, proposal, policy reasons, tool_trace latencies. Source:
-`Journal.list_runs` / `get_run`.
+List newest **writes** (not newest decision-bar `ts`). Walk rows use the
+historical bar time, so sorting by `ts` hid them under later snapshot runs.
+Columns include side / stop / target. Detail panes: regime, proposal, fill
+exit, policy, tool_trace. Source: `Journal.list_runs` / `get_run` / `get_fill`.
 
 ### GPU / host
 
@@ -78,7 +82,8 @@ checklist, proposal, policy reasons, tool_trace latencies. Source:
 | Overlay / MT4 | Chart symbol/TF vs last run, `cmd_id` (`--mt4` already draws `sbox.regime.` + `sbox.ticket.`) |
 | Services | RAG `/health`, Chroma chunk count, MCP up |
 
-Defer: walk-forward charts, kill switch, live P&amp;L, order ticket.
+Defer: walk-forward equity charts, kill switch, live P&amp;L, order ticket.
+(`python -m agent.walk` is the CLI; the dashboard only launches it.)
 
 ---
 

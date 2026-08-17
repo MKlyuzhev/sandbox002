@@ -204,7 +204,7 @@ def main() -> int:
         "--count",
         type=int,
         default=200,
-        help="Candle count (max 5000). Ignored when both --from and --to are set.",
+        help="Candle count (paged above 5000). Ignored when both --from and --to are set.",
     )
     parser.add_argument(
         "--from",

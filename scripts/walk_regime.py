@@ -24,53 +24,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import indicators, oanda_client, regime_walk  # noqa: E402
-
-
-def _merge_warmup_and_test(warmup: list[dict], test: list[dict]) -> list[dict]:
-    return regime_walk.prepare_bars(list(warmup) + list(test))
-
-
-async def _fetch_bars(
-    instrument: str,
-    granularity: str,
-    from_time: str,
-    to_time: str,
-    lookback: int,
-) -> list[dict]:
-    if lookback > regime_walk.MAX_BARS:
-        raise regime_walk.WalkError(
-            f"lookback {lookback} exceeds OANDA max {regime_walk.MAX_BARS}"
-        )
-    warmup_payload = await oanda_client.get_candles(
-        instrument,
-        granularity=granularity,
-        count=lookback,
-        price="M",
-        to_time=from_time,
-    )
-    test_payload = await oanda_client.get_candles(
-        instrument,
-        granularity=granularity,
-        count=None,
-        price="M",
-        from_time=from_time,
-        to_time=to_time,
-    )
-    warmup = oanda_client.candles_to_bars(warmup_payload, prefer="mid")
-    test = oanda_client.candles_to_bars(test_payload, prefer="mid")
-    if len(test) >= regime_walk.MAX_BARS:
-        raise regime_walk.WalkError(
-            f"test range returned {len(test)} bars; OANDA max is "
-            f"{regime_walk.MAX_BARS}. Shrink --from/--to."
-        )
-    bars = _merge_warmup_and_test(warmup, test)
-    bars = regime_walk.drop_after(bars, to_time)
-    return bars
+from app.walk_fetch import fetch_walk_bars  # noqa: E402
 
 
 async def run(args: argparse.Namespace) -> int:
     try:
-        bars = await _fetch_bars(
+        bars = await fetch_walk_bars(
             args.instrument,
             args.granularity,
             args.from_time,

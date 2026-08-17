@@ -11,6 +11,7 @@ Side = Literal["long", "short", "none"]
 Mode = Literal["signal", "paper"]
 Action = Literal["wait", "log_setup", "pending_exec"]
 FillStatus = Literal["pending", "filled_sim", "rejected"]
+ExitStatus = Literal["stop", "target", "window_end"]
 
 
 class Citation(BaseModel):
@@ -88,6 +89,7 @@ class Proposal(BaseModel):
     entry: float | None = None
     stop: float | None = None
     target: float | None = None
+    at_time: str | None = None
     confidence: float = 0.0
     citations: list[Citation] = Field(default_factory=list)
     notes: str = ""
@@ -158,3 +160,26 @@ class SimFill(BaseModel):
     fill_price: float | None = None
     ts: str
     note: str = ""
+    exit_status: ExitStatus | None = None
+    exit_price: float | None = None
+    exit_ts: str | None = None
+    r_realized: float | None = None
+
+
+class PaperTrade(BaseModel):
+    """One causal paper walk fill + outcome. Display / journal only."""
+
+    run_id: str
+    entry_index: int
+    entry_time: str
+    side: Side
+    play_class: PlayClass
+    entry: float
+    stop: float
+    target: float
+    exit_index: int | None = None
+    exit_time: str | None = None
+    exit_price: float | None = None
+    exit_status: ExitStatus | None = None
+    r_realized: float | None = None
+    reasons: list[str] = Field(default_factory=list)
