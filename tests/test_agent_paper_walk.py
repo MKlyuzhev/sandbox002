@@ -9,9 +9,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from agent.journal import Journal
-from agent.paper_walk import check_exit, walk_paper
-from agent.schema import Goal
+from agent.paper_walk import check_exit, summarize_equity, walk_paper
+from agent.schema import Goal, PaperTrade
 from app import mt4_bridge
+from app.risk import apply_r_to_equity
 from tests.test_indicators import _range_bars, _trend_bars
 
 
@@ -63,6 +64,10 @@ def _pass_up_window(window: list[dict]) -> dict:
     return _pass_up(window[-1])
 
 
+def _walk_trades(*args, **kwargs):
+    return walk_paper(*args, **kwargs).trades
+
+
 class TestCheckExit(unittest.TestCase):
     def test_stop_wins_when_both_trade(self) -> None:
         bar = {"high": 1.30, "low": 1.20, "close": 1.25, "open": 1.25}
@@ -79,7 +84,7 @@ class TestWalkPaper(unittest.TestCase):
     def test_mutating_future_bar_does_not_change_entry(self) -> None:
         bars = _stamp(_trend_bars(60, start=1.2, step=0.01))
         lookback = 40
-        first = walk_paper(
+        first = _walk_trades(
             bars, _goal(), lookback=lookback, start_index=lookback - 1,
             classify_fn=_pass_up_window,
         )
@@ -91,7 +96,7 @@ class TestWalkPaper(unittest.TestCase):
         mutated[entry_i + 1]["low"] = 0.01
         mutated[entry_i + 1]["close"] = 50.0
         mutated[entry_i + 1]["open"] = 50.0
-        second = walk_paper(
+        second = _walk_trades(
             mutated, _goal(), lookback=lookback, start_index=lookback - 1,
             classify_fn=_pass_up_window,
         )
@@ -109,20 +114,43 @@ class TestWalkPaper(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         try:
             journal = Journal(Path(tmp.name) / "runs.sqlite")
-            trades = walk_paper(
+            result = walk_paper(
                 bars,
                 _goal(),
                 lookback=lookback,
                 start_index=lookback - 1,
                 journal=journal,
                 classify_fn=_pass_up_window,
+                walk_id="walk-stop",
             )
+            trades = result.trades
             self.assertGreaterEqual(len(trades), 2)
             first, second = trades[0], trades[1]
             self.assertEqual(first.entry_index, lookback - 1)
             self.assertEqual(first.exit_status, "stop")
             self.assertEqual(first.exit_index, lookback)
             self.assertGreater(second.entry_index, first.exit_index)
+            self.assertEqual(result.walk_id, "walk-stop")
+            self.assertEqual(first.walk_id, "walk-stop")
+            self.assertEqual(second.walk_id, "walk-stop")
+            self.assertAlmostEqual(first.r_realized, -1.0)
+            self.assertAlmostEqual(first.pnl, -200.0)
+            self.assertAlmostEqual(first.equity_after, 9800.0)
+            self.assertAlmostEqual(
+                second.pnl, 9800.0 * 0.02 * second.r_realized, places=3
+            )
+            self.assertAlmostEqual(
+                second.equity_after, 9800.0 + second.pnl, places=3
+            )
+            self.assertAlmostEqual(
+                result.equity.ending_equity, trades[-1].equity_after
+            )
+            listed = journal.list_runs(limit=50, walk_id="walk-stop")
+            self.assertEqual(len(listed), len(trades))
+            fill = journal.get_fill(first.run_id)
+            self.assertAlmostEqual(fill.pnl, -200.0)
+            self.assertAlmostEqual(fill.equity_after, 9800.0)
+            self.assertEqual(fill.walk_id, "walk-stop")
             listed = journal.list_runs(limit=50)
             self.assertEqual(len(listed), len(trades))
             by_id = {r.run_id: r for r in listed}
@@ -144,7 +172,7 @@ class TestWalkPaper(unittest.TestCase):
         both = bars[lookback]
         both["low"] = 0.5
         both["high"] = 10.0
-        trades = walk_paper(
+        trades = _walk_trades(
             bars,
             _goal(),
             lookback=lookback,
@@ -167,7 +195,7 @@ class TestWalkPaper(unittest.TestCase):
             analysis["snapshot"]["high_n"] = close + 0.5
             return analysis
 
-        trades = walk_paper(
+        trades = _walk_trades(
             bars, _goal(), lookback=lookback, start_index=lookback - 1,
             classify_fn=classify,
         )
@@ -190,10 +218,12 @@ class TestWalkPaper(unittest.TestCase):
                 "snapshot": {"last_close": close},
             }
 
-        trades = walk_paper(
+        result = walk_paper(
             bars, _goal(), lookback=40, start_index=39, classify_fn=classify
         )
-        self.assertEqual(trades, [])
+        self.assertEqual(result.trades, [])
+        self.assertEqual(result.equity.trade_count, 0)
+        self.assertAlmostEqual(result.equity.ending_equity, 10_000.0)
 
     def test_breakout_watch_never_enters(self) -> None:
         bars = _stamp(_range_bars(50, amp=0.0003))
@@ -209,7 +239,7 @@ class TestWalkPaper(unittest.TestCase):
                 "snapshot": {"last_close": close},
             }
 
-        trades = walk_paper(
+        trades = _walk_trades(
             bars, _goal(), lookback=40, start_index=39, classify_fn=classify
         )
         self.assertEqual(trades, [])
@@ -219,7 +249,7 @@ class TestWalkPaper(unittest.TestCase):
         try:
             journal = Journal(Path(tmp.name) / "runs.sqlite")
             bars = _stamp(_trend_bars(45, start=1.2, step=0.002))
-            trades = walk_paper(
+            trades = _walk_trades(
                 bars,
                 _goal(),
                 lookback=40,
@@ -251,7 +281,7 @@ class TestWalkPaper(unittest.TestCase):
 
     def test_mt4_objects_mark_direction_stop_and_target(self) -> None:
         bars = _stamp(_trend_bars(45, start=1.2, step=0.002))
-        trades = walk_paper(
+        trades = _walk_trades(
             bars, _goal(), lookback=40, start_index=39, classify_fn=_pass_up_window
         )
         self.assertTrue(trades)
@@ -278,6 +308,82 @@ class TestWalkPaper(unittest.TestCase):
         self.assertEqual(target_obj["color"], "green")
         self.assertNotEqual(mt4_bridge.TICKET_WALK_PREFIX, mt4_bridge.TICKET_PREFIX)
         self.assertNotEqual(mt4_bridge.TICKET_WALK_PREFIX, mt4_bridge.REGIME_WALK_PREFIX)
+
+
+class TestEquityStats(unittest.TestCase):
+    def test_compound_two_full_stops(self) -> None:
+        pnl, equity = apply_r_to_equity(10_000.0, 0.02, -1.0)
+        self.assertAlmostEqual(pnl, -200.0)
+        self.assertAlmostEqual(equity, 9800.0)
+        pnl2, equity2 = apply_r_to_equity(equity, 0.02, -1.0)
+        self.assertAlmostEqual(pnl2, -196.0)
+        self.assertAlmostEqual(equity2, 9604.0)
+
+    def test_summarize_wins_losses_drawdown(self) -> None:
+        t1 = PaperTrade(
+            run_id="a",
+            entry_index=0,
+            entry_time="t1",
+            side="long",
+            play_class="join_trend",
+            entry=1.2,
+            stop=1.1,
+            target=1.4,
+            r_realized=-1.0,
+            pnl=-200.0,
+            equity_after=9800.0,
+        )
+        t2 = PaperTrade(
+            run_id="b",
+            entry_index=1,
+            entry_time="t2",
+            side="long",
+            play_class="join_trend",
+            entry=1.2,
+            stop=1.1,
+            target=1.4,
+            r_realized=-1.0,
+            pnl=-196.0,
+            equity_after=9604.0,
+        )
+        t3 = PaperTrade(
+            run_id="c",
+            entry_index=2,
+            entry_time="t3",
+            side="long",
+            play_class="join_trend",
+            entry=1.2,
+            stop=1.1,
+            target=1.4,
+            r_realized=0.0,
+            pnl=0.0,
+            equity_after=9604.0,
+        )
+        t4 = PaperTrade(
+            run_id="d",
+            entry_index=3,
+            entry_time="t4",
+            side="long",
+            play_class="join_trend",
+            entry=1.2,
+            stop=1.1,
+            target=1.4,
+            r_realized=2.0,
+            pnl=384.16,
+            equity_after=9988.16,
+        )
+        eq = summarize_equity("walk-eq", [t1, t2, t3, t4], 10_000.0, 0.02)
+        self.assertEqual(eq.walk_id, "walk-eq")
+        self.assertEqual(eq.trade_count, 4)
+        self.assertEqual(eq.wins, 1)
+        self.assertEqual(eq.losses, 2)
+        self.assertEqual(eq.scratches, 1)
+        self.assertAlmostEqual(eq.win_rate, 0.25)
+        self.assertAlmostEqual(eq.sum_r, 0.0)
+        self.assertAlmostEqual(eq.mean_r, 0.0)
+        self.assertAlmostEqual(eq.ending_equity, 9988.16)
+        self.assertAlmostEqual(eq.max_drawdown, 396.0)
+        self.assertAlmostEqual(eq.max_drawdown_frac, 396.0 / 10_000.0)
 
 
 if __name__ == "__main__":

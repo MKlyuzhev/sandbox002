@@ -138,11 +138,13 @@ async def get_position_book(instrument: str) -> dict:
 
 @mcp.tool()
 async def mt4_status() -> dict:
-    """MT4 bridge status: inbox path/writable, EA heartbeat age, chart
-    symbol/timeframe, last command id, and last EA error.
+    """MT4 bridge status: inbox path/writable, live charts list, newest
+    chart's heartbeat, last command id, and last EA error.
 
-    Call this before drawing. Requires SandboxChartBridge.mq4 attached to a
-    chart (AutoTrading can stay off — objects only, no orders).
+    Call this before drawing. Attach SandboxChartBridge.mq4 to each chart
+    you care about (AutoTrading can stay off — objects only, no orders).
+    ``charts`` lists every folder with a heartbeat; ``ea_ok`` is true if
+    any heartbeat is fresh.
     """
     return mt4_bridge.status()
 
@@ -179,17 +181,35 @@ async def mt4_upsert_objects(
 
 @mcp.tool()
 async def mt4_delete_objects(
+    instrument: str,
+    timeframe: str,
     names: list[str] | None = None,
     prefix: str = "",
 ) -> dict:
-    """Delete chart objects by exact names and/or name prefix (e.g. sbox.formation.)."""
-    return mt4_bridge.delete_objects(names=names or [], prefix=prefix)
+    """Delete chart objects by exact names and/or name prefix (e.g. sbox.formation.).
+
+    Writes to that chart's inbox only (``sandbox002/<SYMBOL>_<TF>/``).
+    """
+    return mt4_bridge.delete_objects(
+        names=names or [],
+        prefix=prefix,
+        symbol=instrument,
+        timeframe=timeframe,
+    )
 
 
 @mcp.tool()
-async def mt4_clear_layer(prefix: str = "sbox.") -> dict:
-    """Remove all sandbox chart objects whose names start with prefix."""
-    return mt4_bridge.clear_layer(prefix=prefix)
+async def mt4_clear_layer(
+    instrument: str,
+    timeframe: str,
+    prefix: str = "sbox.",
+) -> dict:
+    """Remove sandbox chart objects whose names start with prefix on one chart."""
+    return mt4_bridge.clear_layer(
+        prefix=prefix,
+        symbol=instrument,
+        timeframe=timeframe,
+    )
 
 
 @mcp.tool()

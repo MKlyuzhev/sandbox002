@@ -154,6 +154,45 @@ class TestJobArgv(unittest.TestCase):
         self.assertNotIn("--mode", argv)
         self.assertNotIn("--no-llm", argv)
 
+    def test_mt4_clear_argv(self) -> None:
+        argv = build_argv(JobSpec(cmd="agent.mt4_clear"), python="/opt/py")
+        self.assertEqual(
+            argv,
+            [
+                "/opt/py",
+                "-m",
+                "agent.mt4_clear",
+                "--instrument",
+                "EUR_USD",
+                "--granularity",
+                "D",
+            ],
+        )
+        argv = build_argv(
+            JobSpec(
+                cmd="agent.mt4_clear",
+                mt4_prefix="sbox.ticket.",
+                quiet=True,
+            ),
+            python="/opt/py",
+        )
+        self.assertEqual(
+            argv,
+            [
+                "/opt/py",
+                "-m",
+                "agent.mt4_clear",
+                "--instrument",
+                "EUR_USD",
+                "--granularity",
+                "D",
+                "--prefix",
+                "sbox.ticket.",
+                "--quiet",
+            ],
+        )
+        self.assertNotIn("--mt4", argv)
+
     def test_schema_lists_fields(self) -> None:
         schema = job_schema()
         names = [f["name"] for f in schema["fields"]]
@@ -162,6 +201,7 @@ class TestJobArgv(unittest.TestCase):
         self.assertIn("lookback", names)
         self.assertNotIn("extra_args", names)
         self.assertIn("agent.walk", schema["cmds"])
+        self.assertIn("agent.mt4_clear", schema["cmds"])
 
 
 class TestDashboardApi(unittest.TestCase):
@@ -229,10 +269,66 @@ class TestDashboardApi(unittest.TestCase):
         self.assertEqual(fill["exit_price"], 1.268)
         self.assertEqual(fill["r_realized"], -1.0)
 
+    def test_list_runs_includes_fill_equity_and_walk(self) -> None:
+        record = _record(action="pending_exec", run_id="walk1").model_copy(
+            update={"walk_id": "w1"}
+        )
+        self.journal.append_run(record, queue_fill=False)
+        self.journal.record_fill(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00Z",
+                note="walk fill",
+                walk_id="w1",
+            )
+        )
+        self.journal.record_exit(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00Z",
+                note="walk exit stop",
+                exit_status="stop",
+                exit_price=1.268,
+                exit_ts="2024-01-02T00:00:00Z",
+                r_realized=-1.0,
+                walk_id="w1",
+                pnl=-200.0,
+                equity_after=9800.0,
+            )
+        )
+        listed = self.client.get("/api/journal/runs")
+        self.assertEqual(listed.status_code, 200)
+        row = listed.json()["runs"][0]
+        self.assertEqual(row["walk_id"], "w1")
+        self.assertEqual(row["r_realized"], -1.0)
+        self.assertEqual(row["pnl"], -200.0)
+        self.assertEqual(row["equity_after"], 9800.0)
+        filtered = self.client.get("/api/journal/runs?walk_id=w1")
+        self.assertEqual(len(filtered.json()["runs"]), 1)
+        empty = self.client.get("/api/journal/runs?walk_id=nope")
+        self.assertEqual(empty.json()["runs"], [])
+        walk = self.client.get("/api/journal/walks/w1")
+        self.assertEqual(walk.status_code, 200)
+        body = walk.json()
+        self.assertEqual(body["walk_id"], "w1")
+        self.assertEqual(body["equity"]["losses"], 1)
+        self.assertEqual(body["equity"]["wins"], 0)
+        self.assertAlmostEqual(body["equity"]["ending_equity"], 9800.0)
+        self.assertAlmostEqual(body["equity"]["sum_r"], -1.0)
+        self.assertEqual(len(body["fills"]), 1)
+        missing = self.client.get("/api/journal/walks/nope")
+        self.assertEqual(missing.status_code, 404)
+
     def test_index(self) -> None:
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
         self.assertIn("sandbox002", res.text.lower())
+        self.assertIn(">R</th>", res.text)
+        self.assertIn(">equity</th>", res.text)
 
     def test_jobs_schema(self) -> None:
         res = self.client.get("/api/jobs/schema")
@@ -240,6 +336,7 @@ class TestDashboardApi(unittest.TestCase):
         body = res.json()
         self.assertIn("agent.run", body["cmds"])
         self.assertIn("agent.walk", body["cmds"])
+        self.assertIn("agent.mt4_clear", body["cmds"])
         names = [f["name"] for f in body["fields"]]
         self.assertIn("from_time", names)
         self.assertIn("interval", names)

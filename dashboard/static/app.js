@@ -23,6 +23,18 @@
     return String(ts).replace("T", " ").slice(0, 19);
   }
 
+  function fmtN(n, digits) {
+    if (n == null || n === "") return "";
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "";
+    return x.toFixed(digits);
+  }
+
+  function shortId(id) {
+    if (!id) return "";
+    return id.length > 8 ? id.slice(0, 8) : id;
+  }
+
   async function refreshStrip() {
     try {
       const s = await jget("/api/status");
@@ -138,10 +150,25 @@
 
   function syncExtraVisibility() {
     const cmd = document.querySelector('[name="cmd"]')?.value || "agent.run";
-    $("job-extra").querySelectorAll("label").forEach((lab) => {
+    document.querySelectorAll("#job-primary label, #job-extra label").forEach((lab) => {
       const el = lab.querySelector("input, select");
       const g = el?.dataset.group;
       const name = el?.name || "";
+      if (cmd === "agent.mt4_clear") {
+        lab.style.display =
+          name === "cmd" ||
+          name === "instrument" ||
+          name === "granularity" ||
+          name === "mt4_prefix" ||
+          name === "quiet"
+            ? ""
+            : "none";
+        return;
+      }
+      if (g === "primary") {
+        lab.style.display = "";
+        return;
+      }
       if (cmd === "agent.executor") {
         lab.style.display = g === "executor" ? "" : "none";
         return;
@@ -264,7 +291,15 @@
   async function showRun(id) {
     selectedRun = id;
     const rec = await jget("/api/journal/runs/" + id);
+    let extra = "";
+    if (rec.walk_id) {
+      try {
+        const walk = await jget("/api/journal/walks/" + rec.walk_id);
+        extra = pane("Walk equity (simulated)", walk.equity);
+      } catch (_) {}
+    }
     $("run-detail").innerHTML =
+      extra +
       pane("Regime", rec.regime) +
       pane("Proposal", rec.proposal) +
       pane("Fill", rec.fill) +
@@ -288,13 +323,17 @@
           "<td>" + (r.side || "") + "</td>" +
           "<td>" + (r.stop != null ? r.stop : "") + "</td>" +
           "<td>" + (r.target != null ? r.target : "") + "</td>" +
+          "<td>" + fmtN(r.r_realized, 2) + "</td>" +
+          "<td>" + fmtN(r.pnl, 2) + "</td>" +
+          "<td>" + fmtN(r.equity_after, 2) + "</td>" +
+          "<td>" + shortId(r.walk_id) + "</td>" +
           "<td>" + (r.regime || "") + (r.trend_waning ? " waning" : "") + "</td>" +
           "<td>" + (r.error ? "yes" : "") + "</td>";
         tr.addEventListener("click", () => showRun(r.run_id));
         tb.appendChild(tr);
       });
     } catch (err) {
-      tb.innerHTML = "<tr><td colspan=\"8\">journal load failed</td></tr>";
+      tb.innerHTML = "<tr><td colspan=\"12\">journal load failed</td></tr>";
     }
   }
 

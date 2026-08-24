@@ -62,9 +62,15 @@ Run from the repo root with the project venv.
    `qwen3:4b`). Not required for `--no-rag --no-llm`.
 3. **Corpus** with source id `lien-fx` ingested into Chroma if you want citations.
    See [Corpus Runbook](CORPUS_RUNBOOK.md). `--no-rag` skips this.
-4. **MT4 overlay** is optional: `SandboxChartBridge.mq4` on a chart whose
-   **symbol and timeframe match** the run (Daily classification needs D1).
-   AutoTrading can stay off.
+4. **MT4 overlay** is optional: attach `SandboxChartBridge.mq4` to **each
+   chart** you care about (same symbol and timeframe as that chart; Daily
+   classification needs D1). Python still issues **one overlay at a time**
+   (`GBP_USD` + `D` writes `sandbox002/GBPUSD_D1/`). Other charts keep their
+   objects and keep heartbeating. AutoTrading can stay off. Wipe leftover
+   objects with `python -m agent.mt4_clear --instrument GBP_USD --granularity D`
+   (default prefix `sbox.`). Recompile the EA after pulling (**v1.04**) so
+   each chart uses its own inbox and hidden objects are deleted, not only
+   deselected.
 
 FastAPI (`localhost:8000`) does **not** need to be running. The graph talks to
 OANDA, Chroma, and Ollama directly.
@@ -268,8 +274,13 @@ uses only `bars[:i+1][-lookback:]` (no look-forward). No RAG / LLM.
 `--mt4` paints walk ranges (`sbox.regime.walk.`) plus, for **every** sequential
 fill, direction (arrow + `long`/`short` text), time-bounded stop (red dash) and
 take-profit (green dash) on `sbox.ticket.walk.`. Not chart-wide hlines. Every
-fill is a journal row; the list shows side / stop / target; detail includes the
-fill exit (`stop` / `target` / `window_end`).
+fill is a journal row; the list shows side / stop / target / R / simulated pnl
+and equity; detail includes the fill exit (`stop` / `target` / `window_end`).
+
+Simulated equity compounds per fill: `pnl = equity * risk_fraction * R`, then
+`equity += pnl` (default 2% of current equity). Each walk has a `walk_id`. The
+CLI JSON and `GET /api/journal/walks/{walk_id}` report n, win rate, sum/mean R,
+ending equity, and max drawdown. This is not broker P&L.
 
 ```bash
 .venv/bin/python -m agent.walk \
@@ -297,19 +308,21 @@ plus a journaled `wait`):
 .venv/bin/python -m agent.run --instrument GBP_USD --granularity D --mt4
 ```
 
-`--mt4` refuses if the EA heartbeat is stale or the chart is not GBPUSD D1
-(or whatever instrument/TF you passed). Regime overlay is bands, MA stack,
+`--mt4` refuses if that chart's EA heartbeat is stale or the chart is not
+GBPUSD D1 (or whatever instrument/TF you passed). Run one pair at a time;
+leave the EA attached on other charts. Regime overlay is bands, MA stack,
 10-bar high/low, regime label, and a color legend — not oscillator panes.
 If policy passes, entry / stop / target are drawn as hlines on prefix
 `sbox.ticket.` (does not clear `sbox.regime.`), with a vline/arrow at the
-decision bar (`regime.last_time`). Each MT4 command waits until the EA
-heartbeat `last_cmd_id` matches, so the ticket write cannot overwrite
-`cmd.json` before the regime overlay is applied. MCP: `mt4_draw_ticket`
-(explicit prices or journal `run_id`). Display only; no MT4 orders.
-`cmd.json` is pretty-printed so MQL4 `FileReadString` does not split `t1`
-timestamps (that left only the corner legend visible). Recompile
-`SandboxChartBridge.mq4` after pulling for `vline` support and the binary
-file reader.
+decision bar (`regime.last_time`). Each MT4 command waits until **that
+chart's** heartbeat `last_cmd_id` matches, so the ticket write cannot
+overwrite `sandbox002/GBPUSD_D1/cmd.json` before the regime overlay is
+accepted. The EA heartbeats that id before drawing (a full overlay can take
+longer than the wait). MCP: `mt4_draw_ticket` (explicit prices or journal
+`run_id`). Display only; no MT4 orders. `cmd.json` is compact; the EA reads
+it as FILE_BIN chunks so `t1` timestamps are not split. Recompile
+`SandboxChartBridge.mq4` after pulling (v1.04: per-chart inbox; acks before
+drawing; init does not replay leftover `cmd.json`).
 
 **Paper journal loop** (two terminals):
 
@@ -342,5 +355,5 @@ No network. From repo root:
 ```bash
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
   tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
-  tests.test_agent_paper_walk -v
+  tests.test_agent_paper_walk tests.test_agent_mt4_clear -v
 ```

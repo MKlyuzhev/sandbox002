@@ -38,6 +38,10 @@ class TestMapsAndTime(unittest.TestCase):
         with self.assertRaises(mt4_bridge.Mt4BridgeError):
             mt4_bridge.map_timeframe("S5")
 
+    def test_chart_key(self) -> None:
+        self.assertEqual(mt4_bridge.chart_key("GBP_USD", "D"), "GBPUSD_D1")
+        self.assertEqual(mt4_bridge.chart_key("EURUSD", "H1"), "EURUSD_H1")
+
     def test_parse_rfc3339_and_offset(self) -> None:
         utc = mt4_bridge.parse_rfc3339_utc("2024-06-01T00:00:00.000000000Z")
         self.assertEqual(utc, 1717200000)
@@ -96,13 +100,20 @@ class TestInbox(unittest.TestCase):
         self._tmp.cleanup()
 
     def _write_heartbeat(
-        self, symbol: str = "GBPUSD", period: int = 60, ea_ok: bool = True
+        self,
+        symbol: str = "GBPUSD",
+        period: int = 60,
+        ea_ok: bool = True,
+        *,
+        timeframe: str | None = None,
+        folder_symbol: str | None = None,
+        folder_timeframe: str | None = None,
     ) -> None:
-        inbox = mt4_bridge.ensure_inbox()
+        tf = timeframe or mt4_bridge.PERIOD_TO_TF.get(period, "H1")
         payload = {
             "symbol": symbol,
             "period": period,
-            "timeframe": "H1",
+            "timeframe": tf,
             "time_current": 1_000_000,
             "time_gmt": 1_000_000,
             "offset_seconds": 0,
@@ -112,15 +123,25 @@ class TestInbox(unittest.TestCase):
             "object_count": 0,
             "last_prefix": "",
         }
-        (inbox / mt4_bridge.HEARTBEAT_NAME).write_text(
+        dest = mt4_bridge.ensure_chart_dir(
+            folder_symbol or symbol, folder_timeframe or tf
+        )
+        (dest / mt4_bridge.HEARTBEAT_NAME).write_text(
             json.dumps(payload), encoding="utf-8"
         )
+
+    def _cmd_path(self, symbol: str = "GBP_USD", timeframe: str = "H1"):
+        return mt4_bridge.chart_dir(symbol, timeframe) / mt4_bridge.CMD_NAME
+
+    def _hb_path(self, symbol: str = "GBP_USD", timeframe: str = "H1"):
+        return mt4_bridge.chart_dir(symbol, timeframe) / mt4_bridge.HEARTBEAT_NAME
 
     def test_status_writable_without_ea(self) -> None:
         st = mt4_bridge.status()
         self.assertTrue(st["inbox_writable"])
         self.assertFalse(st["ea_ok"])
         self.assertIsNone(st["heartbeat"])
+        self.assertEqual(st["charts"], [])
 
     def test_upsert_writes_cmd_when_chart_matches(self) -> None:
         self._write_heartbeat("GBPUSD", 60)
@@ -142,18 +163,20 @@ class TestInbox(unittest.TestCase):
             prefix="sbox.formation.",
         )
         self.assertTrue(result["ok"], result)
-        cmd_path = mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME
+        cmd_path = self._cmd_path("GBP_USD", "H1")
         cmd = json.loads(cmd_path.read_text(encoding="utf-8"))
         self.assertEqual(cmd["op"], "upsert")
         self.assertEqual(cmd["symbol"], "GBPUSD")
         self.assertEqual(cmd["objects"][0]["name"], "sbox.formation.line1")
         self.assertTrue(cmd["clear_prefix_first"])
         raw = cmd_path.read_text(encoding="utf-8")
-        self.assertIn("\n", raw)
-        self.assertTrue(all(len(line) < 4095 for line in raw.splitlines()))
+        self.assertNotIn("\n", raw)
+        parsed = json.loads(raw)
+        self.assertEqual(parsed["objects"][0]["t1"], 1717200000)
 
-    def test_write_command_pretty_prints_under_mql4_line_limit(self) -> None:
-        # Compact one-line JSON >4095 chars is split mid-t1 by FILE_TXT FileReadString.
+    def test_write_command_compact_json_over_4095_stays_one_line(self) -> None:
+        # EA reads FILE_BIN chunks; compact JSON is fine as long as it is not
+        # FILE_TXT-split. Payload must still round-trip.
         objects = [
             {
                 "name": f"sbox.regime.sma20.{i}",
@@ -171,16 +194,23 @@ class TestInbox(unittest.TestCase):
             {"op": "upsert", "objects": objects}, separators=(",", ":")
         )
         self.assertGreater(len(compact), 4095)
-        mt4_bridge.write_command({"op": "upsert", "objects": objects})
-        raw = (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(
-            encoding="utf-8"
+        mt4_bridge.write_command(
+            {
+                "op": "upsert",
+                "symbol": "GBPUSD",
+                "timeframe": "H1",
+                "objects": objects,
+            }
         )
-        self.assertIn("\n", raw)
-        self.assertTrue(all(len(line) < 4095 for line in raw.splitlines()))
-        self.assertIn('"t1": 1717200000', raw)
+        raw = self._cmd_path("GBPUSD", "H1").read_text(encoding="utf-8")
+        self.assertGreater(len(raw), 4095)
+        self.assertNotIn("\n", raw)
+        self.assertIn('"t1":1717200000', raw)
 
     def test_upsert_refuses_symbol_mismatch(self) -> None:
-        self._write_heartbeat("EURUSD", 60)
+        self._write_heartbeat(
+            "EURUSD", 60, folder_symbol="GBPUSD", folder_timeframe="H1"
+        )
         result = mt4_bridge.upsert_objects(
             "GBP_USD",
             "H1",
@@ -189,15 +219,36 @@ class TestInbox(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertFalse(result["chart_ok"])
         self.assertIn("symbol", result["error"].lower())
-        self.assertFalse((mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).exists())
+        self.assertFalse(self._cmd_path("GBP_USD", "H1").exists())
+
+    def test_upsert_does_not_write_other_chart_cmd(self) -> None:
+        self._write_heartbeat("GBPUSD", 60)
+        self._write_heartbeat("EURUSD", 60)
+        result = mt4_bridge.upsert_objects(
+            "GBP_USD",
+            "H1",
+            [{"name": "x", "type": "hline", "p1": 1.27}],
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(self._cmd_path("GBPUSD", "H1").exists())
+        self.assertFalse(self._cmd_path("EURUSD", "H1").exists())
+
+    def test_status_scans_live_charts(self) -> None:
+        self._write_heartbeat("GBPUSD", 60)
+        self._write_heartbeat("EURUSD", 1440)
+        st = mt4_bridge.status()
+        self.assertTrue(st["ea_ok"])
+        keys = {(c["symbol"], c["timeframe"]) for c in st["charts"]}
+        self.assertIn(("GBPUSD", "H1"), keys)
+        self.assertIn(("EURUSD", "D1"), keys)
 
     def test_clear_layer_writes_cmd(self) -> None:
         self._write_heartbeat()
-        result = mt4_bridge.clear_layer("sbox.")
-        self.assertTrue(result["ok"], result)
-        cmd = json.loads(
-            (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(encoding="utf-8")
+        result = mt4_bridge.clear_layer(
+            "sbox.", symbol="GBP_USD", timeframe="H1"
         )
+        self.assertTrue(result["ok"], result)
+        cmd = json.loads(self._cmd_path("GBP_USD", "H1").read_text(encoding="utf-8"))
         self.assertEqual(cmd["op"], "clear")
         self.assertEqual(cmd["prefix"], "sbox.")
 
@@ -211,13 +262,17 @@ class TestInbox(unittest.TestCase):
 
         def _ack() -> None:
             time.sleep(0.08)
-            path = mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME
+            path = self._hb_path("GBPUSD", "H1")
             hb = json.loads(path.read_text(encoding="utf-8"))
             hb["last_cmd_id"] = cmd_id
             path.write_text(json.dumps(hb), encoding="utf-8")
 
         threading.Thread(target=_ack, daemon=True).start()
-        self.assertTrue(mt4_bridge.wait_for_cmd_ack(cmd_id, timeout=2.0))
+        self.assertTrue(
+            mt4_bridge.wait_for_cmd_ack(
+                cmd_id, timeout=2.0, symbol="GBPUSD", timeframe="H1"
+            )
+        )
 
     def test_write_command_waits_for_ack_before_return(self) -> None:
         self._write_heartbeat()
@@ -226,26 +281,22 @@ class TestInbox(unittest.TestCase):
 
         def _ack() -> None:
             time.sleep(0.08)
-            cmd = json.loads(
-                (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(
-                    encoding="utf-8"
-                )
-            )
+            cmd = json.loads(self._cmd_path("GBPUSD", "H1").read_text(encoding="utf-8"))
             seen.append(cmd["id"])
-            path = mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME
+            path = self._hb_path("GBPUSD", "H1")
             hb = json.loads(path.read_text(encoding="utf-8"))
             hb["last_cmd_id"] = cmd["id"]
             path.write_text(json.dumps(hb), encoding="utf-8")
 
         threading.Thread(target=_ack, daemon=True).start()
-        cmd_id = mt4_bridge.write_command({"op": "clear", "prefix": "sbox."})
+        cmd_id = mt4_bridge.write_command(
+            {"op": "clear", "prefix": "sbox.", "symbol": "GBPUSD", "timeframe": "H1"}
+        )
         self.assertEqual(seen, [cmd_id])
         self.assertEqual(
-            json.loads(
-                (mt4_bridge.inbox_dir() / mt4_bridge.HEARTBEAT_NAME).read_text(
-                    encoding="utf-8"
-                )
-            )["last_cmd_id"],
+            json.loads(self._hb_path("GBPUSD", "H1").read_text(encoding="utf-8"))[
+                "last_cmd_id"
+            ],
             cmd_id,
         )
 
@@ -356,11 +407,11 @@ class TestTicketInbox(unittest.TestCase):
         self._tmp.cleanup()
 
     def _write_heartbeat(self, symbol: str = "GBPUSD", period: int = 1440) -> None:
-        inbox = mt4_bridge.ensure_inbox()
+        tf = mt4_bridge.PERIOD_TO_TF.get(period, "D1")
         payload = {
             "symbol": symbol,
             "period": period,
-            "timeframe": "D1",
+            "timeframe": tf,
             "time_current": 1_000_000,
             "time_gmt": 1_000_000,
             "offset_seconds": 0,
@@ -370,7 +421,8 @@ class TestTicketInbox(unittest.TestCase):
             "object_count": 0,
             "last_prefix": "",
         }
-        (inbox / mt4_bridge.HEARTBEAT_NAME).write_text(
+        dest = mt4_bridge.ensure_chart_dir(symbol, tf)
+        (dest / mt4_bridge.HEARTBEAT_NAME).write_text(
             json.dumps(payload), encoding="utf-8"
         )
 
@@ -381,7 +433,9 @@ class TestTicketInbox(unittest.TestCase):
         )
         self.assertTrue(result["ok"], result)
         cmd = json.loads(
-            (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(encoding="utf-8")
+            (mt4_bridge.chart_dir("GBP_USD", "D") / mt4_bridge.CMD_NAME).read_text(
+                encoding="utf-8"
+            )
         )
         self.assertEqual(cmd["op"], "upsert")
         self.assertEqual(cmd["prefix"], "sbox.ticket.")
@@ -391,10 +445,10 @@ class TestTicketInbox(unittest.TestCase):
 
     def test_apply_ticket_converts_rfc3339_to_broker_time(self) -> None:
         self._write_heartbeat()
-        inbox = mt4_bridge.ensure_inbox()
-        hb = json.loads((inbox / mt4_bridge.HEARTBEAT_NAME).read_text(encoding="utf-8"))
+        path = mt4_bridge.chart_dir("GBP_USD", "D") / mt4_bridge.HEARTBEAT_NAME
+        hb = json.loads(path.read_text(encoding="utf-8"))
         hb["offset_seconds"] = 3600
-        (inbox / mt4_bridge.HEARTBEAT_NAME).write_text(json.dumps(hb), encoding="utf-8")
+        path.write_text(json.dumps(hb), encoding="utf-8")
         result = mt4_bridge.apply_ticket(
             "GBP_USD",
             "D",
@@ -406,7 +460,9 @@ class TestTicketInbox(unittest.TestCase):
         )
         self.assertTrue(result["ok"], result)
         cmd = json.loads(
-            (mt4_bridge.inbox_dir() / mt4_bridge.CMD_NAME).read_text(encoding="utf-8")
+            (mt4_bridge.chart_dir("GBP_USD", "D") / mt4_bridge.CMD_NAME).read_text(
+                encoding="utf-8"
+            )
         )
         vline = next(o for o in cmd["objects"] if o["type"] == "vline")
         self.assertEqual(vline["t1"], 1717200000 + 3600)

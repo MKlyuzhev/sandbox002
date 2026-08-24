@@ -308,7 +308,11 @@ async def run(
                 )
             else:
                 clearer = mt4_bridge.clear_layer
-                clear_result = clearer(mt4_bridge.TICKET_PREFIX)
+                clear_result = clearer(
+                    mt4_bridge.TICKET_PREFIX,
+                    symbol=goal.instrument,
+                    timeframe=goal.granularity,
+                )
                 traces.append(
                     _trace(
                         "mt4_ticket",

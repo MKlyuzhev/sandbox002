@@ -6,12 +6,14 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from agent.journal import Journal
+from agent.paper_walk import summarize_equity
 from agent.schema import RunRecord
 from app import mt4_bridge, ollama_client
 from dashboard import gpu as gpu_mod
@@ -50,7 +52,7 @@ def _jobs(request: Request) -> JobManager:
     return mgr
 
 
-def _run_summary(record: RunRecord) -> dict:
+def _run_summary(record: RunRecord, fill: Any | None = None) -> dict:
     regime = record.regime or {}
     proposal = record.proposal
     return {
@@ -65,6 +67,10 @@ def _run_summary(record: RunRecord) -> dict:
         "side": None if proposal is None else proposal.side,
         "stop": None if proposal is None else proposal.stop,
         "target": None if proposal is None else proposal.target,
+        "walk_id": record.walk_id,
+        "r_realized": None if fill is None else fill.r_realized,
+        "pnl": None if fill is None else fill.pnl,
+        "equity_after": None if fill is None else fill.equity_after,
         "error": record.error,
     }
 
@@ -81,7 +87,7 @@ async def status(request: Request) -> dict:
     ollama_ok = await ollama_client.is_reachable()
     models = await ollama_client.list_running_models() if ollama_ok else []
     runs = journal.list_runs(limit=1)
-    last = _run_summary(runs[0]) if runs else None
+    last = _run_summary(runs[0], journal.get_fill(runs[0].run_id)) if runs else None
     try:
         mt4 = mt4_bridge.status()
         mt4_out = {
@@ -120,11 +126,34 @@ async def list_runs(
     limit: int = Query(50, ge=1, le=500),
     instrument: str | None = None,
     action: str | None = None,
+    walk_id: str | None = None,
 ) -> dict:
-    records = _journal(request).list_runs(
-        limit=limit, instrument=instrument, action=action
+    journal = _journal(request)
+    records = journal.list_runs(
+        limit=limit, instrument=instrument, action=action, walk_id=walk_id
     )
-    return {"runs": [_run_summary(r) for r in records]}
+    return {"runs": [_run_summary(r, journal.get_fill(r.run_id)) for r in records]}
+
+
+@app.get("/api/journal/walks/{walk_id}")
+async def get_walk(walk_id: str, request: Request) -> dict:
+    journal = _journal(request)
+    fills = journal.list_fills_for_walk(walk_id)
+    records = journal.list_runs(limit=500, walk_id=walk_id)
+    if not fills and not records:
+        raise HTTPException(status_code=404, detail="walk not found")
+    starting = 10_000.0
+    risk_fraction = 0.02
+    if records:
+        oldest = records[-1]
+        starting = float(oldest.goal.balance)
+        risk_fraction = float(oldest.goal.risk_fraction)
+    equity = summarize_equity(walk_id, fills, starting, risk_fraction)
+    return {
+        "walk_id": walk_id,
+        "equity": equity.model_dump(mode="json"),
+        "fills": [f.model_dump(mode="json") for f in fills],
+    }
 
 
 @app.get("/api/journal/runs/{run_id}")

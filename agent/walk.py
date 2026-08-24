@@ -87,7 +87,7 @@ async def _async_main(args: argparse.Namespace) -> int:
             start_index,
             args.lookback,
         )
-        trades = walk_paper(
+        result = walk_paper(
             bars,
             goal,
             lookback=args.lookback,
@@ -108,8 +108,10 @@ async def _async_main(args: argparse.Namespace) -> int:
         "start_index": start_index,
         "summary": collapsed["summary"],
         "runs": collapsed["runs"],
-        "trades": [t.model_dump(mode="json") for t in trades],
-        "trade_count": len(trades),
+        "walk_id": result.walk_id,
+        "equity": result.equity.model_dump(mode="json"),
+        "trades": [t.model_dump(mode="json") for t in result.trades],
+        "trade_count": len(result.trades),
     }
 
     if args.mt4:
@@ -130,7 +132,7 @@ async def _async_main(args: argparse.Namespace) -> int:
             print(json.dumps(payload, indent=2, default=str))
             return 1
         tickets = mt4_bridge.apply_paper_walk_tickets(
-            [t.model_dump(mode="json") for t in trades],
+            [t.model_dump(mode="json") for t in result.trades],
             args.instrument,
             args.granularity,
             prefix=args.mt4_ticket_prefix,

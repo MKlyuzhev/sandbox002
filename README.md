@@ -279,6 +279,7 @@ journal. No broker orders. Usage, flags, journal, and stub executor:
 .venv/bin/python -m agent.walk --instrument GBP_USD --granularity D \
   --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
 .venv/bin/python -m agent.executor --once
+.venv/bin/python -m agent.mt4_clear
 ```
 
 ## Ops dashboard

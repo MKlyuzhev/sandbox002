@@ -71,6 +71,21 @@ def r_multiple(entry: float, stop: float, exit_price: float) -> float:
     return (exit_price - entry) / risk
 
 
+def apply_r_to_equity(
+    equity: float, risk_fraction: float, r_realized: float
+) -> tuple[float, float]:
+    """Compound one trade: pnl = equity * risk_fraction * R, then add pnl.
+
+    Returns ``(pnl, equity_after)``.
+    """
+    if equity <= 0:
+        raise RiskError("equity must be positive")
+    if not 0 < risk_fraction <= 1:
+        raise RiskError("risk_fraction must be in (0, 1]")
+    pnl = equity * risk_fraction * r_realized
+    return pnl, equity + pnl
+
+
 def expectancy(win_rate: float, avg_win_r: float, avg_loss_r: float) -> float:
     """Return per-trade expectancy in R.
 

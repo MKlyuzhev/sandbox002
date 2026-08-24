@@ -110,6 +110,49 @@ class TestJournal(unittest.TestCase):
         self.assertEqual(loaded.r_realized, -1.0)
         self.assertEqual(self.journal.list_pending(), [])
 
+    def test_walk_id_and_equity_persist(self) -> None:
+        record = _record(action="pending_exec", run_id="walk1")
+        record = record.model_copy(update={"walk_id": "abc123"})
+        self.journal.append_run(record, queue_fill=False)
+        self.journal.record_fill(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00+00:00",
+                note="walk fill",
+                walk_id="abc123",
+            )
+        )
+        self.journal.record_exit(
+            SimFill(
+                run_id="walk1",
+                status="filled_sim",
+                fill_price=1.27,
+                ts="2024-01-01T00:00:00+00:00",
+                note="walk exit stop",
+                exit_status="stop",
+                exit_price=1.268,
+                exit_ts="2024-01-02T00:00:00+00:00",
+                r_realized=-1.0,
+                walk_id="abc123",
+                pnl=-200.0,
+                equity_after=9800.0,
+            )
+        )
+        loaded_run = self.journal.get_run("walk1")
+        self.assertEqual(loaded_run.walk_id, "abc123")
+        loaded = self.journal.get_fill("walk1")
+        self.assertEqual(loaded.walk_id, "abc123")
+        self.assertEqual(loaded.pnl, -200.0)
+        self.assertEqual(loaded.equity_after, 9800.0)
+        listed = self.journal.list_runs(walk_id="abc123")
+        self.assertEqual([r.run_id for r in listed], ["walk1"])
+        self.assertEqual(self.journal.list_runs(walk_id="missing"), [])
+        fills = self.journal.list_fills_for_walk("abc123")
+        self.assertEqual(len(fills), 1)
+        self.assertEqual(fills[0].equity_after, 9800.0)
+
     def test_list_runs_newest_write_not_oldest_decision_bar(self) -> None:
         self.journal.append_run(
             _record(run_id="live", ts="2026-08-16T00:00:00+00:00")

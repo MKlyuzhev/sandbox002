@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS runs (
     risk_json TEXT NOT NULL,
     citations_json TEXT,
     trace_json TEXT,
-    error TEXT
+    error TEXT,
+    walk_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS fills (
@@ -40,15 +41,22 @@ CREATE TABLE IF NOT EXISTS fills (
     exit_price REAL,
     exit_ts TEXT,
     r_realized REAL,
+    walk_id TEXT,
+    pnl REAL,
+    equity_after REAL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
 );
 """
 
+_RUN_EXTRAS = (("walk_id", "TEXT"),)
 _FILL_EXTRAS = (
     ("exit_status", "TEXT"),
     ("exit_price", "REAL"),
     ("exit_ts", "TEXT"),
     ("r_realized", "REAL"),
+    ("walk_id", "TEXT"),
+    ("pnl", "REAL"),
+    ("equity_after", "REAL"),
 )
 
 
@@ -58,6 +66,10 @@ def _now() -> str:
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
+    run_cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+    for name, typ in _RUN_EXTRAS:
+        if name not in run_cols:
+            conn.execute(f"ALTER TABLE runs ADD COLUMN {name} {typ}")
     cols = {row[1] for row in conn.execute("PRAGMA table_info(fills)")}
     for name, typ in _FILL_EXTRAS:
         if name not in cols:
@@ -85,8 +97,8 @@ class Journal:
                 INSERT INTO runs (
                     id, ts, mode, instrument, granularity, action,
                     goal_json, regime_json, proposal_json, risk_json,
-                    citations_json, trace_json, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    citations_json, trace_json, error, walk_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.run_id,
@@ -102,6 +114,7 @@ class Journal:
                     json.dumps(payload["citations"]),
                     json.dumps(payload["tool_trace"]),
                     record.error,
+                    record.walk_id,
                 ),
             )
             if queue_fill and record.action == "pending_exec":
@@ -129,6 +142,7 @@ class Journal:
         limit: int = 50,
         instrument: str | None = None,
         action: str | None = None,
+        walk_id: str | None = None,
     ) -> list[RunRecord]:
         """Newest writes first (SQLite ``rowid``). Walk ``ts`` is the decision bar,
         which can be years earlier than wall-clock snapshot runs."""
@@ -141,6 +155,9 @@ class Journal:
         if action:
             clauses.append("action = ?")
             params.append(action)
+        if walk_id:
+            clauses.append("walk_id = ?")
+            params.append(walk_id)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
         sql = f"SELECT * FROM runs {where} ORDER BY rowid DESC LIMIT ?"
@@ -166,7 +183,8 @@ class Journal:
                 """
                 UPDATE fills
                 SET status = ?, fill_price = ?, ts = ?, note = ?,
-                    exit_status = ?, exit_price = ?, exit_ts = ?, r_realized = ?
+                    exit_status = ?, exit_price = ?, exit_ts = ?, r_realized = ?,
+                    walk_id = ?, pnl = ?, equity_after = ?
                 WHERE run_id = ? AND status = 'pending'
                 """,
                 (
@@ -178,6 +196,9 @@ class Journal:
                     fill.exit_price,
                     fill.exit_ts,
                     fill.r_realized,
+                    fill.walk_id,
+                    fill.pnl,
+                    fill.equity_after,
                     fill.run_id,
                 ),
             )
@@ -186,9 +207,10 @@ class Journal:
                     """
                     INSERT INTO fills (
                         run_id, status, fill_price, ts, note,
-                        exit_status, exit_price, exit_ts, r_realized
+                        exit_status, exit_price, exit_ts, r_realized,
+                        walk_id, pnl, equity_after
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         fill.run_id,
@@ -200,6 +222,9 @@ class Journal:
                         fill.exit_price,
                         fill.exit_ts,
                         fill.r_realized,
+                        fill.walk_id,
+                        fill.pnl,
+                        fill.equity_after,
                     ),
                 )
             conn.commit()
@@ -212,7 +237,7 @@ class Journal:
                 """
                 UPDATE fills
                 SET exit_status = ?, exit_price = ?, exit_ts = ?, r_realized = ?,
-                    note = ?
+                    note = ?, walk_id = ?, pnl = ?, equity_after = ?
                 WHERE run_id = ? AND status = 'filled_sim'
                 """,
                 (
@@ -221,6 +246,9 @@ class Journal:
                     fill.exit_ts,
                     fill.r_realized,
                     fill.note,
+                    fill.walk_id,
+                    fill.pnl,
+                    fill.equity_after,
                     fill.run_id,
                 ),
             )
@@ -239,6 +267,18 @@ class Journal:
             return None
         return _row_to_fill(row)
 
+    def list_fills_for_walk(self, walk_id: str) -> list[SimFill]:
+        with _connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM fills
+                WHERE walk_id = ?
+                ORDER BY id ASC
+                """,
+                (walk_id,),
+            ).fetchall()
+        return [_row_to_fill(row) for row in rows]
+
 
 def _row_to_record(row: sqlite3.Row) -> RunRecord:
     proposal = json.loads(row["proposal_json"]) if row["proposal_json"] else None
@@ -256,6 +296,7 @@ def _row_to_record(row: sqlite3.Row) -> RunRecord:
         citations=json.loads(row["citations_json"] or "[]"),
         tool_trace=json.loads(row["trace_json"] or "[]"),
         error=row["error"],
+        walk_id=row["walk_id"] if "walk_id" in row.keys() else None,
     )
 
 
@@ -271,4 +312,7 @@ def _row_to_fill(row: sqlite3.Row) -> SimFill:
         exit_price=row["exit_price"] if "exit_price" in keys else None,
         exit_ts=row["exit_ts"] if "exit_ts" in keys else None,
         r_realized=row["r_realized"] if "r_realized" in keys else None,
+        walk_id=row["walk_id"] if "walk_id" in keys else None,
+        pnl=row["pnl"] if "pnl" in keys else None,
+        equity_after=row["equity_after"] if "equity_after" in keys else None,
     )

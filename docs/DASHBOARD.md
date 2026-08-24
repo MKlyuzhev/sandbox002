@@ -20,7 +20,7 @@ The dashboard is an ops console, not a second brain.
 
 | May | Must not |
 |-----|----------|
-| Tail `agent.run` / `agent.walk` / `agent.executor` | Reimplement `agent/graph.py` |
+| Tail `agent.run` / `agent.walk` / `agent.executor` / `agent.mt4_clear` | Reimplement `agent/graph.py` |
 | Query `data/journal/runs.sqlite` | Change policy gates |
 | Poll `nvidia-smi` and Ollama `/api/ps` | Load extra models itself |
 | Show MT4 EA heartbeat | Draw a second price chart |
@@ -51,6 +51,12 @@ above the log. There is no free-text argv box.
   flags. No LLM. One-position paper walk (see [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b).
 - `python -m agent.executor` — `--once` by default; More: `--watch` and
   `--interval`
+- `python -m agent.mt4_clear` — delete sandbox objects on **one** EA chart
+  (fields: instrument, granularity, prefix). Default prefix `sbox.`. More:
+  `--prefix` (must start with `sbox.`), `--quiet`. Attach the EA to each chart
+  you care about; this job still clears one pair at a time. The Object List
+  cannot remove these (hidden / non-selectable); this asks the EA to
+  `ObjectDelete` them. Recompile **v1.04** so each chart has its own inbox.
 
 `--journal` (filesystem path) is not exposed. One job at a time (the 3050
 cannot usefully run two LLM jobs). Stdout and stderr are merged and streamed
@@ -60,8 +66,11 @@ cannot usefully run two LLM jobs). Stdout and stderr are merged and streamed
 
 List newest **writes** (not newest decision-bar `ts`). Walk rows use the
 historical bar time, so sorting by `ts` hid them under later snapshot runs.
-Columns include side / stop / target. Detail panes: regime, proposal, fill
-exit, policy, tool_trace. Source: `Journal.list_runs` / `get_run` / `get_fill`.
+Columns include side / stop / target / R / pnl / equity_after / walk_id.
+Detail panes: walk equity (when `walk_id` is set), regime, proposal, fill
+exit, policy, tool_trace. Source: `Journal.list_runs` / `get_run` / `get_fill`
+/ `GET /api/journal/walks/{walk_id}`. Equity figures are simulated (compound
+`pnl = equity * risk_fraction * R`); not broker P&L.
 
 ### GPU / host
 
@@ -82,7 +91,8 @@ exit, policy, tool_trace. Source: `Journal.list_runs` / `get_run` / `get_fill`.
 | Overlay / MT4 | Chart symbol/TF vs last run, `cmd_id` (`--mt4` already draws `sbox.regime.` + `sbox.ticket.`) |
 | Services | RAG `/health`, Chroma chunk count, MCP up |
 
-Defer: walk-forward equity charts, kill switch, live P&amp;L, order ticket.
+Defer: walk-forward equity *charts*, kill switch, live (broker) P&amp;L, order
+ticket. Walk *stats* (ending equity, win rate, max DD) are in the journal.
 (`python -m agent.walk` is the CLI; the dashboard only launches it.)
 
 ---
@@ -112,8 +122,9 @@ API (same origin):
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/status` | Strip payload |
-| GET | `/api/journal/runs` | List (`limit`, `instrument`, `action`) |
-| GET | `/api/journal/runs/{id}` | One `RunRecord` |
+| GET | `/api/journal/runs` | List (`limit`, `instrument`, `action`, `walk_id`) |
+| GET | `/api/journal/runs/{id}` | One `RunRecord` + fill |
+| GET | `/api/journal/walks/{walk_id}` | Simulated walk equity + fills |
 | GET | `/api/host` | GPU + RAM |
 | GET | `/api/jobs/schema` | Typed fields for the Terminal form |
 | POST | `/api/jobs/preview` | Resolved argv (no process) |

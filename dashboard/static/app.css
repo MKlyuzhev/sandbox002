@@ -95,6 +95,8 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.journal-table-wrap { overflow-x: auto; }
+#runs-table { min-width: 860px; }
 @media (max-width: 900px) {
   .journal-layout { grid-template-columns: 1fr; }
 }

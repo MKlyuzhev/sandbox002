@@ -18,7 +18,7 @@ from live FX bars. Not a signal service and not an execution path.
 ```
 OANDA candles → patterns.py → JSON
        ├──────→ formation_plot.py → PNG (--plot)
-       ├──────→ mt4_bridge → MQL4/Files/sandbox002/cmd.json → EA objects (--mt4)
+       ├──────→ mt4_bridge → MQL4/Files/sandbox002/<SYMBOL>_<TF>/cmd.json → EA objects (--mt4)
        └──────→ --brief → corpus chunks + qwen3:4b brief
 ```
 
@@ -83,17 +83,23 @@ The JSON output includes `plot_path` when a chart is written.
 
 ### MT4 chart objects
 
-Display only (no orders). Python writes `cmd.json` under `MQL4/Files/sandbox002/`;
-an always-on EA draws `OBJ_*` objects. Sequential writes wait for heartbeat
-`last_cmd_id` so a later command does not replace an unread `cmd.json`.
-Commands are pretty-printed so MQL4 `FileReadString` (4095-char chunks) does
-not split timestamps. Recompile `SandboxChartBridge.mq4` after pulling the
-binary file reader change.
+Display only (no orders). Python writes `cmd.json` under
+`MQL4/Files/sandbox002/<SYMBOL>_<TF>/` (e.g. `GBPUSD_H1/`); an always-on EA
+on **that chart** draws `OBJ_*` objects. Attach the EA to each chart you
+care about; the CLI/dashboard still run **one pair at a time**. Sequential
+writes wait for that chart's heartbeat `last_cmd_id` so a later command does
+not replace an unread `cmd.json`. The EA acks (`last_cmd_id`) before drawing
+so a large regime overlay does not miss the wait window. Commands are compact
+JSON; the EA reads FILE_BIN chunks (no FILE_TXT 4095-char split of `t1`).
+Recompile `SandboxChartBridge.mq4` after pulling (**v1.04**). On init the EA
+records the current `cmd.json` id in its chart folder and does not replay it
+(restart used to redraw the last ticket arrow). Root `sandbox002/cmd.json` is
+unused.
 
 1. In MetaEditor, compile `Experts/Custom/SandboxChartBridge.mq4`
    (it includes `Include/Custom/JsonMini.mqh`).
-2. Attach **SandboxChartBridge** to the chart you want annotated (same
-   symbol/timeframe as the analysis, e.g. GBPUSD H1). AutoTrading can stay off.
+2. Attach **SandboxChartBridge** to **each** chart you want annotated (same
+   symbol/timeframe as that chart, e.g. GBPUSD H1). AutoTrading can stay off.
 3. Optional: set `MT4_FILES_DIR` in `.env` if the Wine Files path differs.
 4. Check the bridge, then draw:
 

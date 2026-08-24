@@ -39,6 +39,7 @@ class Goal(BaseModel):
     no_rag: bool = False
     no_llm: bool = False
     use_account: bool = False
+    walk_id: str | None = None
 
 
 def _as_text(value: Any) -> str:
@@ -152,6 +153,7 @@ class RunRecord(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     tool_trace: list[ToolTrace] = Field(default_factory=list)
     error: str | None = None
+    walk_id: str | None = None
 
 
 class SimFill(BaseModel):
@@ -164,6 +166,9 @@ class SimFill(BaseModel):
     exit_price: float | None = None
     exit_ts: str | None = None
     r_realized: float | None = None
+    walk_id: str | None = None
+    pnl: float | None = None
+    equity_after: float | None = None
 
 
 class PaperTrade(BaseModel):
@@ -183,3 +188,30 @@ class PaperTrade(BaseModel):
     exit_status: ExitStatus | None = None
     r_realized: float | None = None
     reasons: list[str] = Field(default_factory=list)
+    walk_id: str | None = None
+    pnl: float | None = None
+    equity_after: float | None = None
+
+
+class WalkEquity(BaseModel):
+    """Simulated compounded equity for one paper walk. Not a broker P&L."""
+
+    walk_id: str
+    starting_equity: float
+    ending_equity: float
+    risk_fraction: float
+    trade_count: int
+    wins: int
+    losses: int
+    scratches: int
+    win_rate: float | None = None
+    sum_r: float | None = None
+    mean_r: float | None = None
+    max_drawdown: float = 0.0
+    max_drawdown_frac: float = 0.0
+
+
+class WalkResult(BaseModel):
+    walk_id: str
+    trades: list[PaperTrade] = Field(default_factory=list)
+    equity: WalkEquity

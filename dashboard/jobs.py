@@ -1,4 +1,4 @@
-"""Whitelist subprocess runner: agent.run / agent.walk / agent.executor. No shell."""
+"""Whitelist subprocess runner: agent.run / agent.walk / agent.executor / agent.mt4_clear. No shell."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ _GRANULARITIES = frozenset(
         "M",
     }
 )
-ALLOWED_CMDS = ("agent.run", "agent.walk", "agent.executor")
+ALLOWED_CMDS = ("agent.run", "agent.walk", "agent.executor", "agent.mt4_clear")
 _RFC3339 = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$"
 )
@@ -110,7 +110,7 @@ def _blank_none(value: Any) -> Any:
 
 
 class JobSpec(BaseModel):
-    cmd: Literal["agent.run", "agent.walk", "agent.executor"] = "agent.run"
+    cmd: Literal["agent.run", "agent.walk", "agent.executor", "agent.mt4_clear"] = "agent.run"
     instrument: str = "EUR_USD"
     granularity: str = "D"
     mode: Literal["signal", "paper"] = "signal"
@@ -207,6 +207,21 @@ def build_argv(spec: JobSpec, python: str | None = None) -> list[str]:
     py = python or sys.executable
     if spec.cmd not in ALLOWED_CMDS:
         raise JobError(f"cmd not allowed: {spec.cmd!r}")
+    if spec.cmd == "agent.mt4_clear":
+        argv = [
+            py,
+            "-m",
+            "agent.mt4_clear",
+            "--instrument",
+            spec.instrument,
+            "--granularity",
+            spec.granularity,
+        ]
+        if spec.mt4_prefix:
+            argv.extend(["--prefix", spec.mt4_prefix])
+        if spec.quiet:
+            argv.append("--quiet")
+        return argv
     if spec.cmd == "agent.executor":
         argv = [py, "-m", "agent.executor"]
         if spec.watch:

@@ -8,13 +8,13 @@ No RAG, no LLM, no broker orders. ``agent.executor`` is not used.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from agent import levels as levels_mod
 from agent import policy, propose as propose_mod
 from agent.journal import Journal
-from agent.schema import Goal, PaperTrade, RunRecord, SimFill
+from agent.schema import Goal, PaperTrade, RunRecord, SimFill, WalkEquity, WalkResult
 from app import indicators, regime as regime_mod, regime_walk, risk as risk_lib
 
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
@@ -66,6 +66,50 @@ def _maybe_enter(
     return proposal, verdict
 
 
+def summarize_equity(
+    walk_id: str,
+    trades: Sequence[Any],
+    starting_equity: float,
+    risk_fraction: float,
+) -> WalkEquity:
+    """Walk-level simulated equity stats from sequential compounded fills."""
+    rs = [float(t.r_realized) for t in trades if t.r_realized is not None]
+    wins = sum(1 for r in rs if r > 0)
+    losses = sum(1 for r in rs if r < 0)
+    scratches = sum(1 for r in rs if r == 0)
+    n = len(rs)
+    ending = starting_equity
+    peak = starting_equity
+    max_dd = 0.0
+    max_dd_frac = 0.0
+    for trade in trades:
+        if trade.equity_after is None:
+            continue
+        ending = float(trade.equity_after)
+        peak = max(peak, ending)
+        drawdown = peak - ending
+        max_dd = max(max_dd, drawdown)
+        if peak > 0:
+            max_dd_frac = max(max_dd_frac, drawdown / peak)
+    if trades and trades[-1].equity_after is not None:
+        ending = float(trades[-1].equity_after)
+    return WalkEquity(
+        walk_id=walk_id,
+        starting_equity=round(starting_equity, 4),
+        ending_equity=round(ending, 4),
+        risk_fraction=risk_fraction,
+        trade_count=len(trades),
+        wins=wins,
+        losses=losses,
+        scratches=scratches,
+        win_rate=round(wins / n, 4) if n else None,
+        sum_r=round(sum(rs), 4) if n else None,
+        mean_r=round(sum(rs) / n, 4) if n else None,
+        max_drawdown=round(max_dd, 4),
+        max_drawdown_frac=round(max_dd_frac, 4),
+    )
+
+
 def _close_trade(
     trade: PaperTrade,
     *,
@@ -74,13 +118,19 @@ def _close_trade(
     exit_price: float,
     exit_status: str,
     journal: Journal | None,
-) -> PaperTrade:
+    equity: float,
+    risk_fraction: float,
+) -> tuple[PaperTrade, float]:
     try:
         r_realized = round(
             risk_lib.r_multiple(trade.entry, trade.stop, exit_price), 4
         )
     except risk_lib.RiskError:
         r_realized = None
+    r_for_eq = 0.0 if r_realized is None else r_realized
+    pnl, equity_after = risk_lib.apply_r_to_equity(equity, risk_fraction, r_for_eq)
+    pnl = round(pnl, 4)
+    equity_after = round(equity_after, 4)
     closed = trade.model_copy(
         update={
             "exit_index": exit_index,
@@ -88,6 +138,8 @@ def _close_trade(
             "exit_price": exit_price,
             "exit_status": exit_status,
             "r_realized": r_realized,
+            "pnl": pnl,
+            "equity_after": equity_after,
         }
     )
     if journal is not None:
@@ -102,9 +154,12 @@ def _close_trade(
                 exit_price=exit_price,
                 exit_ts=exit_time,
                 r_realized=r_realized,
+                walk_id=trade.walk_id,
+                pnl=pnl,
+                equity_after=equity_after,
             )
         )
-    return closed
+    return closed, equity_after
 
 
 def _journal_entry(
@@ -115,6 +170,7 @@ def _journal_entry(
     verdict: Any,
     run_id: str,
     bar_time: str,
+    walk_id: str,
 ) -> None:
     if journal is None:
         return
@@ -136,6 +192,7 @@ def _journal_entry(
         citations=[],
         tool_trace=[],
         error=None,
+        walk_id=walk_id,
     )
     journal.append_run(record, queue_fill=False)
     journal.record_fill(
@@ -145,6 +202,7 @@ def _journal_entry(
             fill_price=float(proposal.entry),
             ts=bar_time,
             note="walk fill at decision-bar close; no broker",
+            walk_id=walk_id,
         )
     )
 
@@ -157,10 +215,12 @@ def walk_paper(
     start_index: int | None = None,
     journal: Journal | None = None,
     classify_fn: ClassifyFn | None = None,
-) -> list[PaperTrade]:
+    walk_id: str | None = None,
+) -> WalkResult:
     """Walk causal windows; at most one open paper ticket at a time.
 
     Window at index ``i`` is ``bars[: i + 1][-lookback:]``. Step is always 1.
+    Equity compounds: ``pnl = equity * risk_fraction * R``.
     """
     if lookback < indicators.MIN_BARS:
         raise regime_walk.WalkError(
@@ -179,6 +239,9 @@ def walk_paper(
 
     goal = _goal_for_walk(goal)
     classify = classify_fn or regime_mod.analyze_bars
+    walk_id = walk_id or uuid.uuid4().hex
+    starting = float(goal.balance)
+    equity = starting
     trades: list[PaperTrade] = []
     open_trade: PaperTrade | None = None
     last_i = len(series) - 1
@@ -194,13 +257,15 @@ def walk_paper(
             )
             if hit is not None:
                 status, price = hit
-                open_trade = _close_trade(
+                open_trade, equity = _close_trade(
                     open_trade,
                     exit_index=i,
                     exit_time=bar_time,
                     exit_price=price,
                     exit_status=status,
                     journal=journal,
+                    equity=equity,
+                    risk_fraction=goal.risk_fraction,
                 )
                 trades.append(open_trade)
                 open_trade = None
@@ -225,21 +290,35 @@ def walk_paper(
                     stop=float(proposal.stop),
                     target=float(proposal.target),
                     reasons=list(verdict.reasons),
+                    walk_id=walk_id,
                 )
                 _journal_entry(
-                    journal, goal, analysis, proposal, verdict, run_id, bar_time
+                    journal,
+                    goal,
+                    analysis,
+                    proposal,
+                    verdict,
+                    run_id,
+                    bar_time,
+                    walk_id,
                 )
 
     if open_trade is not None:
         last = series[last_i]
-        open_trade = _close_trade(
+        open_trade, equity = _close_trade(
             open_trade,
             exit_index=last_i,
             exit_time=str(last.get("time") or ""),
             exit_price=float(last["close"]),
             exit_status="window_end",
             journal=journal,
+            equity=equity,
+            risk_fraction=goal.risk_fraction,
         )
         trades.append(open_trade)
 
-    return trades
+    return WalkResult(
+        walk_id=walk_id,
+        trades=trades,
+        equity=summarize_equity(walk_id, trades, starting, goal.risk_fraction),
+    )

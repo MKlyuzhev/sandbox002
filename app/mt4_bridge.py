@@ -1,9 +1,10 @@
 """Wine-safe MT4 chart-object bridge (file inbox, no orders).
 
-Python writes ``cmd.json`` under ``MQL4/Files/sandbox002/``; the
-``SandboxChartBridge`` EA polls it and draws ``OBJ_*`` objects. Heartbeat
-from the EA supplies chart symbol/period and ``TimeCurrent`` vs ``TimeGMT``
-so OANDA RFC3339 timestamps can be shifted to broker time.
+Python writes ``cmd.json`` under ``MQL4/Files/sandbox002/<SYMBOL>_<TF>/``;
+the ``SandboxChartBridge`` EA on that chart polls it and draws ``OBJ_*``
+objects. Heartbeat from the EA supplies chart symbol/period and
+``TimeCurrent`` vs ``TimeGMT`` so OANDA RFC3339 timestamps can be shifted
+to broker time. Each attached chart uses its own folder.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ WALK_SHOW_MARKERS = "markers"
 WALK_SHOW_BOTH = "both"
 WALK_SHOW_CHOICES = (WALK_SHOW_RANGES, WALK_SHOW_MARKERS, WALK_SHOW_BOTH)
 HEARTBEAT_STALE_SEC = 10.0
-CMD_ACK_TIMEOUT_SEC = 8.0
+CMD_ACK_TIMEOUT_SEC = 20.0
 CMD_ACK_POLL_SEC = 0.05
 # Unit tests set this False so a static fake heartbeat does not block.
 WAIT_FOR_ACK = True
@@ -102,6 +103,22 @@ def ensure_inbox() -> Path:
     return path
 
 
+def chart_key(symbol: str, timeframe: str) -> str:
+    """``GBP_USD`` + ``D`` → ``GBPUSD_D1`` (same rule as the EA)."""
+    tf_name, _period = map_timeframe(timeframe)
+    return f"{map_symbol(symbol)}_{tf_name}"
+
+
+def chart_dir(symbol: str, timeframe: str) -> Path:
+    return inbox_dir() / chart_key(symbol, timeframe)
+
+
+def ensure_chart_dir(symbol: str, timeframe: str) -> Path:
+    path = chart_dir(symbol, timeframe)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def map_symbol(instrument: str) -> str:
     """OANDA ``GBP_USD`` → MT4 ``GBPUSD``."""
     return instrument.replace("_", "").replace("/", "").strip().upper()
@@ -161,8 +178,7 @@ def offset_from_heartbeat(heartbeat: dict[str, Any] | None) -> int:
     return int(tc) - int(tg)
 
 
-def read_heartbeat() -> dict[str, Any] | None:
-    path = inbox_dir() / HEARTBEAT_NAME
+def _load_heartbeat(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
@@ -172,11 +188,95 @@ def read_heartbeat() -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def heartbeat_age_sec(path: Path | None = None) -> float | None:
+def read_heartbeat(
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> dict[str, Any] | None:
+    if symbol and timeframe:
+        return _load_heartbeat(chart_dir(symbol, timeframe) / HEARTBEAT_NAME)
+    return _load_heartbeat(inbox_dir() / HEARTBEAT_NAME)
+
+
+def heartbeat_age_sec(
+    path: Path | None = None,
+    *,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> float | None:
+    if path is None and symbol and timeframe:
+        path = chart_dir(symbol, timeframe) / HEARTBEAT_NAME
     hb_path = path or (inbox_dir() / HEARTBEAT_NAME)
     if not hb_path.is_file():
         return None
     return max(0.0, time.time() - hb_path.stat().st_mtime)
+
+
+def _heartbeat_live(hb: dict[str, Any] | None, age: float | None) -> bool:
+    return bool(
+        hb
+        and hb.get("ea_ok", True)
+        and age is not None
+        and age <= HEARTBEAT_STALE_SEC
+    )
+
+
+def _chart_from_heartbeat(
+    hb: dict[str, Any] | None, age: float | None
+) -> dict[str, Any]:
+    period = hb.get("period") if hb else None
+    timeframe = None
+    if hb:
+        timeframe = hb.get("timeframe") or PERIOD_TO_TF.get(int(period or 0))
+    return {
+        "heartbeat": hb,
+        "heartbeat_age_sec": age,
+        "ea_ok": _heartbeat_live(hb, age),
+        "symbol": (hb or {}).get("symbol"),
+        "period": period,
+        "timeframe": timeframe,
+        "last_cmd_id": (hb or {}).get("last_cmd_id"),
+        "last_error": (hb or {}).get("last_error") or "",
+        "object_count": (hb or {}).get("object_count"),
+        "last_prefix": (hb or {}).get("last_prefix"),
+    }
+
+
+def chart_status(symbol: str, timeframe: str) -> dict[str, Any]:
+    path = chart_dir(symbol, timeframe) / HEARTBEAT_NAME
+    hb = _load_heartbeat(path)
+    age = heartbeat_age_sec(path)
+    out = _chart_from_heartbeat(hb, age)
+    out["inbox_dir"] = str(chart_dir(symbol, timeframe))
+    return out
+
+
+def _scan_charts() -> list[dict[str, Any]]:
+    root = inbox_dir()
+    if not root.is_dir():
+        return []
+    charts: list[dict[str, Any]] = []
+    for child in sorted(root.iterdir()):
+        if not child.is_dir():
+            continue
+        path = child / HEARTBEAT_NAME
+        hb = _load_heartbeat(path)
+        if not hb:
+            continue
+        age = heartbeat_age_sec(path)
+        period = hb.get("period")
+        timeframe = hb.get("timeframe") or PERIOD_TO_TF.get(int(period or 0))
+        charts.append(
+            {
+                "symbol": hb.get("symbol"),
+                "timeframe": timeframe,
+                "age": age,
+                "last_cmd_id": hb.get("last_cmd_id"),
+                "ea_ok": _heartbeat_live(hb, age),
+                "heartbeat": hb,
+            }
+        )
+    charts.sort(key=lambda c: c["age"] if c["age"] is not None else 1e9)
+    return charts
 
 
 def status() -> dict[str, Any]:
@@ -190,32 +290,25 @@ def status() -> dict[str, Any]:
         writable = True
     except OSError:
         writable = False
-    hb = read_heartbeat()
-    age = heartbeat_age_sec()
-    ea_ok = bool(
-        hb
-        and hb.get("ea_ok", True)
-        and age is not None
-        and age <= HEARTBEAT_STALE_SEC
-    )
-    period = hb.get("period") if hb else None
-    timeframe = None
-    if hb:
-        timeframe = hb.get("timeframe") or PERIOD_TO_TF.get(int(period or 0))
-    return {
-        "inbox_dir": str(inbox),
-        "inbox_writable": writable,
-        "heartbeat": hb,
-        "heartbeat_age_sec": age,
-        "ea_ok": ea_ok,
-        "symbol": (hb or {}).get("symbol"),
-        "period": period,
-        "timeframe": timeframe,
-        "last_cmd_id": (hb or {}).get("last_cmd_id"),
-        "last_error": (hb or {}).get("last_error") or "",
-        "object_count": (hb or {}).get("object_count"),
-        "last_prefix": (hb or {}).get("last_prefix"),
-    }
+    scanned = _scan_charts()
+    live = [c for c in scanned if c.get("ea_ok")]
+    chosen = live[0] if live else (scanned[0] if scanned else None)
+    hb = (chosen or {}).get("heartbeat") if chosen else None
+    age = (chosen or {}).get("age") if chosen else None
+    out = _chart_from_heartbeat(hb, age)
+    out["inbox_dir"] = str(inbox)
+    out["inbox_writable"] = writable
+    out["ea_ok"] = bool(live)
+    out["charts"] = [
+        {
+            "symbol": c.get("symbol"),
+            "timeframe": c.get("timeframe"),
+            "age": c.get("age"),
+            "last_cmd_id": c.get("last_cmd_id"),
+        }
+        for c in scanned
+    ]
+    return out
 
 
 def _atomic_write_json(
@@ -231,21 +324,31 @@ def _atomic_write_json(
     tmp.replace(path)
 
 
-def wait_for_cmd_ack(cmd_id: str, timeout: float = CMD_ACK_TIMEOUT_SEC) -> bool:
-    """Block until the EA heartbeat reports ``last_cmd_id``.
+def wait_for_cmd_ack(
+    cmd_id: str,
+    timeout: float = CMD_ACK_TIMEOUT_SEC,
+    *,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> bool:
+    """Block until that chart's EA heartbeat reports ``last_cmd_id``.
 
-    Returns True if acked, if there is no live EA, or if waiting is disabled.
-    The inbox is a single ``cmd.json``; callers must wait before the next write
-    or the EA will only see the last command (regime overlay lost to ticket).
+    Returns True if acked, if there is no live EA on that chart, or if
+    waiting is disabled. Callers must wait before the next write to the
+    same chart or the EA will only see the last command.
     """
     if not WAIT_FOR_ACK or not cmd_id:
         return True
-    st = status()
+    if not symbol or not timeframe:
+        if not status().get("ea_ok"):
+            return True
+        return True
+    st = chart_status(symbol, timeframe)
     if not st.get("ea_ok"):
         return True
     deadline = time.monotonic() + max(0.05, float(timeout))
     while time.monotonic() < deadline:
-        hb = read_heartbeat() or {}
+        hb = read_heartbeat(symbol, timeframe) or {}
         if hb.get("last_cmd_id") == cmd_id:
             return True
         time.sleep(CMD_ACK_POLL_SEC)
@@ -253,20 +356,40 @@ def wait_for_cmd_ack(cmd_id: str, timeout: float = CMD_ACK_TIMEOUT_SEC) -> bool:
         "MT4 EA did not ack cmd %s within %.1fs (last_cmd_id=%r)",
         cmd_id,
         timeout,
-        (read_heartbeat() or {}).get("last_cmd_id"),
+        (read_heartbeat(symbol, timeframe) or {}).get("last_cmd_id"),
     )
     return False
 
 
-def write_command(payload: dict[str, Any]) -> str:
+def _command_chart(
+    payload: dict[str, Any],
+    symbol: str | None,
+    timeframe: str | None,
+) -> tuple[str, str]:
+    sym = symbol or payload.get("symbol")
+    tf = timeframe or payload.get("timeframe")
+    if not sym or not tf:
+        raise Mt4BridgeError("command requires symbol and timeframe")
+    return str(sym), str(tf)
+
+
+def write_command(
+    payload: dict[str, Any],
+    *,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> str:
     cmd_id = payload.get("id") or str(uuid.uuid4())
     payload = dict(payload)
     payload["id"] = cmd_id
-    # Pretty JSON: MQL4 FILE_TXT FileReadString stops at '\\n' or 4095 chars.
-    # A compact one-line cmd.json was split mid-number (t1), so SMA/BB trends
-    # landed in 1970 and only corner labels (no t1) stayed visible.
-    _atomic_write_json(ensure_inbox() / CMD_NAME, payload, indent=2)
-    wait_for_cmd_ack(cmd_id)
+    sym, tf = _command_chart(payload, symbol, timeframe)
+    payload["symbol"] = map_symbol(sym)
+    payload["timeframe"] = map_timeframe(tf)[0]
+    # Compact JSON. The EA reads FILE_BIN in 4095-byte chunks (no FILE_TXT
+    # newline injection). Pretty-print made 400-object regime upserts too
+    # slow to ack within the wait window.
+    _atomic_write_json(ensure_chart_dir(sym, tf) / CMD_NAME, payload)
+    wait_for_cmd_ack(cmd_id, symbol=sym, timeframe=tf)
     return cmd_id
 
 
@@ -322,11 +445,14 @@ def check_chart(
     timeframe: str,
     heartbeat: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
-    st = status() if heartbeat is None else None
-    hb = heartbeat if heartbeat is not None else (st or {}).get("heartbeat")
-    ea_ok = True if heartbeat is not None else bool((st or {}).get("ea_ok"))
-    if heartbeat is None and not ea_ok:
-        return False, "EA heartbeat missing or stale; attach SandboxChartBridge."
+    if heartbeat is None:
+        st = chart_status(symbol, timeframe)
+        hb = st.get("heartbeat")
+        ea_ok = bool(st.get("ea_ok"))
+        if not ea_ok:
+            return False, "EA heartbeat missing or stale; attach SandboxChartBridge."
+    else:
+        hb = heartbeat
     if not hb:
         return False, "EA heartbeat missing; attach SandboxChartBridge."
     want_sym = map_symbol(symbol)
@@ -351,7 +477,7 @@ def upsert_objects(
     clear_prefix_first: bool = True,
     require_chart_match: bool = True,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(symbol, timeframe)
     if require_chart_match:
         ok, reason = check_chart(symbol, timeframe, heartbeat=st.get("heartbeat"))
         if not st.get("ea_ok") or not ok:
@@ -375,7 +501,9 @@ def upsert_objects(
             "prefix": prefix,
             "clear_prefix_first": clear_prefix_first,
             "objects": normalized,
-        }
+        },
+        symbol=symbol,
+        timeframe=timeframe,
     )
     return {
         "ok": True,
@@ -390,8 +518,11 @@ def upsert_objects(
 def delete_objects(
     names: list[str] | None = None,
     prefix: str = "",
+    *,
+    symbol: str,
+    timeframe: str,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(symbol, timeframe)
     if not st.get("ea_ok"):
         return {
             "ok": False,
@@ -404,13 +535,22 @@ def delete_objects(
             "op": "delete",
             "names": list(names or []),
             "prefix": prefix,
-        }
+            "symbol": map_symbol(symbol),
+            "timeframe": map_timeframe(timeframe)[0],
+        },
+        symbol=symbol,
+        timeframe=timeframe,
     )
     return {"ok": True, "cmd_id": cmd_id, "status": st}
 
 
-def clear_layer(prefix: str = DEFAULT_PREFIX) -> dict[str, Any]:
-    st = status()
+def clear_layer(
+    prefix: str = DEFAULT_PREFIX,
+    *,
+    symbol: str,
+    timeframe: str,
+) -> dict[str, Any]:
+    st = chart_status(symbol, timeframe)
     if not st.get("ea_ok"):
         return {
             "ok": False,
@@ -418,7 +558,16 @@ def clear_layer(prefix: str = DEFAULT_PREFIX) -> dict[str, Any]:
             "chart_ok": False,
             "status": st,
         }
-    cmd_id = write_command({"op": "clear", "prefix": prefix})
+    cmd_id = write_command(
+        {
+            "op": "clear",
+            "prefix": prefix,
+            "symbol": map_symbol(symbol),
+            "timeframe": map_timeframe(timeframe)[0],
+        },
+        symbol=symbol,
+        timeframe=timeframe,
+    )
     return {"ok": True, "cmd_id": cmd_id, "prefix": prefix, "status": st}
 
 
@@ -617,7 +766,7 @@ def apply_formation(
     prefix: str = FORMATION_PREFIX,
     require_chart_match: bool = True,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(instrument, granularity)
     offset = offset_from_heartbeat(st.get("heartbeat"))
     objects = formation_to_objects(analysis, bars, offset, prefix=prefix)
     result = upsert_objects(
@@ -883,7 +1032,7 @@ def apply_regime(
     prefix: str = REGIME_PREFIX,
     require_chart_match: bool = True,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(instrument, granularity)
     offset = offset_from_heartbeat(st.get("heartbeat"))
     objects = regime_to_objects(analysis, bars, offset, prefix=prefix)
     result = upsert_objects(
@@ -1030,7 +1179,7 @@ def apply_ticket(
     ``at_time`` is UTC unix seconds or RFC3339 (the decision bar). Broker
     offset comes from the EA heartbeat.
     """
-    st = status()
+    st = chart_status(instrument, granularity)
     offset = offset_from_heartbeat(st.get("heartbeat"))
     broker_t, time_label = _ticket_broker_time(at_time, offset)
     try:
@@ -1275,7 +1424,7 @@ def apply_regime_walk(
     instability_watch: float = 0.6,
     show: str = WALK_SHOW_BOTH,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(instrument, granularity)
     offset = offset_from_heartbeat(st.get("heartbeat"))
     objects = regime_walk_to_objects(
         result,
@@ -1404,7 +1553,7 @@ def apply_paper_walk_tickets(
     prefix: str = TICKET_WALK_PREFIX,
     require_chart_match: bool = True,
 ) -> dict[str, Any]:
-    st = status()
+    st = chart_status(instrument, granularity)
     offset = offset_from_heartbeat(st.get("heartbeat"))
     objects = paper_walk_to_objects(trades, offset, prefix=prefix)
     drawn = upsert_objects(
