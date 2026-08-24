@@ -18,6 +18,10 @@ Research only. No orders. Full strategy tables: [docs/LIEN_FX_STRATEGIES.md](doc
 
 Prefer ≥ 1:2 R, ≤ ~2% equity (`app/risk.py`). Scale half at 1R, stop to breakeven, trail the rest. Never add to losers.
 
+## Entry engines
+
+Ch. 8 (Multiple Time Frames) is coded as the `entry_mtf` tool (oanda-research): higher-TF direction gate + lower-TF RSI-dip/rally trigger, run after the regime filter. Chapters 9–16 are not tools yet; use the doc tables only after the regime filter.
+
 ## Not available yet
 
-Risk reversals and implied vol are `unavailable` — do not invent them. Chapters 8–16 entry engines are not tools; use the doc tables only after the regime filter.
+Risk reversals and implied vol are `unavailable` — do not invent them.

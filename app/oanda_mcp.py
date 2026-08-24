@@ -352,6 +352,60 @@ async def indicator_snapshot(
 
 
 @mcp.tool()
+async def entry_mtf(
+    instrument: str,
+    htf_granularity: str = "D",
+    ltf_granularity: str = "H1",
+    htf_count: int = 250,
+    ltf_count: int = 250,
+    rsi_os: float = 30.0,
+    rsi_ob: float = 70.0,
+    buffer_pips: int = 10,
+) -> dict:
+    """Lien Ch.8 Multiple Time Frame entry signal (deterministic).
+
+    Higher timeframe sets trend direction; the lower timeframe times the entry
+    on an RSI pullback: buy dips (rsi<=rsi_os) in an uptrend, sell rallies
+    (rsi>=rsi_ob) in a downtrend. Only signals with the higher-TF trend and
+    never when the higher TF is trend_waning. Indicators/regime are computed in
+    code (Ch.7 filter) — do not recompute them in the model.
+
+    Returns a signal (long|short|none), reason, htf/ltf summaries, a
+    entry/stop/2R ticket when aligned (else null), and lien-fx citations. On too
+    few bars on either timeframe, returns an ``error`` field. Research only; no
+    orders.
+    """
+    from app import indicators
+    from agent.engines import mtf
+
+    try:
+        _htf_bars, htf_analysis = await _analyze_regime(
+            instrument, htf_granularity, htf_count, "", ""
+        )
+        _ltf_bars, ltf_analysis = await _analyze_regime(
+            instrument, ltf_granularity, ltf_count, "", ""
+        )
+    except indicators.IndicatorError as exc:
+        return {
+            "error": str(exc),
+            "instrument": instrument,
+            "htf_granularity": htf_granularity,
+            "ltf_granularity": ltf_granularity,
+        }
+
+    return mtf.mtf_signal(
+        htf_analysis,
+        ltf_analysis,
+        instrument,
+        rsi_os=rsi_os,
+        rsi_ob=rsi_ob,
+        buffer_pips=buffer_pips,
+        htf_granularity=htf_granularity,
+        ltf_granularity=ltf_granularity,
+    )
+
+
+@mcp.tool()
 async def mt4_draw_regime(
     instrument: str,
     granularity: str = "D",

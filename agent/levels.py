@@ -70,7 +70,7 @@ def _mid(levels: dict[str, float]) -> float | None:
     return None
 
 
-def _ticket(
+def build_ticket(
     side: str,
     entry: float,
     stop: float,
@@ -78,6 +78,11 @@ def _ticket(
     entry_name: str,
     stop_name: str,
 ) -> dict[str, Any] | None:
+    """Round to pip, enforce >= PLANNED_R, return a ticket dict or None.
+
+    Shared by Ch. 7 geometry and the Ch. 8 entry engine so both use the same
+    pip-rounding and minimum-R guardrails.
+    """
     entry = _round_pip(entry, pip)
     stop = _round_pip(stop, pip)
     if side == "long" and not (stop < entry):
@@ -122,14 +127,14 @@ def _join_trend(levels: dict[str, float], direction: str | None, pip: float, buf
             rail, stop_name = levels["bb_lower_1"], "bb_lower_1"
         else:
             return None
-        return _ticket("long", close, rail - buffer, pip, "last_close", stop_name)
+        return build_ticket("long", close, rail - buffer, pip, "last_close", stop_name)
     if "high_n" in levels:
         rail, stop_name = levels["high_n"], "high_n"
     elif "bb_upper_1" in levels:
         rail, stop_name = levels["bb_upper_1"], "bb_upper_1"
     else:
         return None
-    return _ticket("short", close, rail + buffer, pip, "last_close", stop_name)
+    return build_ticket("short", close, rail + buffer, pip, "last_close", stop_name)
 
 
 def _fade_range(levels: dict[str, float], pip: float, buffer: float) -> dict[str, Any] | None:
@@ -145,8 +150,8 @@ def _fade_range(levels: dict[str, float], pip: float, buffer: float) -> dict[str
     high_name = "high_n" if "high_n" in levels else "bb_upper_1"
     low_name = "low_n" if "low_n" in levels else "bb_lower_1"
     if fade_short:
-        return _ticket("short", close, high + buffer, pip, "last_close", high_name)
-    return _ticket("long", close, low - buffer, pip, "last_close", low_name)
+        return build_ticket("short", close, high + buffer, pip, "last_close", high_name)
+    return build_ticket("long", close, low - buffer, pip, "last_close", low_name)
 
 
 def plan_ticket(

@@ -7,8 +7,10 @@ Not a signal service and not an execution path.
 **Governing layer in this repo:** deterministic regime classification from OHLC
 (`app/indicators.py`, `app/regime.py`) plus MCP/CLI/MT4 wrappers. After
 classification, `agent/levels.py` maps the snapshot to a ticket (last close,
-10-bar high/low, 10-pip buffer, 2R target). Named entry engines (Ch. 8–16) are
-documented here for later iterations and are **not** encoded as trade logic yet.
+10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) is now
+encoded as an entry engine (`agent/engines/mtf.py`); the remaining named engines
+(Ch. 9–16) are documented here for later iterations and are **not** encoded as
+trade logic yet.
 
 ```
 OANDA candles → indicators.py → regime.py → JSON
@@ -148,11 +150,13 @@ Unit tests (no network):
 
 ---
 
-## Technical strategies (Ch. 8–16) — documented, not coded
+## Technical strategies (Ch. 8–16)
+
+Ch. 8 is coded (see below); Ch. 9–16 are documented, not coded.
 
 | Ch | Strategy | Timeframe | Idea | Use when | Avoid when |
 |----|----------|-----------|------|----------|------------|
-| **8** | Multiple time frames | Daily bias + H1/M15 entry | Higher TF sets direction; buy RSI dips in uptrends | Trend on daily | Fading daily trend from a lower TF |
+| **8** *(coded)* | Multiple time frames | Daily bias + H1/M15 entry | Higher TF sets direction; buy RSI dips in uptrends | Trend on daily | Fading daily trend from a lower TF |
 | **9** | Double Bollinger Bands | Daily | 1σ+2σ: fade only after close back through 1σ; outer zone = trend; close through 1σ after opposite side = join trend | Regime already classified | Single-band fades that hug 2σ |
 | **10** | Fade double zeros | 15m | Fade round numbers 10–15 pips before the figure; stop ~20 pips beyond; 20-SMA filter | Quiet tape, tighter crosses, confluence | News, strong trend |
 | **11** | Waiting for the Deal | GBPUSD, London | Skip first London spike (stop hunt); trade reverse through power-hour (6–7 GMT) range | After US open / major release | First spike |
@@ -164,6 +168,33 @@ Unit tests (no network):
 
 Recurring execution pattern across these chapters: **two-lot scale-out** (half at
 ~1R, trail the rest) and **±5–15 pip buffers** off exact highs/lows.
+
+### Ch. 8 entry engine (encoded)
+
+`agent/engines/mtf.py` is a deterministic, research-only engine. The higher
+timeframe (default **D**) sets trend direction from the Ch. 7 classification;
+the lower timeframe (default **H1**) times the entry on an RSI pullback: buy
+dips (`rsi ≤ 30`) in an uptrend, sell rallies (`rsi ≥ 70`) in a downtrend. It
+only signals **with** the higher-TF trend and never when the higher TF is
+`trend_waning` (Lien's main warning: do not fade the daily trend from a lower
+TF). Ticket geometry reuses `agent/levels.py` (lower-TF last close entry,
+10-bar high/low ± 10-pip buffer stop, 2R target). Output is JSON with a
+`signal` (long/short/none), `reason`, htf/ltf summaries, an entry/stop/target
+`ticket` when aligned, and `lien-fx` citations. No orders, no MT4.
+
+How to run (practice OANDA):
+
+```bash
+.venv/bin/python scripts/entry_mtf.py --instrument USD_JPY
+.venv/bin/python scripts/entry_mtf.py --instrument GBP_USD \
+  --htf-granularity D --ltf-granularity H1 --rsi-os 30 --rsi-ob 70
+```
+
+MCP (`oanda-research`): `entry_mtf`. Unit tests (no network):
+
+```bash
+.venv/bin/python -m unittest tests.test_entry_mtf -v
+```
 
 ---
 
@@ -219,7 +250,7 @@ Recurring execution pattern across these chapters: **two-lot scale-out** (half a
 
 ## Out of scope / later
 
-- Encoding Ch. 8–16 entry engines as tools
+- Encoding Ch. 9–16 entry engines as tools (Ch. 8 done: `agent/engines/mtf.py`)
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)
 - Orders, a risk MCP wrapper, or live execution
