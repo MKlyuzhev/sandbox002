@@ -206,6 +206,7 @@ class TestInbox(unittest.TestCase):
         self.assertGreater(len(raw), 4095)
         self.assertNotIn("\n", raw)
         self.assertIn('"t1":1717200000', raw)
+        self.assertTrue(raw.startswith('{"id":'), raw[:80])
 
     def test_upsert_refuses_symbol_mismatch(self) -> None:
         self._write_heartbeat(

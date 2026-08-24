@@ -381,10 +381,13 @@ def write_command(
 ) -> str:
     cmd_id = payload.get("id") or str(uuid.uuid4())
     payload = dict(payload)
-    payload["id"] = cmd_id
+    payload.pop("id", None)
     sym, tf = _command_chart(payload, symbol, timeframe)
     payload["symbol"] = map_symbol(sym)
     payload["timeframe"] = map_timeframe(tf)[0]
+    # ``id`` first. JsonMini / MQL4 StringFind on a 400-object overlay can
+    # miss a trailing ``id``, skip the ack, and leave last_cmd_id empty.
+    payload = {"id": cmd_id, **payload}
     # Compact JSON. The EA reads FILE_BIN in 4095-byte chunks (no FILE_TXT
     # newline injection). Pretty-print made 400-object regime upserts too
     # slow to ack within the wait window.
