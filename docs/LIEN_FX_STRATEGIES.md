@@ -206,6 +206,15 @@ timeframe with `--ltf-granularity` and restrict engines with `--engines`. See
 .venv/bin/python -m agent.run --instrument USD_JPY --granularity D --ltf-granularity H1 --no-llm
 ```
 
+Causal **rollover-peak paper walk** over a date range (Ch. 7 HTF + Ch. 8 LTF,
+journal + simulated fills): `python -m agent.walk_mtf` — see
+[AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9c.
+
+The same Ch. 8 logic can be back-tested **inside the MT4 Strategy Tester** for a
+native equity/drawdown report (two-pass: export bars, compute decisions, replay
+as simulated orders): `python -m agent.tester_backtest` — see
+[MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
+
 ---
 
 ## Fundamental / cross-market (Ch. 17–25) — later

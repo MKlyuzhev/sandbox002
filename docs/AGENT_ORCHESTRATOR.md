@@ -327,6 +327,64 @@ Decisions are causal; **outcomes** use later bars by design. Do not use
 
 ---
 
+## 9c. Causal MTF paper walk — `python -m agent.walk_mtf`
+
+Ch. 8 rollover-peak back-test on the **lower TF** (default **H1**), with Ch. 7
+regime on the **higher TF** (default **D**). Same warmup + `[--from, --to]`
+fetch as §9b, but two series via `app/walk_fetch.fetch_walk_bars`. Each LTF
+step uses causal HTF/LTF windows only (`htf[:htf_idx+1][-lookback:]`,
+`ltf[:i+1][-lookback:]` where `htf_idx` is the last HTF bar with
+`time <= ltf[i].time`).
+
+While **flat**:
+
+1. Run `mtf_signal` + `signal_confidence` (`agent/engines/mtf.py`).
+2. Track the running max confidence among **firing** signals.
+3. When confidence **strictly drops** (including a non-fire at `0`), confirm the
+   **peak bar** (not the rollover bar), journal, and paper-fill at that bar’s
+   close/ticket.
+4. If a peak never rolls over before `--to`, confirm it on the last LTF bar.
+
+While **in trade**: manage stop / target on subsequent LTF bars (stop wins if
+both trade). Still open at `--to` → `window_end`. After flat, reset peak
+tracking and resume hunting (multiple entries per walk allowed).
+
+```bash
+.venv/bin/python -m agent.walk_mtf \
+  --instrument GBP_USD --granularity D --ltf-granularity H1 \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+```
+
+Stdout JSON: `walk_id`, `trades`, compounded `equity` (same math as §9b).
+Journal rows use `proposal.engine=mtf` and peak confidence on the proposal.
+Research only; no broker orders.
+
+---
+
+## 9d. MT4 Strategy Tester back-test — `python -m agent.tester_backtest`
+
+Runs the same Ch. 8 rollover-peak logic **inside the MT4 Strategy Tester** so
+MT4's native report (equity curve, profit factor, drawdown) is the output.
+Two passes, file-based, because the tester cannot do a live handshake (`Sleep()`
+does not pause in the tester and the run is a burst). Full workflow and
+constraints: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
+
+1. **Export pass** — `SandboxTesterBridge.mq4` with `InpMode=export` writes every
+   completed bar to `tester/files/sandbox002/<SYMBOL>_<TF>/bars.csv`.
+2. **Compute** — `python -m agent.tester_backtest` reads `bars.csv`, resamples the
+   HTF (`app/mt4_tester.resample_bars`), runs `agent.mtf_walk.mtf_decisions`
+   (every confirmed peak, ungated by open trades — the tester owns position
+   state), and writes `decisions.csv`.
+3. **Replay pass** — `SandboxTesterBridge.mq4` with `InpMode=replay` loads
+   `decisions.csv` and `OrderSend`s each entry at the open of the bar after its
+   signal bar, SL/TP from the ticket; the tester manages exits natively.
+
+`mtf_decisions` shares the `_PeakTracker` with `walk_mtf`, so decisions match the
+paper walk's confirmation logic. Orders exist only inside the tester (the EA
+refuses to run outside it via `IsTesting()`); the live bridge stays order-free.
+
+---
+
 ## 10. Typical sessions
 
 **Check the governing layer only** (same numbers as `scripts/classify_regime.py`,
@@ -390,6 +448,7 @@ No network. From repo root:
 ```bash
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
   tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
-  tests.test_agent_paper_walk tests.test_agent_mt4_clear \
+  tests.test_agent_paper_walk tests.test_agent_mtf_walk tests.test_mt4_tester \
+  tests.test_agent_mt4_clear \
   tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf -v
 ```

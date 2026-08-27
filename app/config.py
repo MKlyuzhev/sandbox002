@@ -41,5 +41,12 @@ class Settings(BaseSettings):
         "OANDA - MetaTrader 4/MQL4/Files"
     )
 
+    # MT4 Strategy Tester sandbox (Wine, portable install). The tester writes
+    # to <terminal>/tester/files. Feed is <this>/sandbox002/<SYMBOL>_<TF>/{bars,decisions}.csv.
+    mt4_tester_files_dir: str = (
+        "/home/maxim/.wine/drive_c/Program Files (x86)/"
+        "OANDA - MetaTrader 4/tester/files"
+    )
+
 
 settings = Settings()
