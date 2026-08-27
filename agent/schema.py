@@ -23,6 +23,8 @@ class Citation(BaseModel):
 class Goal(BaseModel):
     instrument: str = "EUR_USD"
     granularity: str = "D"
+    ltf_granularity: str = "H1"
+    engines: list[int] | None = None
     mode: Mode = "signal"
     count: int = 250
     from_time: str | None = None
@@ -92,6 +94,8 @@ class Proposal(BaseModel):
     target: float | None = None
     at_time: str | None = None
     confidence: float = 0.0
+    engine: str | None = None
+    chapter: int | None = None
     citations: list[Citation] = Field(default_factory=list)
     notes: str = ""
 

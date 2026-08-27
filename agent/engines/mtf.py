@@ -16,6 +16,8 @@ from __future__ import annotations
 from typing import Any
 
 from agent import levels as levels_mod
+from agent.engines.base import EngineContext, EngineResult
+from agent.schema import Citation, Goal, PlayClass
 
 CHAPTER = 8
 DEFAULT_HTF = "D"
@@ -199,3 +201,73 @@ def _build_ltf_ticket(
     return levels_mod.build_ticket(
         "short", close, rail + buffer, pip, "last_close", stop_name
     )
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def signal_confidence(
+    signal: str,
+    htf_analysis: dict[str, Any],
+    rsi: float | None,
+    rsi_os: float,
+    rsi_ob: float,
+) -> float:
+    """Blend higher-TF regime confidence with lower-TF RSI extremity.
+
+    Non-firing signals get 0. A deeper RSI dip (long) or higher rally (short)
+    beyond the threshold raises confidence.
+    """
+    if signal not in ("long", "short") or rsi is None:
+        return 0.0
+    htf_conf = _f(htf_analysis.get("confidence")) or 0.0
+    if signal == "long":
+        extremity = _clamp01((rsi_os - rsi) / rsi_os) if rsi_os else 0.0
+    else:
+        span = 100.0 - rsi_ob
+        extremity = _clamp01((rsi - rsi_ob) / span) if span else 0.0
+    return round(0.5 * htf_conf + 0.5 * extremity, 3)
+
+
+class MtfEngine:
+    """Ch. 8 Multiple Time Frame engine over an ``EngineContext``."""
+
+    chapter = CHAPTER
+    name = "mtf"
+    play_classes: tuple[PlayClass, ...] = ("join_trend",)
+
+    def granularities(self, goal: Goal) -> tuple[str, ...]:
+        return (goal.granularity, goal.ltf_granularity)
+
+    def signal(self, ctx: EngineContext) -> EngineResult:
+        htf_gran = ctx.goal.granularity
+        ltf_gran = ctx.goal.ltf_granularity
+        htf_analysis = ctx.analysis(htf_gran) or {}
+        ltf_analysis = ctx.analysis(ltf_gran) or {}
+
+        out = mtf_signal(
+            htf_analysis,
+            ltf_analysis,
+            ctx.instrument,
+            htf_granularity=htf_gran,
+            ltf_granularity=ltf_gran,
+        )
+        rsi = (out.get("ltf") or {}).get("rsi")
+        confidence = signal_confidence(
+            out["signal"], htf_analysis, rsi, RSI_OS, RSI_OB
+        )
+        citations = [
+            Citation(source=str(c["source"]), chunk_index=int(c["chunk_index"]))
+            for c in out.get("citations", [])
+        ]
+        return EngineResult(
+            engine=self.name,
+            chapter=self.chapter,
+            signal=out["signal"],
+            play_class="join_trend",
+            ticket=out.get("ticket"),
+            reason=out.get("reason", ""),
+            confidence=confidence,
+            citations=citations,
+        )

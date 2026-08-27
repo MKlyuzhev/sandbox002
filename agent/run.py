@@ -31,9 +31,14 @@ def _configure_logging(quiet: bool) -> None:
 
 
 async def _async_main(args: argparse.Namespace) -> int:
+    engines = None
+    if args.engines:
+        engines = [int(x) for x in args.engines.split(",") if x.strip()]
     goal = Goal(
         instrument=args.instrument,
         granularity=args.granularity,
+        ltf_granularity=args.ltf_granularity,
+        engines=engines,
         mode=args.mode,
         count=args.count,
         from_time=args.from_time,
@@ -66,6 +71,17 @@ def main() -> int:
     )
     parser.add_argument("--instrument", default="EUR_USD")
     parser.add_argument("--granularity", default="D")
+    parser.add_argument(
+        "--ltf-granularity",
+        default="H1",
+        help="Lower timeframe for multi-TF engines like Ch.8 MTF (default: H1).",
+    )
+    parser.add_argument(
+        "--engines",
+        default=None,
+        metavar="CHAPTERS",
+        help="Comma-separated chapter allow-list (e.g. 8,7). Default: all matching.",
+    )
     parser.add_argument("--count", type=int, default=250)
     parser.add_argument("--from", dest="from_time", default=None, metavar="RFC3339")
     parser.add_argument("--to", dest="to_time", default=None, metavar="RFC3339")

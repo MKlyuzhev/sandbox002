@@ -1,7 +1,7 @@
 # Agent orchestrator — user manual
 
 How to run the headless Lien analysis loop: regime → retrieve → propose →
-Ch. 7 geometry → risk gate → journal, then (optionally) a stub paper fill.
+entry engines → risk gate → journal, then (optionally) a stub paper fill.
 
 This is a **research / paper-journal** workflow. It does **not** place, modify,
 or close broker or MT4 orders. Evidence in the corpus is **heuristic**. Treat
@@ -16,11 +16,12 @@ Related: [Lien FX Strategies](LIEN_FX_STRATEGIES.md) (Ch. 7 governing layer),
 ## 1. What it does
 
 `python -m agent.run` walks a **fixed graph**. The language model may fill
-thesis and citations; **prices** come from Ch. 7 geometry on the indicator
-snapshot. The model cannot skip the policy node or talk to a broker.
-`python -m agent.walk` is a separate causal paper walk over `--from`/`--to`
-(warmup before `--from`, one position at a time). `agent.run --from/--to`
-still snapshots the **last** bar of that window.
+thesis and citations; **prices** come from a deterministic **entry engine**
+selected by the regime (see §6b). The model cannot skip the policy node or talk
+to a broker. `python -m agent.walk` is a separate causal paper walk over
+`--from`/`--to` (warmup before `--from`, one position at a time; still Ch. 7
+geometry only). `agent.run --from/--to` still snapshots the **last** bar of that
+window.
 
 ```mermaid
 flowchart LR
@@ -29,8 +30,8 @@ flowchart LR
   candles --> regime["regime.analyze_bars"]
   regime --> rag["retrieve lien-fx"]
   rag --> llm["propose JSON"]
-  llm --> geometry["Ch.7 geometry"]
-  geometry --> policy["policy.evaluate"]
+  llm --> engines["entry engines (select + pick)"]
+  engines --> policy["policy.evaluate"]
   policy --> journal[(SQLite journal)]
   exec["python -m agent.executor"] --> journal
 ```
@@ -41,7 +42,7 @@ flowchart LR
 | Regime | `app/regime.py` in code | No |
 | RAG | Chroma + `nomic-embed-text` | `--no-rag` |
 | Propose | Ollama chat, or skeleton | `--no-llm` |
-| Geometry | `agent/levels.py` from the snapshot | No (after a proposal) |
+| Engines | `agent/engines/` (registry select + highest-confidence firing signal) | No (after a proposal) |
 | Policy | `agent/policy.py` + `app/risk.py` | **Never** |
 | Journal | `data/journal/runs.sqlite` | `--no-journal` |
 | Stub fill | separate process | only if `--mode paper` queued a fill |
@@ -119,7 +120,9 @@ Failures always become `wait`. `breakout_watch` never becomes `pending_exec`.
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--instrument` | `EUR_USD` | OANDA name (`GBP_USD`, not `GBPUSD`) |
-| `--granularity` | `D` | Lien journal default. `H1` / `H4` allowed |
+| `--granularity` | `D` | Lien journal default (higher timeframe). `H1` / `H4` allowed |
+| `--ltf-granularity` | `H1` | Lower timeframe for multi-TF engines (Ch. 8 MTF) |
+| `--engines` | unset | Comma-separated chapter allow-list (e.g. `8,7`). Default: all matching |
 | `--count` | `250` | Candle count (covers 200-SMA). Ignored if both `--from` and `--to` are set |
 | `--from` / `--to` | unset | RFC3339 window (OANDA: not from+to+count together). Snapshot at the **last** bar. |
 | `--mode` | `signal` | `signal` or `paper` |
@@ -157,7 +160,7 @@ Look at `action` first, then `risk.reasons` if it is `wait`.
 | `run_id` | Journal primary key (hex UUID) |
 | `action` | `wait` / `log_setup` / `pending_exec` |
 | `regime` | Full Ch. 7 checklist (`regime`, `direction`, `trend_waning`, `allowed_play_classes`, snapshot, notes) |
-| `proposal` | Thesis, play class, side, entry/stop/target, **`at_time`** (decision bar), citations |
+| `proposal` | Thesis, play class, side, entry/stop/target, **`at_time`** (decision bar), **`engine`/`chapter`** (chosen entry engine), citations |
 | `risk` | `ok`, planned R, `size_units`, `stop_distance`, `reasons` |
 | `citations` | `{source, chunk_index, distance}` from retrieve |
 | `tool_trace` | Node name + latency_ms + short detail |
@@ -177,6 +180,37 @@ Play classes (must match `regime.allowed_play_classes`):
 | `join_trend` | trend, not waning |
 | `fade_range` | range |
 | `breakout_watch` | mixed, or waning (then the graph waits before proposing) |
+
+---
+
+## 6b. Entry engines
+
+After a proposal (LLM or skeleton), the graph selects **entry engines** by
+regime and picks the highest-confidence *firing* signal. Engines are
+deterministic, never recompute indicators, and only run when not `trend_waning`.
+The chosen engine overwrites the proposal's `play_class`, `side`, and
+`entry/stop/target`; the model keeps only thesis and citations.
+
+| Engine | Chapter | Fires for | Timeframes | Confidence |
+|--------|---------|-----------|------------|------------|
+| `mtf` (`agent/engines/mtf.py`) | 8 | `join_trend` | `--granularity` + `--ltf-granularity` | `0.5*htf_regime_conf + 0.5*rsi_extremity` |
+| `ch7_geometry` (`agent/engines/ch7.py`) | 7 | `join_trend`, `fade_range` | `--granularity` | `0.5*regime_conf` (fallback discount) |
+
+- Selection (`agent/engines/registry.py`): engines whose `play_classes` match
+  `allowed_play_classes`, filtered by `--engines` when set. Ch. 7 is the generic
+  fallback, so a firing specialized engine (Ch. 8+) outranks it by confidence;
+  ties break by registry priority.
+- Multi-TF fetch: the Ch. 8 engine needs the lower timeframe too. In live mode
+  the graph fetches + classifies it; with injected bars (tests) it is only
+  fetched when a `fetch_analyses_fn` is provided, so injected-bars runs stay
+  offline (MTF simply does not fire).
+- If no engine matches the regime (e.g. `breakout_watch`), the graph falls back
+  to Ch. 7 geometry directly (`side: none`, policy waits) — prior behavior.
+- The chosen engine is recorded on `proposal.engine` / `proposal.chapter` and in
+  the `engines` tool trace.
+
+The standalone Ch. 8 tool/CLI (`entry_mtf`, `scripts/entry_mtf.py`) still exists
+for a direct two-timeframe signal outside the graph.
 
 ---
 
@@ -339,9 +373,10 @@ drawing; init does not replay leftover `cmd.json`).
 ## 11. What this is not
 
 - Not live or practice **order** placement (OANDA MCP stays read-only).
-- Not Lien Ch. 8–16 entry engines (those stay in
-  [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md) tables). Tickets today are
-  Ch. 7 geometry (`agent/levels.py`), not a named chapter setup.
+- Ch. 8 (Multiple Time Frames) is wired in as an entry engine (`mtf`); Ch. 9–16
+  remain documented only in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md)
+  tables. When no specialized engine fires, tickets fall back to Ch. 7 geometry
+  (`agent/levels.py`).
 - Not HTTP `/agent/run` (still a later wrapper around this same graph).
 - Not a Cursor-only flow: Cursor via MCP is an alternate client; this CLI is
   the in-repo orchestrator.
@@ -355,5 +390,6 @@ No network. From repo root:
 ```bash
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
   tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
-  tests.test_agent_paper_walk tests.test_agent_mt4_clear -v
+  tests.test_agent_paper_walk tests.test_agent_mt4_clear \
+  tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf -v
 ```

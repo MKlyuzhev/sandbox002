@@ -50,6 +50,33 @@ def _fade_proposal(regime: dict, _chunks, _goal: Goal) -> Proposal:
     )
 
 
+def _ltf_analysis(rsi: float) -> dict:
+    return {
+        "regime": "range",
+        "direction": None,
+        "trend_waning": False,
+        "allowed_play_classes": ["fade_range"],
+        "confidence": 0.4,
+        "last_close": 1.10,
+        "last_time": "t-ltf",
+        "snapshot": {
+            "last_close": 1.10,
+            "rsi": rsi,
+            "low_n": 1.09,
+            "high_n": 1.11,
+            "sma": {},
+            "bollinger": {},
+        },
+    }
+
+
+def _fetch_ltf(rsi: float):
+    async def _fetch(_goal, granularities):
+        return {g: _ltf_analysis(rsi) for g in granularities}
+
+    return _fetch
+
+
 class TestGraph(unittest.TestCase):
     def test_trend_setup_logs(self) -> None:
         record = asyncio.run(
@@ -65,7 +92,10 @@ class TestGraph(unittest.TestCase):
         self.assertTrue(record.risk.ok)
         self.assertGreaterEqual(record.risk.r_planned, 2.0)
 
-    def test_mismatch_waits(self) -> None:
+    def test_engine_overrides_model_play_class(self) -> None:
+        # The model proposes a mismatched play_class (fade_range in a trend);
+        # the engine layer normalizes play_class/prices to the regime, so the
+        # Ch.7 join_trend engine fires and the setup is logged.
         record = asyncio.run(
             run(
                 _goal(),
@@ -73,8 +103,11 @@ class TestGraph(unittest.TestCase):
                 propose_fn=_fade_proposal,
             )
         )
-        self.assertEqual(record.action, "wait")
-        self.assertFalse(record.risk.ok)
+        self.assertEqual(record.regime["regime"], "trend")
+        self.assertEqual(record.proposal.play_class, "join_trend")
+        self.assertEqual(record.proposal.engine, "ch7_geometry")
+        self.assertEqual(record.action, "log_setup")
+        self.assertTrue(record.risk.ok)
 
     def test_waning_skips_proposer(self) -> None:
         called = {"n": 0}
@@ -180,6 +213,33 @@ class TestGraph(unittest.TestCase):
             self.assertEqual(len(journal.list_pending()), 1)
         finally:
             tmp.cleanup()
+
+    def test_mtf_engine_wins_on_ltf_dip(self) -> None:
+        record = asyncio.run(
+            run(
+                _goal(no_llm=True),
+                bars=_trend_bars(250, step=0.008),
+                fetch_analyses_fn=_fetch_ltf(20.0),
+            )
+        )
+        self.assertEqual(record.regime["regime"], "trend")
+        self.assertEqual(record.proposal.engine, "mtf")
+        self.assertEqual(record.proposal.chapter, 8)
+        self.assertEqual(record.proposal.side, "long")
+        self.assertEqual(record.action, "log_setup")
+        self.assertTrue(record.risk.ok)
+
+    def test_ch7_fallback_when_mtf_quiet(self) -> None:
+        record = asyncio.run(
+            run(
+                _goal(no_llm=True),
+                bars=_trend_bars(250, step=0.008),
+                fetch_analyses_fn=_fetch_ltf(55.0),
+            )
+        )
+        self.assertEqual(record.proposal.engine, "ch7_geometry")
+        self.assertEqual(record.proposal.play_class, "join_trend")
+        self.assertEqual(record.action, "log_setup")
 
     def test_mt4_draws_ticket_after_pass(self) -> None:
         drawn = {}

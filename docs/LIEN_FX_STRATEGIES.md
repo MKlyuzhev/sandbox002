@@ -196,6 +196,16 @@ MCP (`oanda-research`): `entry_mtf`. Unit tests (no network):
 .venv/bin/python -m unittest tests.test_entry_mtf -v
 ```
 
+The engine is also wired into the agent orchestrator as a selectable entry
+engine (`agent/engines/mtf.py`, chapter 8). `python -m agent.run` picks it over
+the Ch. 7 geometry fallback when it fires on a lower-TF RSI dip; set the lower
+timeframe with `--ltf-granularity` and restrict engines with `--engines`. See
+[AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §6b.
+
+```bash
+.venv/bin/python -m agent.run --instrument USD_JPY --granularity D --ltf-granularity H1 --no-llm
+```
+
 ---
 
 ## Fundamental / cross-market (Ch. 17–25) — later

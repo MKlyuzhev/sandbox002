@@ -14,6 +14,8 @@ from typing import Any
 
 from agent import levels as levels_mod
 from agent import policy, propose as propose_mod, retrieve as retrieve_mod
+from agent.engines import registry as engine_registry
+from agent.engines.base import EngineContext, result_to_proposal
 from agent.journal import Journal
 from agent.schema import Citation, Goal, Proposal, RunRecord, ToolTrace
 from app import indicators, oanda_client, regime as regime_mod
@@ -22,6 +24,7 @@ from app.config import settings
 logger = logging.getLogger("agent")
 
 FetchBarsFn = Callable[[Goal], Awaitable[list[dict[str, Any]]]]
+FetchAnalysesFn = Callable[[Goal, set[str]], Awaitable[dict[str, dict[str, Any]]]]
 RetrieveFn = Callable[[str, int, str | None], Awaitable[list[dict[str, Any]]]]
 ProposeFn = Callable[[dict[str, Any], list[dict[str, Any]], Goal], Proposal]
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
@@ -73,6 +76,73 @@ async def _default_fetch_bars(goal: Goal) -> list[dict[str, Any]]:
     return oanda_client.candles_to_bars(payload, prefer="mid")
 
 
+async def _default_fetch_analyses(
+    goal: Goal,
+    granularities: set[str],
+) -> dict[str, dict[str, Any]]:
+    """Fetch + classify each requested granularity (network). Injectable in tests."""
+    out: dict[str, dict[str, Any]] = {}
+    for gran in granularities:
+        sub_goal = goal.model_copy(update={"granularity": gran})
+        bars = await _default_fetch_bars(sub_goal)
+        analysis = regime_mod.analyze_bars(bars)
+        analysis.setdefault("instrument", goal.instrument)
+        analysis.setdefault("granularity", gran)
+        out[gran] = analysis
+    return out
+
+
+async def _dispatch_engines(
+    proposal: Proposal | None,
+    analysis: dict[str, Any],
+    goal: Goal,
+    traces: list[ToolTrace],
+    fetch_analyses_fn: FetchAnalysesFn | None,
+    bars_injected: bool,
+) -> Proposal | None:
+    """Pick a regime-matched engine and merge its ticket into the proposal.
+
+    Falls back to Ch. 7 geometry when no engine matches the regime (e.g.
+    breakout_watch), preserving prior behavior.
+    """
+    started = time.perf_counter()
+    engines = engine_registry.select(analysis, goal)
+    if not engines:
+        traces.append(_trace("engines", started, "none matched -> ch7 geometry"))
+        return levels_mod.apply_geometry(proposal, analysis, goal.instrument)
+
+    analyses: dict[str, dict[str, Any]] = {goal.granularity: analysis}
+    extra = engine_registry.required_timeframes(engines, goal) - {goal.granularity}
+    # Only reach for extra timeframes when we can do so deterministically: an
+    # injected fetcher (tests) or live mode (bars not injected). This keeps
+    # injected-bars runs offline; multi-TF engines simply do not fire.
+    fetcher = fetch_analyses_fn or (None if bars_injected else _default_fetch_analyses)
+    if extra and fetcher is not None:
+        try:
+            analyses.update(await fetcher(goal, extra))
+        except Exception as exc:
+            logger.info("engine extra-TF fetch failed: %s", exc)
+
+    ctx = EngineContext(instrument=goal.instrument, goal=goal, analyses=analyses)
+    chosen, candidates = engine_registry.run_and_pick(engines, ctx)
+    if chosen is None:
+        detail = f"no firing; {len(engines)} engine(s)"
+        traces.append(_trace("engines", started, detail))
+        fallback = candidates[0] if candidates else None
+        if fallback is None:
+            return proposal
+        return result_to_proposal(proposal, fallback, analysis)
+
+    traces.append(
+        _trace(
+            "engines",
+            started,
+            f"chosen=ch{chosen.chapter} {chosen.engine} conf={chosen.confidence}",
+        )
+    )
+    return result_to_proposal(proposal, chosen, analysis)
+
+
 async def _maybe_use_account(goal: Goal) -> Goal:
     if not goal.use_account:
         return goal
@@ -88,6 +158,7 @@ async def run(
     *,
     bars: list[dict[str, Any]] | None = None,
     fetch_bars: FetchBarsFn | None = None,
+    fetch_analyses_fn: FetchAnalysesFn | None = None,
     retrieve_fn: RetrieveFn | None = None,
     propose_fn: ProposeFn | None = None,
     classify_fn: ClassifyFn | None = None,
@@ -232,8 +303,13 @@ async def run(
                     settings.ollama_llm_model,
                 )
                 proposal = await propose_mod.llm_propose(analysis, chunks, goal)
-            proposal = levels_mod.apply_geometry(
-                proposal, analysis, goal.instrument
+            proposal = await _dispatch_engines(
+                proposal,
+                analysis,
+                goal,
+                traces,
+                fetch_analyses_fn,
+                bars_injected=bars is not None,
             )
             traces.append(
                 _trace(
