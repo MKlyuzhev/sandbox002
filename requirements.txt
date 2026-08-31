@@ -13,3 +13,6 @@ beautifulsoup4>=4.12.0
 pyyaml>=6.0.0
 mcp>=1.2.0,<2
 matplotlib>=3.8.0
+
+# Test runner for the suite under tests/
+pytest>=8.0.0
