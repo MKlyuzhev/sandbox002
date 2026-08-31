@@ -1,12 +1,21 @@
 # MT4 Strategy Tester back-test
 
-Run the Ch. 8 rollover-peak entry engine **inside the MetaTrader 4 Strategy
-Tester** so MT4's native report (equity curve, profit factor, drawdown, trade
-list) is the output, instead of the Python paper-walk simulation
+Run an entry engine **inside the MetaTrader 4 Strategy Tester** so MT4's native
+report (equity curve, profit factor, drawdown, trade list) is the output,
+instead of the Python paper-walk simulation
 ([AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9c).
 
+Two engines are selectable with the `--engine` flag on the decision-compute step:
+
+- `mtf` (Ch. 8, default): rollover-peak Multiple Time Frame; the tester runs on
+  a lower timeframe (e.g. H1) and the higher timeframe (D) is resampled from the
+  exported bars.
+- `dbb` (Ch. 9): Double Bollinger Bands; a **single daily** timeframe run
+  directly on the exported bars (no resample). The tester runs on `D1`.
+
 Research only. Orders exist **only** inside the tester (fully simulated); the
-EA refuses to run on a live/practice chart.
+EA refuses to run on a live/practice chart. The EA is engine-agnostic — it only
+reads `decisions.csv`, so the same compiled `SandboxTesterBridge` serves both.
 
 ---
 
@@ -44,8 +53,9 @@ flowchart TD
 |-------|------|
 | Tester EA | `MQL4/Experts/Custom/SandboxTesterBridge.mq4` |
 | Feed IO / resample | [app/mt4_tester.py](../app/mt4_tester.py) |
-| Decision compute CLI | [agent/tester_backtest.py](../agent/tester_backtest.py) |
-| Rollover-peak engine | [agent/mtf_walk.py](../agent/mtf_walk.py) (`mtf_decisions`) |
+| Decision compute CLI | [agent/tester_backtest.py](../agent/tester_backtest.py) (`--engine mtf\|dbb`) |
+| Ch. 8 rollover-peak engine | [agent/mtf_walk.py](../agent/mtf_walk.py) (`mtf_decisions`) |
+| Ch. 9 Double Bollinger engine | [agent/dbb_walk.py](../agent/dbb_walk.py) (`dbb_decisions`) |
 | Config (tester dir) | [app/config.py](../app/config.py) (`mt4_tester_files_dir`) |
 
 Feed files live at `tester/files/sandbox002/<SYMBOL>_<TF>/{bars,decisions}.csv`
@@ -59,9 +69,13 @@ clock); Python converts to/from RFC3339 for the engines.
 
 ## Entry / exit model
 
-- Decisions are made on a signal bar's **close** (rollover-peak: confidence rises
-  then strictly drops; the peak bar is confirmed, not the rollover bar — same
-  logic as `agent.walk_mtf`).
+### Ch. 8 (`--engine mtf`)
+
+- Rollover-peak, **causal**: confidence rises then strictly drops; the peak bar
+  is only knowable once a lower bar follows it, so `signal_time` is the
+  **rollover bar** (where the drop is observed) — never the peak bar — and the
+  ticket is **recomputed from the rollover bar's geometry**. Same logic as
+  `agent.walk_mtf`. Unconfirmed peaks at the series end are dropped.
 - The EA opens the trade at the **open of the next bar** after `signal_time`
   (nearest realistic tester fill), passing the ticket SL/TP straight into
   `OrderSend`. The tester handles exits natively at SL/TP.
@@ -80,6 +94,27 @@ range must start **well before** the first intended entry so the engines have
 warmup — e.g. an H1 test needs ~250 daily buckets (~1 year) for the HTF regime.
 Lower `--lookback` for shorter ranges.
 
+**MTF entry timing** (`--entry-mode`, mtf only):
+
+- `peak` (default): wait for confidence to roll over; `signal_time` is the
+  rollover bar and the ticket is repriced there.
+- `first_fire`: enter on the first bar of each contiguous firing run; `signal_time`
+  is the signal bar and the ticket comes from that bar (no rollover wait).
+
+### Ch. 9 (`--engine dbb`)
+
+- **Discrete one-shot**, causal: the signal is a close crossing the 1σ Bollinger
+  band (join out, or fade back in). It is fully knowable at that bar's close
+  because the trigger already depends on the prior bars' zones, so no
+  rollover-peak confirmation is needed — `signal_time` is the **signal bar
+  itself** and its ticket is priced from that bar (`agent.dbb_walk`).
+- **Single daily timeframe**: the tester runs on `D1` and Python computes Ch. 9
+  directly on the exported daily bars — **no HTF resample**. `--tf D`, no `--htf`.
+- Same next-bar-open fill, native SL/TP exits, one-position gate, and EA lot
+  sizing as Ch. 8. Warmup: a daily test needs ~`--lookback` daily bars before
+  the first intended entry (default 250 ≈ 1 year); lower `--lookback` for
+  shorter ranges.
+
 ---
 
 ## Run sequence (MetaEditor + Strategy Tester GUI)
@@ -94,11 +129,20 @@ Lower `--lookback` for shorter ranges.
 3. **Compute** the decision feed:
 
 ```bash
-.venv/bin/python -m agent.tester_backtest --instrument GBP_USD --tf H1 --htf D
+# Ch. 8 (MTF): export on H1, resample D internally
+.venv/bin/python -m agent.tester_backtest --engine mtf --instrument GBP_USD --tf H1 --htf D
+
+# Ch. 8 (MTF) with first-fire timing instead of rollover-peak
+.venv/bin/python -m agent.tester_backtest --engine mtf --entry-mode first_fire --instrument GBP_USD --tf H1 --htf D
+
+# Ch. 9 (Double Bollinger): export on D1, single timeframe, no resample
+.venv/bin/python -m agent.tester_backtest --engine dbb --instrument GBP_USD --tf D
 ```
 
-   Prints a JSON summary (bar counts, decision count, first/last signal). Writes
-   `decisions.csv` next to `bars.csv`.
+   For Ch. 9 the export pass (step 2) must run on Period `D1`, producing
+   `tester/files/sandbox002/GBPUSD_D1/bars.csv`. Prints a JSON summary (bar
+   count, decision count, first/last signal). Writes `decisions.csv` next to
+   `bars.csv`.
 4. **Replay pass** — Strategy Tester, same Expert / Symbol / Period / range:
    - Model: **Every tick** (realistic intrabar SL/TP fills).
    - Inputs: `InpMode = replay`, set `InpRisk` / `InpMagic` / `InpSlippage`.
@@ -123,7 +167,8 @@ Lower `--lookback` for shorter ranges.
 No network, no MT4:
 
 ```bash
-.venv/bin/python -m unittest tests.test_mt4_tester tests.test_agent_mtf_walk -v
+.venv/bin/python -m unittest tests.test_mt4_tester tests.test_agent_mtf_walk \
+  tests.test_agent_dbb_walk tests.test_entry_dbb -v
 ```
 
 ---

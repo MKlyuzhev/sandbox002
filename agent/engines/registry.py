@@ -11,12 +11,14 @@ from typing import Any
 
 from agent.engines.base import Engine, EngineContext, EngineResult
 from agent.engines.ch7 import Ch7Engine
+from agent.engines.dbb import DbbEngine
 from agent.engines.mtf import MtfEngine
 from agent.schema import Goal
 
 # Priority order (specialized first, generic Ch. 7 fallback last).
 REGISTRY: list[Engine] = [
     MtfEngine(),
+    DbbEngine(),
     Ch7Engine(),
 ]
 

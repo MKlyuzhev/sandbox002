@@ -340,10 +340,14 @@ While **flat**:
 
 1. Run `mtf_signal` + `signal_confidence` (`agent/engines/mtf.py`).
 2. Track the running max confidence among **firing** signals.
-3. When confidence **strictly drops** (including a non-fire at `0`), confirm the
-   **peak bar** (not the rollover bar), journal, and paper-fill at that bar’s
-   close/ticket.
-4. If a peak never rolls over before `--to`, confirm it on the last LTF bar.
+3. When confidence **strictly drops** (including a non-fire at `0`), the prior
+   bar was the peak. Since a peak is only knowable once a lower bar follows it,
+   enter at the **rollover bar** (where the drop is observed) — never backdated
+   to the peak bar — with the ticket **recomputed from the rollover bar's
+   geometry** (last close entry, 10-bar high/low ± buffer stop, 2R target). This
+   keeps the walk causal (no look-ahead). Confidence recorded is the peak's.
+4. If a peak never rolls over before `--to`, it is **not** entered (no causal
+   confirmation).
 
 While **in trade**: manage stop / target on subsequent LTF bars (stop wins if
 both trade). Still open at `--to` → `window_end`. After flat, reset peak
@@ -377,7 +381,8 @@ constraints: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
    state), and writes `decisions.csv`.
 3. **Replay pass** — `SandboxTesterBridge.mq4` with `InpMode=replay` loads
    `decisions.csv` and `OrderSend`s each entry at the open of the bar after its
-   signal bar, SL/TP from the ticket; the tester manages exits natively.
+   `signal_time` (the rollover bar), SL/TP from the ticket; the tester manages
+   exits natively.
 
 `mtf_decisions` shares the `_PeakTracker` with `walk_mtf`, so decisions match the
 paper walk's confirmation logic. Orders exist only inside the tester (the EA

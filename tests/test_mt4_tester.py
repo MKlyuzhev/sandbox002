@@ -142,12 +142,13 @@ class TestMtfDecisions(unittest.TestCase):
 
     def test_emits_all_peaks(self) -> None:
         ltf = _hourly_bars(55)
-        # Two separate rollover peaks (fire then drop, twice).
+        # Two separate rollover peaks (fire then drop, twice). Each decision is
+        # stamped with the rollover bar (42, 49), not the peak bar (41, 48).
         rsi_map = {
             str(ltf[41]["time"]): 24.0,
-            str(ltf[42]["time"]): 55.0,  # rollover -> confirm peak #1 at 41
+            str(ltf[42]["time"]): 55.0,  # rollover of peak #1 (bar 41)
             str(ltf[48]["time"]): 26.0,
-            str(ltf[49]["time"]): 55.0,  # rollover -> confirm peak #2 at 48
+            str(ltf[49]["time"]): 55.0,  # rollover of peak #2 (bar 48)
         }
         htf = self._htf_for_ltf(ltf)
         decisions = mtf_decisions(
@@ -160,16 +161,16 @@ class TestMtfDecisions(unittest.TestCase):
             ltf_classify_fn=_ltf_stub_factory(rsi_map),
         )
         self.assertEqual(len(decisions), 2)
-        t41 = str(ltf[41]["time"])
-        t48 = str(ltf[48]["time"])
-        self.assertEqual(decisions[0]["signal_time"], t41)
-        self.assertEqual(decisions[1]["signal_time"], t48)
+        t42 = str(ltf[42]["time"])
+        t49 = str(ltf[49]["time"])
+        self.assertEqual(decisions[0]["signal_time"], t42)
+        self.assertEqual(decisions[1]["signal_time"], t49)
         for d in decisions:
             self.assertEqual(d["side"], "long")
             self.assertLess(d["stop"], d["entry"])
             self.assertGreater(d["target"], d["entry"])
 
-    def test_unconfirmed_peak_flushed_at_end(self) -> None:
+    def test_unconfirmed_peak_dropped_at_end(self) -> None:
         ltf = _hourly_bars(50)
         rsi_map = {str(ltf[49]["time"]): 22.0}  # peak on last bar, never rolls
         htf = self._htf_for_ltf(ltf)
@@ -182,8 +183,7 @@ class TestMtfDecisions(unittest.TestCase):
             htf_classify_fn=_htf_stub,
             ltf_classify_fn=_ltf_stub_factory(rsi_map),
         )
-        self.assertEqual(len(decisions), 1)
-        self.assertEqual(decisions[0]["signal_time"], str(ltf[49]["time"]))
+        self.assertEqual(len(decisions), 0)
 
 
 if __name__ == "__main__":

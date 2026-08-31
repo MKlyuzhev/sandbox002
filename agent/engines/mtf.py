@@ -170,6 +170,22 @@ def mtf_signal(
     return _result(side, reason, htf, ltf, instrument, ticket=ticket)
 
 
+def build_ltf_ticket(
+    ltf_analysis: dict[str, Any],
+    side: str,
+    instrument: str,
+    *,
+    buffer_pips: int = BUFFER_PIPS,
+) -> dict[str, Any] | None:
+    """Public Ch.8 lower-TF ticket for a chosen side (rollover-bar entry).
+
+    Same geometry ``mtf_signal`` uses (last close entry, 10-bar high/low +/- pip
+    buffer stop, 2R target), but for an explicit side so a caller can price the
+    ticket at the bar it actually acts on rather than the peak bar.
+    """
+    return _build_ltf_ticket(ltf_analysis, side, instrument, buffer_pips)
+
+
 def _build_ltf_ticket(
     ltf_analysis: dict[str, Any],
     side: str,

@@ -63,6 +63,39 @@ class TestBollinger(unittest.TestCase):
         self.assertEqual(snap["bollinger"]["zone"], "trend_up")
 
 
+class TestDoubleBollinger(unittest.TestCase):
+    def test_state_keys_and_zone(self) -> None:
+        closes = [1.0 + 0.01 * i for i in range(60)]
+        dbb = indicators.double_bollinger_state(closes)
+        for key in (
+            "upper_2",
+            "upper_1",
+            "mid",
+            "lower_1",
+            "lower_2",
+            "zone",
+            "prev_zone",
+            "prev2_zone",
+        ):
+            self.assertIn(key, dbb)
+        # A steady climb keeps the close above the upper 1sigma band.
+        self.assertEqual(dbb["zone"], "trend_up")
+
+    def test_snapshot_carries_double_bb(self) -> None:
+        bars = _trend_bars(80, step=0.03)
+        snap = indicators.snapshot(bars)
+        self.assertIn("double_bb", snap)
+        self.assertEqual(snap["double_bb"]["zone"], snap["bollinger"]["zone"])
+
+    def test_cross_up_from_range_to_trend(self) -> None:
+        # Flat closes (range) then a jump that closes above the upper band.
+        closes = [1.20] * 30 + [1.24]
+        dbb = indicators.double_bollinger_state(closes)
+        self.assertEqual(dbb["zone"], "trend_up")
+        self.assertEqual(dbb["prev_zone"], "range")
+        self.assertEqual(dbb["prev2_zone"], "range")
+
+
 class TestAdx(unittest.TestCase):
     def test_adx_higher_on_directional_run(self) -> None:
         trend = _trend_bars(80, step=0.015)

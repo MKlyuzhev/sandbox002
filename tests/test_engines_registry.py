@@ -60,9 +60,12 @@ class TestSelect(unittest.TestCase):
         self.assertLess(chapters.index(8), chapters.index(7))
 
     def test_range_excludes_mtf(self) -> None:
+        # MTF (Ch.8) never fires in a range; Ch.9 (dbb fade) and the Ch.7
+        # fallback do, specialized before generic.
         analysis = _analysis("range", ["fade_range"])
         chapters = [e.chapter for e in registry.select(analysis, Goal())]
-        self.assertEqual(chapters, [7])
+        self.assertNotIn(8, chapters)
+        self.assertEqual(chapters, [9, 7])
 
     def test_goal_engines_allow_list(self) -> None:
         analysis = _analysis("trend", ["join_trend"])

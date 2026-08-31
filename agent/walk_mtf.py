@@ -94,6 +94,7 @@ async def _async_main(args: argparse.Namespace) -> int:
             goal,
             lookback=args.lookback,
             start_index=start_index,
+            entry_mode=args.entry_mode,
             journal=journal,
         )
     except (regime_walk.WalkError, indicators.IndicatorError) as exc:
@@ -107,6 +108,7 @@ async def _async_main(args: argparse.Namespace) -> int:
         "from_time": args.from_time,
         "to_time": args.to_time,
         "lookback": args.lookback,
+        "entry_mode": args.entry_mode,
         "htf_bar_count": len(htf_bars),
         "ltf_bar_count": len(ltf_bars),
         "start_index": start_index,
@@ -140,6 +142,15 @@ def main() -> int:
         type=int,
         default=regime_walk.DEFAULT_LOOKBACK,
         help="Causal window length (default 250). Warmup is fetched before --from.",
+    )
+    parser.add_argument(
+        "--entry-mode",
+        choices=("peak", "first_fire"),
+        default="first_fire",
+        help=(
+            "Entry timing: peak=rollover-peak confirmation (default); "
+            "first_fire=first bar of each firing run."
+        ),
     )
     parser.add_argument("--balance", type=float, default=10_000.0)
     parser.add_argument("--risk-fraction", type=float, default=0.02)

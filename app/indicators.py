@@ -181,6 +181,45 @@ def bb_zone(close: float, bands: dict[str, float | None]) -> str:
     return "range"
 
 
+def double_bollinger_state(
+    closes: list[float],
+    period: int = BB_PERIOD,
+) -> dict[str, Any]:
+    """Ch.9 double-Bollinger context: last-bar bands plus the last three zones.
+
+    Lien's Ch.9 keys everything off a close crossing the 1σ band, and the join /
+    fade distinction needs the prior bars' positions relative to that band. This
+    returns the last bar's 1σ/2σ bands and the ``bb_zone`` of the last three
+    bars (``zone`` newest, then ``prev_zone``, ``prev2_zone``) so an engine can
+    detect the cross without recomputing indicators.
+    """
+    bb = bollinger_series(closes, period)
+    n = len(closes)
+
+    def _zone_at(i: int) -> str:
+        if i < 0 or i >= n:
+            return "unknown"
+        bands = {
+            "upper_1": bb["upper_1"][i],
+            "upper_2": bb["upper_2"][i],
+            "lower_1": bb["lower_1"][i],
+            "lower_2": bb["lower_2"][i],
+        }
+        return bb_zone(closes[i], bands)
+
+    return {
+        "period": period,
+        "upper_2": _round(_last(bb["upper_2"])),
+        "upper_1": _round(_last(bb["upper_1"])),
+        "mid": _round(_last(bb["mid"])),
+        "lower_1": _round(_last(bb["lower_1"])),
+        "lower_2": _round(_last(bb["lower_2"])),
+        "zone": _zone_at(n - 1),
+        "prev_zone": _zone_at(n - 2),
+        "prev2_zone": _zone_at(n - 3),
+    }
+
+
 def adx_series(
     bars: list[dict],
     period: int = ADX_PERIOD,
@@ -413,6 +452,7 @@ def snapshot(bars: list[dict], slope_bars: int = ADX_SLOPE_BARS) -> dict[str, An
         bb_last["width"] = None
     zone = bb_zone(last_close, bb_last)
     bb_last["zone"] = zone
+    double_bb = double_bollinger_state(closes, BB_PERIOD)
 
     adx = adx_series(bars, ADX_PERIOD)
     adx_now = _last(adx["adx"])
@@ -453,6 +493,7 @@ def snapshot(bars: list[dict], slope_bars: int = ADX_SLOPE_BARS) -> dict[str, An
         "close_vs_sma": close_vs_sma,
         "ma_perfect_order": order,
         "bollinger": bb_last,
+        "double_bb": double_bb,
         "adx": {
             "adx": _round(adx_now, 4),
             "plus_di": _round(_last(adx["plus_di"]), 4),

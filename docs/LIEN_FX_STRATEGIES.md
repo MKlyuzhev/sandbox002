@@ -7,9 +7,10 @@ Not a signal service and not an execution path.
 **Governing layer in this repo:** deterministic regime classification from OHLC
 (`app/indicators.py`, `app/regime.py`) plus MCP/CLI/MT4 wrappers. After
 classification, `agent/levels.py` maps the snapshot to a ticket (last close,
-10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) is now
-encoded as an entry engine (`agent/engines/mtf.py`); the remaining named engines
-(Ch. 9–16) are documented here for later iterations and are **not** encoded as
+10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) and
+Ch. 9 (Double Bollinger Bands) are now encoded as entry engines
+(`agent/engines/mtf.py`, `agent/engines/dbb.py`); the remaining named engines
+(Ch. 10–16) are documented here for later iterations and are **not** encoded as
 trade logic yet.
 
 ```
@@ -152,12 +153,12 @@ Unit tests (no network):
 
 ## Technical strategies (Ch. 8–16)
 
-Ch. 8 is coded (see below); Ch. 9–16 are documented, not coded.
+Ch. 8 and Ch. 9 are coded (see below); Ch. 10–16 are documented, not coded.
 
 | Ch | Strategy | Timeframe | Idea | Use when | Avoid when |
 |----|----------|-----------|------|----------|------------|
 | **8** *(coded)* | Multiple time frames | Daily bias + H1/M15 entry | Higher TF sets direction; buy RSI dips in uptrends | Trend on daily | Fading daily trend from a lower TF |
-| **9** | Double Bollinger Bands | Daily | 1σ+2σ: fade only after close back through 1σ; outer zone = trend; close through 1σ after opposite side = join trend | Regime already classified | Single-band fades that hug 2σ |
+| **9** *(coded)* | Double Bollinger Bands | Daily | 1σ+2σ: fade only after close back through 1σ; outer zone = trend; close through 1σ after opposite side = join trend | Regime already classified | Single-band fades that hug 2σ |
 | **10** | Fade double zeros | 15m | Fade round numbers 10–15 pips before the figure; stop ~20 pips beyond; 20-SMA filter | Quiet tape, tighter crosses, confluence | News, strong trend |
 | **11** | Waiting for the Deal | GBPUSD, London | Skip first London spike (stop hunt); trade reverse through power-hour (6–7 GMT) range | After US open / major release | First spike |
 | **12** | Inside-days breakout | Daily (hourly only before London/US) | ≥2 nested inside days; enter ±10 pips; **stop-and-reverse** on false break | Compression, tighter pairs (EURGBP, USDCAD, EURCHF, EURCAD, AUDCAD) | Chasing without nested insides |
@@ -215,6 +216,45 @@ native equity/drawdown report (two-pass: export bars, compute decisions, replay
 as simulated orders): `python -m agent.tester_backtest` — see
 [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 
+### Ch. 9 entry engine (encoded)
+
+`agent/engines/dbb.py` is a deterministic, research-only engine. It keys off a
+close crossing the **1σ Bollinger band** (double bands = 20-period 1σ + 2σ). The
+`double_bb` block of the Ch. 7 snapshot (`app/indicators.py`) carries the last
+three bar zones (`trend_up` = close above upper 1σ, `trend_down` = close below
+lower 1σ, `range` = between the 1σ bands), and that single cross splits into two
+sub-signals mapped onto the repo's play classes:
+
+- **join trend** (`join_trend`): the prior two closes sat inside the 1σ bands,
+  then a close pushes *out* through the 1σ band into the outer 1σ–2σ zone (long
+  above the upper band, short below the lower band).
+- **fade / pick top-bottom** (`fade_range`): the prior bar sat in the outer
+  zone, then a close comes *back* through the 1σ band toward the middle (long
+  reclaims the lower 1σ, short loses the upper 1σ).
+
+It only fires **with** the Ch. 7 regime (join_* needs a `join_trend` regime,
+fade_* needs a `fade_range` regime) and never when `trend_waning`. Ticket
+geometry reuses `agent/levels.py` band-relative 2R (last close entry; join stop
+at the mid band ± 10-pip buffer, fade stop just past the reclaimed 1σ band).
+Lien's fixed 65/50/195-pip templates are intentionally *not* used — the doc's
+Limits section flags them as not volatility-normalized. Output is JSON with a
+`signal` (long/short/none), `play_class`, `reason`, snapshot summary, an
+entry/stop/target `ticket` when aligned, and `lien-fx` citations (chunks 73–75).
+No orders, no MT4.
+
+Unit tests (no network):
+
+```bash
+.venv/bin/python -m unittest tests.test_entry_dbb -v
+```
+
+The engine is wired into the registry (`agent/engines/registry.py`, specialized
+before the Ch. 7 fallback) so `python -m agent.run` selects it by confidence
+when it fires. The same Ch. 9 logic can be back-tested **inside the MT4 Strategy
+Tester** (single daily timeframe, no HTF resample): `python -m
+agent.tester_backtest --engine dbb --tf D` — see
+[MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
+
 ---
 
 ## Fundamental / cross-market (Ch. 17–25) — later
@@ -269,7 +309,8 @@ as simulated orders): `python -m agent.tester_backtest` — see
 
 ## Out of scope / later
 
-- Encoding Ch. 9–16 entry engines as tools (Ch. 8 done: `agent/engines/mtf.py`)
+- Encoding Ch. 10–16 entry engines as tools (Ch. 8 done: `agent/engines/mtf.py`;
+  Ch. 9 done: `agent/engines/dbb.py`)
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)
 - Orders, a risk MCP wrapper, or live execution
