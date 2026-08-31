@@ -20,7 +20,7 @@ Prefer ≥ 1:2 R, ≤ ~2% equity (`app/risk.py`). Scale half at 1R, stop to brea
 
 ## Entry engines
 
-Ch. 8 (Multiple Time Frames) is coded as the `entry_mtf` tool (oanda-research): higher-TF direction gate + lower-TF RSI-dip/rally trigger, run after the regime filter. Chapters 9–16 are not tools yet; use the doc tables only after the regime filter.
+Ch. 8 (Multiple Time Frames) is coded as the `entry_mtf` tool (oanda-research): higher-TF direction gate + lower-TF RSI-dip/rally trigger, run after the regime filter. Ch. 9 is `entry_dbb`. Ch. 13/14/16 are `entry_lien(chapter)`. Chapters 10, 11, 12, and 15 are not tools yet (news, session clock, `breakout_watch` paper policy); use the doc tables only after the regime filter.
 
 ## Not available yet
 

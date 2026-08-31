@@ -9,9 +9,10 @@ Not a signal service and not an execution path.
 classification, `agent/levels.py` maps the snapshot to a ticket (last close,
 10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) and
 Ch. 9 (Double Bollinger Bands) are now encoded as entry engines
-(`agent/engines/mtf.py`, `agent/engines/dbb.py`); the remaining named engines
-(Ch. 10–16) are documented here for later iterations and are **not** encoded as
-trade logic yet.
+(`agent/engines/mtf.py`, `agent/engines/dbb.py`); Ch. 13 (Fader), 14 (20-day
+breakout), and 16 (Perfect order) are also encoded. Chapters 10, 11, 12, and 15
+remain documented here for later iterations (news, London session,
+`breakout_watch` paper policy) and are **not** encoded as trade logic yet.
 
 ```
 OANDA candles → indicators.py → regime.py → JSON
@@ -153,7 +154,8 @@ Unit tests (no network):
 
 ## Technical strategies (Ch. 8–16)
 
-Ch. 8 and Ch. 9 are coded (see below); Ch. 10–16 are documented, not coded.
+Ch. 8, 9, 13, 14, and 16 are coded (see below); Ch. 10, 11, 12, and 15 are
+documented, not coded.
 
 | Ch | Strategy | Timeframe | Idea | Use when | Avoid when |
 |----|----------|-----------|------|----------|------------|
@@ -162,10 +164,10 @@ Ch. 8 and Ch. 9 are coded (see below); Ch. 10–16 are documented, not coded.
 | **10** | Fade double zeros | 15m | Fade round numbers 10–15 pips before the figure; stop ~20 pips beyond; 20-SMA filter | Quiet tape, tighter crosses, confluence | News, strong trend |
 | **11** | Waiting for the Deal | GBPUSD, London | Skip first London spike (stop hunt); trade reverse through power-hour (6–7 GMT) range | After US open / major release | First spike |
 | **12** | Inside-days breakout | Daily (hourly only before London/US) | ≥2 nested inside days; enter ±10 pips; **stop-and-reverse** on false break | Compression, tighter pairs (EURGBP, USDCAD, EURCHF, EURCAD, AUDCAD) | Chasing without nested insides |
-| **13** | Fader | Daily ADX + hourly entry | ADX(14) &lt; 20: fade a ≥15-pip probe beyond prior day H/L | Range regime | ADX trending |
-| **14** | 20-day breakout | Daily | 20-day extreme → 2-day pullback → rebreak within 3 days | Trend / expansion | First touch of the 20-day without shakeout |
+| **13** *(coded)* | Fader | Daily ADX + hourly entry | ADX(14) &lt; 20: fade a ≥15-pip probe beyond prior day H/L | Range regime | ADX trending |
+| **14** *(coded)* | 20-day breakout | Daily | 20-day extreme → 2-day pullback → rebreak within 3 days | Trend / expansion | First touch of the 20-day without shakeout |
 | **15** | Channels | Intraday or daily | Narrow channel; enter ±10 pips; stop opposite rail; target 2R | Asian channel into London/US, or data at the rail | Fade a channel extreme into a big number |
-| **16** | Perfect order | Daily | SMA stack 10&gt;20&gt;50&gt;100&gt;200; ADX rising, ideally &gt;20; enter 5 bars after stack forms; exit when stack breaks | Early trend | High frequency / tight stops (low hit rate) |
+| **16** *(coded)* | Perfect order | Daily | SMA stack 10&gt;20&gt;50&gt;100&gt;200; ADX rising, ideally &gt;20; enter 5 bars after stack forms; exit when stack breaks | Early trend | High frequency / tight stops (low hit rate) |
 
 Recurring execution pattern across these chapters: **two-lot scale-out** (half at
 ~1R, trail the rest) and **±5–15 pip buffers** off exact highs/lows.
@@ -255,6 +257,60 @@ Tester** (single daily timeframe, no HTF resample): `python -m
 agent.tester_backtest --engine dbb --tf D` — see
 [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 
+MCP (`oanda-research`): `entry_dbb`.
+
+### Ch. 13 Fader (encoded)
+
+`agent/engines/fader.py` is a dual-TF range fade. Daily ADX must be **below 20**;
+the H1 bar must probe **≥15 pips** beyond the prior day's high or low and
+**close back inside** that range (failed break). Long fades a breakdown; short
+fades a breakout. Missing lower-TF analysis does not fire (same as MTF). Ticket:
+last close, stop beyond the probe extreme ± 10-pip buffer, 2R. Citations:
+`lien-fx` chunks 87–88.
+
+```bash
+.venv/bin/python scripts/entry_lien.py --chapter 13 --instrument EUR_USD
+.venv/bin/python -m agent.walk_lien --chapter 13 --instrument EUR_USD \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.tester_backtest --chapter 13 --instrument EUR_USD --tf H1 --htf D
+.venv/bin/python -m unittest tests.test_entry_fader tests.test_agent_fader_walk -v
+```
+
+MCP: `entry_lien(chapter=13, ...)`.
+
+### Ch. 14 20-day breakout (encoded)
+
+`agent/engines/breakout20.py` fires only on a **rebreak** after a ≥2-day
+pullback — not the first touch of the 20-day extreme (`app/lien_geometry.py`).
+`join_trend` only. Stop at the 20-day extreme ± buffer, 2R. Citations: chunks
+88–89.
+
+```bash
+.venv/bin/python scripts/entry_lien.py --chapter 14 --instrument GBP_USD
+.venv/bin/python -m agent.walk_lien --chapter 14 --instrument GBP_USD \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.tester_backtest --chapter 14 --instrument GBP_USD --tf D
+.venv/bin/python -m unittest tests.test_entry_breakout20 tests.test_lien_geometry -v
+```
+
+MCP: `entry_lien(chapter=14, ...)`.
+
+### Ch. 16 Perfect order (encoded)
+
+`agent/engines/perfect_order.py` is a **pulse**: SMA stack intact, ADX rising
+(ideally >20), and `ma_perfect_order_age == 5` only — not every bar the stack
+exists. `join_trend` only. Citations: chunks 92–93.
+
+```bash
+.venv/bin/python scripts/entry_lien.py --chapter 16 --instrument USD_JPY
+.venv/bin/python -m agent.walk_lien --chapter 16 --instrument USD_JPY \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.tester_backtest --chapter 16 --instrument USD_JPY --tf D
+.venv/bin/python -m unittest tests.test_entry_perfect_order tests.test_lien_geometry -v
+```
+
+MCP: `entry_lien(chapter=16, ...)`.
+
 ---
 
 ## Fundamental / cross-market (Ch. 17–25) — later
@@ -309,8 +365,9 @@ agent.tester_backtest --engine dbb --tf D` — see
 
 ## Out of scope / later
 
-- Encoding Ch. 10–16 entry engines as tools (Ch. 8 done: `agent/engines/mtf.py`;
-  Ch. 9 done: `agent/engines/dbb.py`)
+- Encoding Ch. 10 (double zeros — news cannot be coded), 11 (London session
+  clock), 12 (inside days), and 15 (channels). 12/15 need a `breakout_watch` →
+  `pending_exec` policy change this pass did not make.
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)
 - Orders, a risk MCP wrapper, or live execution

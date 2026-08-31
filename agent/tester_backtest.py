@@ -4,12 +4,12 @@ Middle step of the MT4 Strategy Tester two-pass back-test. Reads the bars the
 ``SandboxTesterBridge`` EA exported (``bars.csv``) and writes ``decisions.csv``
 for the EA replay pass. Research only; no orders.
 
-Two entry engines are selectable with ``--engine``:
+Entry engines via ``--engine`` or ``--chapter``:
 
-* ``mtf`` (Ch.8, default): derives the higher timeframe by resampling the
-  exported LTF bars and computes rollover-peak MTF decisions (``agent.mtf_walk``).
-* ``dbb`` (Ch.9): single-timeframe Double Bollinger Bands run directly on the
-  exported bars (default ``--tf D``); no resample (``agent.dbb_walk``).
+* ``mtf`` (Ch.8, default): resample HTF from exported LTF; rollover-peak MTF.
+* ``dbb`` (Ch.9): single-TF Double Bollinger on exported bars.
+* ``perfect_order`` (Ch.16) / ``breakout20`` (Ch.14): single-TF event walks.
+* ``fader`` (Ch.13): resample HTF like MTF; first-fire failed-break fades.
 """
 
 from __future__ import annotations
@@ -23,7 +23,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from agent.dbb_walk import dbb_decisions  # noqa: E402
+from agent.event_walk import event_decisions  # noqa: E402
+from agent.fader_walk import fader_decisions  # noqa: E402
+from agent.lien_chapters import EVENT_ENGINES, resolve_engine  # noqa: E402
 from agent.mtf_walk import mtf_decisions  # noqa: E402
 from agent.schema import Goal  # noqa: E402
 from app import mt4_tester, regime_walk  # noqa: E402
@@ -39,13 +41,32 @@ def _run_mtf(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, di
         start_index=args.start_index,
         entry_mode=args.entry_mode,
     )
-    return decisions, {"htf": args.htf, "htf_bar_count": len(htf_bars), "entry_mode": args.entry_mode}
+    return decisions, {
+        "htf": args.htf,
+        "htf_bar_count": len(htf_bars),
+        "entry_mode": args.entry_mode,
+    }
 
 
-def _run_dbb(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, dict]:
-    decisions = dbb_decisions(
+def _run_fader(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, dict]:
+    htf_bars = mt4_tester.resample_bars(bars, args.htf)
+    decisions = fader_decisions(
+        htf_bars,
         bars,
         goal,
+        lookback=args.lookback,
+        start_index=args.start_index,
+    )
+    return decisions, {"htf": args.htf, "htf_bar_count": len(htf_bars)}
+
+
+def _run_event(
+    engine: str, args: argparse.Namespace, bars: list, goal: Goal
+) -> tuple[list, dict]:
+    decisions = event_decisions(
+        bars,
+        goal,
+        engine,
         lookback=args.lookback,
         start_index=args.start_index,
     )
@@ -53,6 +74,12 @@ def _run_dbb(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, di
 
 
 def _run(args: argparse.Namespace) -> int:
+    try:
+        engine = resolve_engine(chapter=args.chapter, engine=args.engine)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
     bars_file = (
         Path(args.bars)
         if args.bars
@@ -70,9 +97,10 @@ def _run(args: argparse.Namespace) -> int:
         print(f"Feed error: {exc}", file=sys.stderr)
         return 2
 
+    dual_tf = engine in ("mtf", "fader")
     goal = Goal(
         instrument=args.instrument,
-        granularity=args.htf if args.engine == "mtf" else args.tf,
+        granularity=args.htf if dual_tf else args.tf,
         ltf_granularity=args.tf,
         mode="paper",
         risk_fraction=args.risk_fraction,
@@ -82,10 +110,15 @@ def _run(args: argparse.Namespace) -> int:
     )
 
     try:
-        if args.engine == "mtf":
+        if engine == "mtf":
             decisions, extra = _run_mtf(args, bars, goal)
+        elif engine == "fader":
+            decisions, extra = _run_fader(args, bars, goal)
+        elif engine in EVENT_ENGINES:
+            decisions, extra = _run_event(engine, args, bars, goal)
         else:
-            decisions, extra = _run_dbb(args, bars, goal)
+            print(f"tester_backtest: unsupported engine {engine}", file=sys.stderr)
+            return 2
     except (mt4_tester.TesterFeedError, regime_walk.WalkError) as exc:
         print(f"Walk error: {exc}", file=sys.stderr)
         return 1
@@ -93,7 +126,8 @@ def _run(args: argparse.Namespace) -> int:
     mt4_tester.write_decisions_csv(decisions_file, decisions)
 
     payload = {
-        "engine": args.engine,
+        "engine": engine,
+        "chapter": args.chapter,
         "instrument": args.instrument,
         "tf": args.tf,
         "lookback": args.lookback,
@@ -113,27 +147,33 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Compute the MT4 Strategy Tester decision feed from exported bars. "
-            "engine=mtf resamples an HTF and runs rollover-peak MTF (Ch.8); "
-            "engine=dbb runs Double Bollinger Bands on the exported TF (Ch.9). "
-            "Writes decisions.csv. No orders."
+            "engine=mtf resamples an HTF (Ch.8); engine=fader resamples HTF (Ch.13); "
+            "dbb/breakout20/perfect_order run on the exported TF. Writes decisions.csv. "
+            "No orders."
         )
     )
     parser.add_argument("--instrument", required=True)
     parser.add_argument(
         "--engine",
-        choices=("mtf", "dbb"),
-        default="mtf",
-        help="Entry engine: mtf (Ch.8, default) or dbb (Ch.9 Double Bollinger).",
+        choices=("mtf", "dbb", "fader", "breakout20", "perfect_order"),
+        default=None,
+        help="Entry engine (default mtf if --chapter is omitted).",
+    )
+    parser.add_argument(
+        "--chapter",
+        type=int,
+        default=None,
+        help="Lien chapter alias: 8=mtf, 9=dbb, 13=fader, 14=breakout20, 16=perfect_order.",
     )
     parser.add_argument(
         "--tf",
         default="H1",
-        help="Timeframe the tester ran (default H1; use D for dbb).",
+        help="Timeframe the tester ran (default H1; use D for dbb/14/16).",
     )
     parser.add_argument(
         "--htf",
         default="D",
-        help="Higher TF to resample (mtf only; default D).",
+        help="Higher TF to resample (mtf and fader only; default D).",
     )
     parser.add_argument(
         "--entry-mode",
@@ -169,6 +209,8 @@ def main() -> int:
         help="Override decisions.csv path (default tester sandbox).",
     )
     args = parser.parse_args()
+    if args.engine is None and args.chapter is None:
+        args.engine = "mtf"
     return _run(args)
 
 

@@ -406,6 +406,120 @@ async def entry_mtf(
 
 
 @mcp.tool()
+async def entry_dbb(
+    instrument: str,
+    granularity: str = "D",
+    count: int = 250,
+    buffer_pips: int = 10,
+) -> dict:
+    """Lien Ch.9 Double Bollinger Bands entry signal (deterministic).
+
+    Keys off a close crossing the 1sigma band: join_trend (break out into the
+    outer zone) or fade_range (reclaim back through 1sigma). Only fires with the
+    Ch.7 regime's allowed play classes and never when trend_waning. Indicators
+    are computed in code — do not recompute them in the model.
+
+    Returns a signal (long|short|none), play_class, reason, snapshot summary, a
+    2R ticket when aligned (else null), and lien-fx citations. Research only; no
+    orders.
+    """
+    from app import indicators
+    from agent.engines import dbb
+
+    try:
+        _bars, analysis = await _analyze_regime(instrument, granularity, count, "", "")
+    except indicators.IndicatorError as exc:
+        return {"error": str(exc), "instrument": instrument, "granularity": granularity}
+
+    return dbb.dbb_signal(
+        analysis,
+        instrument,
+        buffer_pips=buffer_pips,
+        granularity=granularity,
+    )
+
+
+@mcp.tool()
+async def entry_lien(
+    chapter: int,
+    instrument: str,
+    granularity: str = "D",
+    ltf_granularity: str = "H1",
+    count: int = 250,
+    ltf_count: int = 250,
+    buffer_pips: int = 10,
+    probe_pips: int = 15,
+) -> dict:
+    """Lien Ch.13 / 14 / 16 entry signal (deterministic).
+
+    Chapter 13 (fader): daily ADX<20 + H1 probe ≥15 pips beyond prior day H/L,
+    fade. Chapter 14 (20-day breakout): rebreak after a ≥2-day pullback, not
+    first touch. Chapter 16 (perfect order): SMA stack intact, ADX rising,
+    pulse when stack age is exactly 5. Other chapters return an error (10/11/12/15
+    are not encoded yet; 8 is entry_mtf; 9 is entry_dbb).
+
+    Always after the Ch.7 filter. Research only; no orders.
+    """
+    from app import indicators
+    from agent.lien_chapters import ENTRY_LIEN_CHAPTERS, entry_lien_error
+    from agent.engines import breakout20, fader, perfect_order
+
+    if chapter not in ENTRY_LIEN_CHAPTERS:
+        return {
+            "error": entry_lien_error(chapter),
+            "chapter": chapter,
+            "instrument": instrument,
+        }
+
+    try:
+        bars, analysis = await _analyze_regime(instrument, granularity, count, "", "")
+    except indicators.IndicatorError as exc:
+        return {
+            "error": str(exc),
+            "chapter": chapter,
+            "instrument": instrument,
+            "granularity": granularity,
+        }
+
+    if chapter == 13:
+        try:
+            _ltf_bars, ltf_analysis = await _analyze_regime(
+                instrument, ltf_granularity, ltf_count, "", ""
+            )
+        except indicators.IndicatorError as exc:
+            return {
+                "error": str(exc),
+                "chapter": chapter,
+                "instrument": instrument,
+                "ltf_granularity": ltf_granularity,
+            }
+        return fader.fader_signal(
+            analysis,
+            ltf_analysis,
+            instrument,
+            buffer_pips=buffer_pips,
+            probe_pips=probe_pips,
+            htf_granularity=granularity,
+            ltf_granularity=ltf_granularity,
+        )
+    if chapter == 14:
+        return breakout20.breakout20_signal(
+            analysis,
+            instrument,
+            buffer_pips=buffer_pips,
+            granularity=granularity,
+            bars=bars,
+        )
+    return perfect_order.perfect_order_signal(
+        analysis,
+        instrument,
+        buffer_pips=buffer_pips,
+        granularity=granularity,
+        bars=bars,
+    )
+
+
+@mcp.tool()
 async def mt4_draw_regime(
     instrument: str,
     granularity: str = "D",

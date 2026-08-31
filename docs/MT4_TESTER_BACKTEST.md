@@ -115,6 +115,18 @@ Lower `--lookback` for shorter ranges.
   the first intended entry (default 250 ≈ 1 year); lower `--lookback` for
   shorter ranges.
 
+### Ch. 13 (`--engine fader` / `--chapter 13`)
+
+- Dual-TF like Ch. 8: export **H1**, resample **D**. Daily ADX &lt; 20; H1 probe
+  ≥15 pips beyond prior day H/L then close back inside. First-fire (no
+  rollover-peak). `--tf H1 --htf D`.
+
+### Ch. 14 / 16 (`--chapter 14` / `--chapter 16`)
+
+- Single daily timeframe like Ch. 9 (`agent.event_walk`). Ch. 14 is a 20-day
+  **rebreak** (not first touch). Ch. 16 fires only when perfect-order **age is
+  5**. `--tf D`.
+
 ---
 
 ## Run sequence (MetaEditor + Strategy Tester GUI)
@@ -135,8 +147,12 @@ Lower `--lookback` for shorter ranges.
 # Ch. 8 (MTF) with first-fire timing instead of rollover-peak
 .venv/bin/python -m agent.tester_backtest --engine mtf --entry-mode first_fire --instrument GBP_USD --tf H1 --htf D
 
-# Ch. 9 (Double Bollinger): export on D1, single timeframe, no resample
-.venv/bin/python -m agent.tester_backtest --engine dbb --instrument GBP_USD --tf D
+# Ch. 13 (Fader): export on H1, resample D internally
+.venv/bin/python -m agent.tester_backtest --chapter 13 --instrument EUR_USD --tf H1 --htf D
+
+# Ch. 14 / 16: export on D1, single timeframe, no resample
+.venv/bin/python -m agent.tester_backtest --chapter 14 --instrument GBP_USD --tf D
+.venv/bin/python -m agent.tester_backtest --chapter 16 --instrument USD_JPY --tf D
 ```
 
    For Ch. 9 the export pass (step 2) must run on Period `D1`, producing
@@ -168,7 +184,9 @@ No network, no MT4:
 
 ```bash
 .venv/bin/python -m unittest tests.test_mt4_tester tests.test_agent_mtf_walk \
-  tests.test_agent_dbb_walk tests.test_entry_dbb -v
+  tests.test_agent_dbb_walk tests.test_agent_event_walk tests.test_agent_fader_walk \
+  tests.test_entry_dbb tests.test_entry_fader tests.test_entry_breakout20 \
+  tests.test_entry_perfect_order -v
 ```
 
 ---

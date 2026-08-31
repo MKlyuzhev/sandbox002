@@ -10,7 +10,9 @@ RAG FastAPI (unchanged)      →  http://127.0.0.1:8000
 ```
 
 Related: [Agent Orchestrator](AGENT_ORCHESTRATOR.md),
-[Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) §14 (clients own no logic).
+[Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) §14 (clients own no
+indicator / policy / order logic) and §1c (planner ReAct is Cursor today; this
+UI has no natural-language box on purpose).
 
 ---
 
@@ -40,7 +42,8 @@ Tabs: **Terminal** | **Journal** | **GPU**.
 Not a full PTY. The form is schema-backed (`GET /api/jobs/schema`): primary
 fields stay visible; **More** holds the rest. Empty optionals are omitted so
 the CLI defaults apply. `POST /api/jobs/preview` shows the resolved `$ argv`
-above the log. There is no free-text argv box.
+above the log. There is no free-text argv box. Natural language → `JobSpec` is
+the planner (§1c), not an open shell here.
 
 - `python -m agent.run` — instrument, granularity, mode, `--no-llm` / `--no-rag`
   / `--mt4`; More: `--count`, `--from` / `--to` (`2024-01-01T00:00:00Z`), `--balance`,

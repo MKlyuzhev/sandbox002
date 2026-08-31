@@ -99,6 +99,7 @@ async def _dispatch_engines(
     traces: list[ToolTrace],
     fetch_analyses_fn: FetchAnalysesFn | None,
     bars_injected: bool,
+    used_bars: list[dict[str, Any]] | None = None,
 ) -> Proposal | None:
     """Pick a regime-matched engine and merge its ticket into the proposal.
 
@@ -123,7 +124,12 @@ async def _dispatch_engines(
         except Exception as exc:
             logger.info("engine extra-TF fetch failed: %s", exc)
 
-    ctx = EngineContext(instrument=goal.instrument, goal=goal, analyses=analyses)
+    ctx = EngineContext(
+        instrument=goal.instrument,
+        goal=goal,
+        analyses=analyses,
+        bars={goal.granularity: used_bars} if used_bars else {},
+    )
     chosen, candidates = engine_registry.run_and_pick(engines, ctx)
     if chosen is None:
         detail = f"no firing; {len(engines)} engine(s)"
@@ -310,6 +316,7 @@ async def run(
                 traces,
                 fetch_analyses_fn,
                 bars_injected=bars is not None,
+                used_bars=used_bars,
             )
             traces.append(
                 _trace(

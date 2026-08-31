@@ -484,6 +484,13 @@ def snapshot(bars: list[dict], slope_bars: int = ADX_SLOPE_BARS) -> dict[str, An
 
     missing_sma = [p for p in SMA_PERIODS if sma_last[str(p)] is None]
 
+    from app import lien_geometry
+
+    order_series = lien_geometry.perfect_order_series(sma_series_map)
+    order_age = lien_geometry.perfect_order_age(order_series)
+    prior = lien_geometry.prior_day_high_low(bars)
+    b20 = lien_geometry.breakout_20_state(bars)
+
     return {
         "bar_count": len(bars),
         "last_time": bars[-1].get("time"),
@@ -512,6 +519,11 @@ def snapshot(bars: list[dict], slope_bars: int = ADX_SLOPE_BARS) -> dict[str, An
         "high_n": _round(hi_n),
         "low_n": _round(lo_n),
         "high_n_period": HIGH_N,
+        "last_high": _round(float(bars[-1]["high"])),
+        "last_low": _round(float(bars[-1]["low"])),
+        "ma_perfect_order_age": order_age,
+        "prior_day": prior,
+        "breakout_20": b20,
         "risk_reversals": "unavailable",
         "implied_vol": "unavailable",
     }

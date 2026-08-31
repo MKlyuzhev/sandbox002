@@ -8,7 +8,8 @@ or close broker or MT4 orders. Evidence in the corpus is **heuristic**. Treat
 output as a replayable brief, not a signal service.
 
 Related: [Lien FX Strategies](LIEN_FX_STRATEGIES.md) (Ch. 7 governing layer),
-[Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) (architecture),
+[Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) (architecture; §1c is the
+intended LLM **planner** around this CLI, not inside it),
 [Corpus Runbook](CORPUS_RUNBOOK.md) (ingest `lien-fx`).
 
 ---
@@ -121,7 +122,7 @@ Failures always become `wait`. `breakout_watch` never becomes `pending_exec`.
 |------|---------|---------|
 | `--instrument` | `EUR_USD` | OANDA name (`GBP_USD`, not `GBPUSD`) |
 | `--granularity` | `D` | Lien journal default (higher timeframe). `H1` / `H4` allowed |
-| `--ltf-granularity` | `H1` | Lower timeframe for multi-TF engines (Ch. 8 MTF) |
+| `--ltf-granularity` | `H1` | Lower timeframe for multi-TF engines (Ch. 8 MTF, Ch. 13 Fader) |
 | `--engines` | unset | Comma-separated chapter allow-list (e.g. `8,7`). Default: all matching |
 | `--count` | `250` | Candle count (covers 200-SMA). Ignored if both `--from` and `--to` are set |
 | `--from` / `--to` | unset | RFC3339 window (OANDA: not from+to+count together). Snapshot at the **last** bar. |
@@ -194,23 +195,29 @@ The chosen engine overwrites the proposal's `play_class`, `side`, and
 | Engine | Chapter | Fires for | Timeframes | Confidence |
 |--------|---------|-----------|------------|------------|
 | `mtf` (`agent/engines/mtf.py`) | 8 | `join_trend` | `--granularity` + `--ltf-granularity` | `0.5*htf_regime_conf + 0.5*rsi_extremity` |
+| `dbb` (`agent/engines/dbb.py`) | 9 | `join_trend`, `fade_range` | `--granularity` | `0.5*regime_conf + 0.5*band_extremity` |
+| `fader` (`agent/engines/fader.py`) | 13 | `fade_range` | `--granularity` + `--ltf-granularity` | `0.5*regime_conf + 0.5*probe_excess` |
+| `breakout20` (`agent/engines/breakout20.py`) | 14 | `join_trend` | `--granularity` | `0.5*regime_conf + 0.5*clearance` |
+| `perfect_order` (`agent/engines/perfect_order.py`) | 16 | `join_trend` | `--granularity` | `0.5*regime_conf + 0.5*ADX_strength` |
 | `ch7_geometry` (`agent/engines/ch7.py`) | 7 | `join_trend`, `fade_range` | `--granularity` | `0.5*regime_conf` (fallback discount) |
 
 - Selection (`agent/engines/registry.py`): engines whose `play_classes` match
   `allowed_play_classes`, filtered by `--engines` when set. Ch. 7 is the generic
   fallback, so a firing specialized engine (Ch. 8+) outranks it by confidence;
   ties break by registry priority.
-- Multi-TF fetch: the Ch. 8 engine needs the lower timeframe too. In live mode
-  the graph fetches + classifies it; with injected bars (tests) it is only
-  fetched when a `fetch_analyses_fn` is provided, so injected-bars runs stay
-  offline (MTF simply does not fire).
+- Multi-TF fetch: Ch. 8 (`mtf`) and Ch. 13 (`fader`) need the lower timeframe
+  too. In live mode the graph fetches + classifies it; with injected bars (tests)
+  it is only fetched when a `fetch_analyses_fn` is provided, so injected-bars
+  runs stay offline (those engines simply do not fire).
 - If no engine matches the regime (e.g. `breakout_watch`), the graph falls back
   to Ch. 7 geometry directly (`side: none`, policy waits) — prior behavior.
 - The chosen engine is recorded on `proposal.engine` / `proposal.chapter` and in
   the `engines` tool trace.
 
-The standalone Ch. 8 tool/CLI (`entry_mtf`, `scripts/entry_mtf.py`) still exists
-for a direct two-timeframe signal outside the graph.
+The standalone tools/CLIs (`entry_mtf`, `entry_dbb`, `entry_lien`,
+`scripts/entry_mtf.py`, `scripts/entry_lien.py`) still exist for a direct
+signal outside the graph. Causal walks: `python -m agent.walk_mtf` (Ch. 8),
+`python -m agent.walk_lien --chapter 9|13|14|16`.
 
 ---
 
@@ -365,20 +372,37 @@ Research only; no broker orders.
 
 ---
 
-## 9d. MT4 Strategy Tester back-test — `python -m agent.tester_backtest`
+## 9d. Causal Lien walks — `python -m agent.walk_lien`
 
-Runs the same Ch. 8 rollover-peak logic **inside the MT4 Strategy Tester** so
-MT4's native report (equity curve, profit factor, drawdown) is the output.
-Two passes, file-based, because the tester cannot do a live handshake (`Sleep()`
-does not pause in the tester and the run is a burst). Full workflow and
-constraints: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
+Ch. 9 / 14 / 16 are **one-shot events** on the primary TF (`agent.event_walk`).
+Ch. 13 Fader steps the **lower TF** against a daily ADX gate (`agent.fader_walk`),
+first-fire like MTF `--entry-mode first_fire`. Same warmup + `[--from, --to]`
+fetch as §9b.
+
+```bash
+.venv/bin/python -m agent.walk_lien --chapter 16 --instrument USD_JPY \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.walk_lien --chapter 13 --instrument EUR_USD \
+  --granularity D --ltf-granularity H1 \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+```
+
+`--chapter 9` is the same Ch. 9 event feed as `agent.tester_backtest --engine dbb`.
+
+---
+
+## 9e. MT4 Strategy Tester back-test — `python -m agent.tester_backtest`
+
+Runs encoded engines **inside the MT4 Strategy Tester** so MT4's native report
+(equity curve, profit factor, drawdown) is the output. Two passes, file-based.
+`--engine mtf|dbb|fader|breakout20|perfect_order` or `--chapter 8|9|13|14|16`.
+Full workflow: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 
 1. **Export pass** — `SandboxTesterBridge.mq4` with `InpMode=export` writes every
    completed bar to `tester/files/sandbox002/<SYMBOL>_<TF>/bars.csv`.
-2. **Compute** — `python -m agent.tester_backtest` reads `bars.csv`, resamples the
-   HTF (`app/mt4_tester.resample_bars`), runs `agent.mtf_walk.mtf_decisions`
-   (every confirmed peak, ungated by open trades — the tester owns position
-   state), and writes `decisions.csv`.
+2. **Compute** — `python -m agent.tester_backtest` reads `bars.csv` and writes
+   `decisions.csv`. MTF/Fader resample an HTF; dbb/breakout20/perfect_order run
+   on the exported TF. Tester owns position state.
 3. **Replay pass** — `SandboxTesterBridge.mq4` with `InpMode=replay` loads
    `decisions.csv` and `OrderSend`s each entry at the open of the bar after its
    `signal_time` (the rollover bar), SL/TP from the ticket; the tester manages
@@ -436,10 +460,11 @@ drawing; init does not replay leftover `cmd.json`).
 ## 11. What this is not
 
 - Not live or practice **order** placement (OANDA MCP stays read-only).
-- Ch. 8 (Multiple Time Frames) is wired in as an entry engine (`mtf`); Ch. 9–16
-  remain documented only in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md)
-  tables. When no specialized engine fires, tickets fall back to Ch. 7 geometry
-  (`agent/levels.py`).
+- Encoded entry engines: Ch. 8 (`mtf`), 9 (`dbb`), 13 (`fader`), 14
+  (`breakout20`), 16 (`perfect_order`), plus Ch. 7 geometry fallback. Ch. 10,
+  11, 12, and 15 remain documented only in
+  [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). When no specialized engine
+  fires, tickets fall back to Ch. 7 geometry (`agent/levels.py`).
 - Not HTTP `/agent/run` (still a later wrapper around this same graph).
 - Not a Cursor-only flow: Cursor via MCP is an alternate client; this CLI is
   the in-repo orchestrator.
@@ -454,6 +479,9 @@ No network. From repo root:
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
   tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
   tests.test_agent_paper_walk tests.test_agent_mtf_walk tests.test_mt4_tester \
-  tests.test_agent_mt4_clear \
-  tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf -v
+  tests.test_agent_mt4_clear tests.test_agent_dbb_walk tests.test_agent_event_walk \
+  tests.test_agent_fader_walk tests.test_lien_geometry tests.test_lien_chapters \
+  tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf \
+  tests.test_entry_dbb tests.test_entry_fader tests.test_entry_breakout20 \
+  tests.test_entry_perfect_order -v
 ```

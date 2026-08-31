@@ -17,14 +17,18 @@ from agent.schema import Citation, Goal, PlayClass, Proposal, Side
 
 
 class EngineContext(BaseModel):
-    """Inputs an engine needs: instrument, goal, and per-timeframe analyses."""
+    """Inputs an engine needs: instrument, goal, analyses, and optional OHLC."""
 
     instrument: str
     goal: Goal
     analyses: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    bars: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
 
     def analysis(self, granularity: str) -> dict[str, Any] | None:
         return self.analyses.get(granularity)
+
+    def bars_for(self, granularity: str) -> list[dict[str, Any]] | None:
+        return self.bars.get(granularity)
 
 
 class EngineResult(BaseModel):

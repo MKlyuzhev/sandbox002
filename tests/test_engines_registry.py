@@ -56,16 +56,19 @@ class TestSelect(unittest.TestCase):
         chapters = [e.chapter for e in registry.select(analysis, Goal())]
         self.assertIn(8, chapters)
         self.assertIn(7, chapters)
+        self.assertIn(14, chapters)
+        self.assertIn(16, chapters)
+        self.assertNotIn(13, chapters)
         # MTF (specialized) comes before the Ch.7 fallback.
         self.assertLess(chapters.index(8), chapters.index(7))
 
     def test_range_excludes_mtf(self) -> None:
-        # MTF (Ch.8) never fires in a range; Ch.9 (dbb fade) and the Ch.7
-        # fallback do, specialized before generic.
+        # MTF (Ch.8) never fires in a range; Ch.9 (dbb fade), Ch.13 (fader)
+        # and the Ch.7 fallback do, specialized before generic.
         analysis = _analysis("range", ["fade_range"])
         chapters = [e.chapter for e in registry.select(analysis, Goal())]
         self.assertNotIn(8, chapters)
-        self.assertEqual(chapters, [9, 7])
+        self.assertEqual(chapters, [9, 13, 7])
 
     def test_goal_engines_allow_list(self) -> None:
         analysis = _analysis("trend", ["join_trend"])
