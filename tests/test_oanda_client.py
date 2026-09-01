@@ -136,5 +136,52 @@ class TestCandlePaging(unittest.TestCase):
             )
 
 
+class TestBarsWithBa(unittest.TestCase):
+    def test_mid_plus_bid_ask(self) -> None:
+        payload = {
+            "candles": [
+                {
+                    "time": _hour(0),
+                    "complete": True,
+                    "volume": 10,
+                    "mid": {"o": "1.10", "h": "1.12", "l": "1.09", "c": "1.11"},
+                    "bid": {"o": "1.0998", "h": "1.1198", "l": "1.0898", "c": "1.1098"},
+                    "ask": {"o": "1.1002", "h": "1.1202", "l": "1.0902", "c": "1.1102"},
+                }
+            ]
+        }
+        bars = oanda_client.bars_with_ba(payload)
+        self.assertEqual(len(bars), 1)
+        bar = bars[0]
+        self.assertAlmostEqual(bar["open"], 1.10)
+        self.assertAlmostEqual(bar["close"], 1.11)
+        self.assertAlmostEqual(bar["bid"]["o"], 1.0998)
+        self.assertAlmostEqual(bar["ask"]["o"], 1.1002)
+
+    def test_mid_only_payload_omits_ba(self) -> None:
+        payload = {"candles": [_candle(_hour(0))]}
+        bars = oanda_client.bars_with_ba(payload)
+        self.assertEqual(len(bars), 1)
+        self.assertNotIn("bid", bars[0])
+        self.assertNotIn("ask", bars[0])
+
+    def test_candles_to_bars_still_mid_only(self) -> None:
+        payload = {
+            "candles": [
+                {
+                    "time": _hour(0),
+                    "complete": True,
+                    "mid": {"o": "1.10", "h": "1.12", "l": "1.09", "c": "1.11"},
+                    "bid": {"o": "1.09", "h": "1.11", "l": "1.08", "c": "1.10"},
+                    "ask": {"o": "1.11", "h": "1.13", "l": "1.10", "c": "1.12"},
+                }
+            ]
+        }
+        bars = oanda_client.candles_to_bars(payload, prefer="mid")
+        self.assertEqual(len(bars), 1)
+        self.assertNotIn("bid", bars[0])
+        self.assertAlmostEqual(bars[0]["close"], 1.11)
+
+
 if __name__ == "__main__":
     unittest.main()

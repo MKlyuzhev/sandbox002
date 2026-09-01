@@ -22,12 +22,12 @@ Keep knowledge, planning, coded decisions, and execution separate:
 |-------|------|---------------------|
 | **Knowledge** | Rules, definitions, frameworks from ingested books | RAG + MCP (`search_knowledge`, `get_source_chunk`); corpora include `lien-fx`, `murphy-digital` |
 | **Orchestrator** | Regime → engines → policy → journal | **Done** — bounded graph (`agent/`); optional `llm_propose` is narration only |
-| **Planner (LLM agent)** | Outer-loop ReAct: scan, retry, retrieve, compare, natural language → Goal | **Prototype** — Cursor + MCP; not in `agent/` or the dashboard |
+| **Planner (LLM agent)** | Outer-loop ReAct: scan, experiment, sweep, retrieve, compare, natural language → Goal | **Prototype** — Cursor + MCP; not in `agent/` or the dashboard |
 | **Execution** | Prices, orders, positions, risk | **Stub only** — journal + `agent.executor` sim fills; no broker orders |
 
 - RAG answers: *"What does Murphy say about X?"*
 - The **orchestrator** answers: *"Given this instrument and bar, does a coded engine pass policy?"*
-- The **planner** answers: *"Given my intent, which pairs, timeframes, and engines should we run next?"*
+- The **planner** answers: *"Given my intent, which pairs, engines, windows, and knobs should we run next — and what did the last walk actually show?"*
 - A broker/exchange API actually executes (paper first, live much later).
 
 The slogan *"Given my thesis, market state, and rules, what should I do next?"* is a **question type**, not a chat product. Chat is one client. The planner may take natural language (ordinary English); the orchestrator takes a structured `Goal`. Neither sentence implies the LLM chooses prices or may skip policy.
@@ -46,7 +46,9 @@ flowchart TB
   planner --> rag
   planner --> market
   planner --> graph
+  planner --> walks[walks / tester / journal]
   graph --> risk
+  walks --> journal[(SQLite + WalkEquity)]
   risk --> exec
   rag --> chroma[(ChromaDB)]
   market --> feeds[Quotes bars indicators]
@@ -111,67 +113,129 @@ APIs. MCP servers are the **planner's toolbox**, not a second graph.
 
 ### 1c. Planner — the intended LLM agent
 
-The useful LLM is a **searcher in front of the graph**, not a decision node
-inside it. Encoding remaining Lien chapters (10, 11, 12, 15) expands the toolbox; it does
-not replace this loop. A human typing flags and a ReAct agent emitting the same
-`Goal` produce the **same ticket** if both go through `agent.run`. They are not
-the same **planner**: ReAct does the work between runs.
+The useful LLM is a **searcher and experimenter in front of the graph**, not a
+decision node inside it. Encoding remaining Lien chapters (10, 11, 12, 15)
+expands the toolbox; it does not replace this loop. A human typing flags and a
+ReAct agent emitting the same `Goal` produce the **same ticket** if both go
+through `agent.run`. They are not the same **planner**: ReAct does the work
+**between** runs — including strategy tests, parameter trials, and reading
+walk results.
 
-**Jobs this planner should do** (research only; no broker orders):
+**Split of labor**
 
-| Job | Example |
-|-----|---------|
-| Scan a universe | Several pairs on D; drop `trend_waning` |
-| Retry after `wait` | Try H4 LTF or another encoded chapter |
-| Book → engine | `search_knowledge`, then `--engines` / `entry_*` — not a prose ticket |
-| Compare candidates | "MTF fired, DBB did not — is that Lien-consistent?" |
-| Natural language → `Goal` | Sentence to instrument, window, snapshot vs walk, engine allow-list |
+| Who | Does | Does not |
+|-----|------|----------|
+| **Planner (LLM)** | Choose the next experiment: pair, chapter/engine, window, a small set of knobs; sequence tools; read coded outputs; decide retry / stop / report | Invent ADX, RSI, fills, R, or equity; pick entry/stop/target; skip policy; place orders |
+| **Deterministic tools** | `classify_regime`, `entry_*`, `agent.run`, `agent.walk_*`, `agent.tester_backtest`, `app/risk.py`, journal / `WalkEquity` | Choose *which* experiment to run next |
+
+The planner is a **lab manager**. Walks and engines are the instruments. Research
+only; no broker orders.
+
+Walk `--fill rest` sizes and fills from historical bid/ask candles (next-bar
+market-order shape). That is **not** `POST /v3/accounts/.../orders` on the
+practice host. See [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b.
+
+**Jobs this planner should do**
+
+| Job | Example | Tooling today |
+|-----|---------|----------------|
+| Scan a universe | Majors on D; drop `trend_waning` | N× `classify_regime` in Cursor — no `scan_regimes` helper |
+| Snapshot signal | "Does MTF fire on GBP_USD now?" | `entry_mtf` / `entry_dbb` / `entry_lien`; or `agent.run` to journal |
+| Strategy test (walk) | Ch. 16 on USD_JPY, 2023–2026 | `python -m agent.walk_lien --chapter 16 …` (CLI; **not** an MCP tool yet) |
+| Try other instruments | Same engine, next pair that passed the scan | Repeat walk / `agent.run` with a new `--instrument` |
+| Parameter trial | H1 vs H4 LTF; `rsi_os` 30 vs 40; `--lookback` 250 vs 120 | Same CLIs with different flags. **No** `sweep()` helper — the planner loops |
+| Analyze results | Win rate, mean R, max DD, "fader fired while daily ADX was 28" | Walk JSON `equity`, journal `GET /api/journal/walks/{id}`, tester report. Numbers come from code |
+| Book → engine | Lien Ch. 13 after a range regime | `search_knowledge`, then `--engines 13` / `entry_lien` — not a prose ticket |
+| Compare candidates | "MTF fired, DBB did not — Lien-consistent?" | One `agent.run` winner today; candidate list on `RunRecord` is a gap |
+| Natural language → `Goal` | Sentence to instrument, window, snapshot vs walk, engine allow-list | Type flags; dashboard has no free-text |
+
+**Research campaign (the loop you described)**
+
+A typical planner session is not one `agent.run`. It is a **campaign**:
+
+1. **Intent** — e.g. "Is the Fader worth paper-journaling on quieter majors in 2024?"
+2. **Filter** — `classify_regime` on a small universe; keep `fade_range`, drop waning.
+3. **Baseline test** — one causal walk per survivor (`walk_lien --chapter 13`) with
+   **book defaults** (ADX&lt;20, 15-pip probe, 2R). Record `WalkEquity`.
+4. **Cross-section** — same engine, other pairs / another year. Still defaults.
+5. **Optional knob trial** — one dimension at a time (LTF, lookback, `buffer_pips`),
+   small grid, cap rounds. Treat winners as **hypotheses**, not new encoded rules.
+6. **Read the artifacts** — trade list, `sum_r` / `mean_r` / `max_drawdown_frac`,
+   journal reasons. Ask: did the engine fire in the regime Lien requires?
+7. **Report and stop** — or change chapter / universe. Do not keep sweeping until
+   a curve looks good (narrative overfitting; see §12).
+
+Walks already set `no_llm`: the in-graph chat model is not in this loop. The
+**outer** LLM only chooses argv and interprets JSON that code already produced.
+
+**What "parameter sweeping" is and is not**
+
+Encoded engines expose a few flags (`rsi_os` / `rsi_ob` on MTF, `buffer_pips`,
+`lookback`, `--ltf-granularity`, `--chapter`). The planner *may* iterate those
+by re-running the same walk. That is an experiment log, not a search for a
+secret edge.
+
+- Prefer **book defaults** as the baseline row in any table.
+- Sweep **one** axis per campaign when possible; cap the grid (e.g. 5–10 runs).
+- Do not silently rewrite `agent/engines/*.py` from a lucky window.
+- Do not invent a walk result. If the CLI was not run, there is no mean R.
+- Pip templates in the book stay out of tickets (2R + buffer); do not sweep
+  Lien's 65/50/195-pip numbers back in.
 
 **Hard rules** so the planner does not become the trader:
 
 - No inventing ADX, RSI, or prices. Indicators stay in code.
 - No `pending_exec` except via the graph (`agent.run` / walks).
-- Unencoded chapters: retrieve and explain, or skip — do not emit a fake ticket.
+- Unencoded chapters: retrieve and explain, or skip — do not emit a fake ticket
+  or a fake back-test.
 - Prefer a capable tool-caller (Cursor / frontier) for this loop. In-graph
   `qwen3:4b` (`llm_propose`) is the wrong brain for ReAct. Do not run embed +
   vision + chat concurrently on the 6 GB card (risk of out-of-memory).
-- Cap tool rounds (e.g. 5–10). Preview a structured plan before acting
-  (dashboard `POST /api/jobs/preview` is the pattern).
+- Cap tool rounds (e.g. 5–10 per campaign slice). Preview a structured plan
+  before acting (dashboard `POST /api/jobs/preview` is the pattern).
+- Walks and tester can be expensive (OANDA history + CPU). The planner should
+  propose the grid, not dump an unbounded nested sweep on the practice API.
 
-**MCP side door:** `classify_regime` and `entry_mtf` do **not** run
+**MCP side door:** `classify_regime` and `entry_*` do **not** run
 `agent/policy.py` or write the journal. A planner that only calls those tools is
-not bound by the graph. The allowed "act" for a journaled setup is submitting a
-`Goal` to the orchestrator.
+not bound by the graph. The allowed "act" for a journaled setup or a measured
+walk is submitting a `Goal` / walk argv to the orchestrator (CLI or, later,
+`run_graph`). Snapshot `entry_*` is a peek; equity comes from `walk_*`.
 
 **MTF vs DBB inside one run:** the registry already runs matching engines and
 keeps the highest-confidence fire. ReAct is not required to pick the winner on
-that bar. ReAct *is* required to **explain losers** and to choose the next
-experiment. Today `tool_trace` is a one-liner; candidate engines are not a
-first-class table.
+that bar. ReAct *is* required to **explain losers**, to choose the **next
+experiment** (other pair, window, chapter, or one knob), and to read walk
+stats without re-computing them.
 
 | Capability | Today | Gap |
 |------------|--------|-----|
 | Scan pairs, drop waning | N× `classify_regime` in Cursor | No `scan_regimes(universe)` |
 | After `wait`, other LTF / chapter | Human or Cursor changes flags | Graph is one-shot; no retry node |
 | Retrieve then choose engine | RAG MCP + manual `--engines` | No book → engine-id helper |
-| Compare MTF vs DBB | Two CLIs or one `agent.run` winner | No candidate list on `RunRecord` |
+| Compare MTF vs DBB (one bar) | Two CLIs or one `agent.run` winner | No candidate list on `RunRecord` |
+| Strategy test over `--from`/`--to` | `agent.walk` / `walk_mtf` / `walk_lien` / tester CLI | No `run_walk` MCP; dashboard whitelist only |
+| Cross-instrument campaign | Repeat CLI with a new `--instrument` | No basket helper |
+| Parameter grid | Manual flag loops in Cursor | No `sweep` tool; easy to overfit |
+| Read walk / journal stats | Walk JSON, `GET /api/journal/walks/{id}` | Planner must be given the artifact; no `analyze_walk` summarizer |
 | Sentence → `Goal` | Type RFC3339 flags | No parser; dashboard has no free-text |
 | `entry_dbb` / `entry_lien` as MCP | **Done** — Ch. 9 `entry_dbb`; Ch. 13/14/16 `entry_lien` | Ch. 10/11/12/15 still unencoded |
 | `agent.run` / walks as MCP | CLI / dashboard whitelist only | No `run_graph(Goal)` tool |
 
 **Practical order**
 
-1. Use Cursor as this planner now (MCP + playbook). Example: scan majors on D,
-   drop waning, run `entry_mtf` on the rest.
-2. Planner-facing tools: `run_graph(Goal)`, `scan_regimes`, richer
-   engine-candidate output. Do not loosen policy.
+1. Use Cursor as this planner now (MCP + playbook + CLI). Example: scan majors
+   on D, drop waning, `entry_*` peek, then **one** `walk_lien` on a pair that
+   matched the play class.
+2. Planner-facing tools: `run_graph(Goal)`, walk/tester as callable jobs,
+   `scan_regimes`, richer engine-candidate output. Do not loosen policy.
 3. Natural language → `JobSpec` + preview (dashboard/CLI). Confirmed walk or
-   basket of classify calls — not a free shell.
+   basket of classify calls — not a free shell and not an unbounded sweep.
 4. Encode remaining chapters (10, 11, 12, 15) when news/session/`breakout_watch`
    policy is honest.
 
 HTTP `/agent/run` and a dashboard chat box are later wrappers around the same
-split: planner proposes argv; user or policy confirms; graph runs.
+split: planner proposes argv; user or policy confirms; graph / walk runs.
 
 ---
 
@@ -181,7 +245,7 @@ Be explicit about what "agentic trading" means for your deployment:
 
 | Mode | Behavior | Status |
 |------|----------|--------|
-| **Planner (ReAct)** | Scan / retry / retrieve / compare / natural language → Goal; no orders | **Prototype** — Cursor + MCP; see §1c |
+| **Planner (ReAct)** | Scan / walk / trial knobs / retrieve / compare / natural language → Goal; no orders | **Prototype** — Cursor + MCP; see §1c |
 | **Research brief** | Book + captions, thesis, citations | **Done** — `agent.run` RAG + optional LLM (`--mode signal`) |
 | **Signal (orchestrator)** | Coded engines + policy → `log_setup` or `wait` | **Done** — `agent/` graph |
 | **Execution** | Paper trades under hard rules | **Partial** — stub executor only; no broker API |
@@ -261,13 +325,13 @@ act → journal) still applies, but **around** the graph, not inside
 `llm_propose`:
 
 1. **Intent** — e.g. "Look for MTF entries on GBP_USD from 2023-01-01 to 2026-01-01"
-2. **Plan** — parse to `Goal` / `JobSpec` (instrument, engines, snapshot vs walk)
+2. **Plan** — parse to `Goal` / `JobSpec` (instrument, engines, snapshot vs walk, optional knob trial)
 3. **Observe** — `classify_regime` / `scan_regimes` (drop `trend_waning`)
 4. **Retrieve** — `search_knowledge` when choosing an unencoded or next chapter
-5. **Run** — `entry_*` for a peek, or `agent.run` / `agent.walk_*` to journal
-6. **Compare** — engine candidates; mismatch vs Lien
-7. **Retry or stop** — other LTF, other chapter, next pair; cap rounds
-8. **Act** — only the graph may set `pending_exec`
+5. **Run** — `entry_*` for a peek, or `agent.run` / `agent.walk_*` / tester to journal a measured test
+6. **Compare** — engine candidates; walk `WalkEquity`; mismatch vs Lien
+7. **Retry or stop** — other pair, LTF, chapter, or one flag; cap rounds; do not unbounded-sweep
+8. **Act** — only the graph / walk may set `pending_exec` or simulated fills
 
 Multi-iteration ReAct is this outer loop (research-only). It is **not** a later
 rewrite of `agent/graph.py`. Cursor + MCP is the prototype; dashboard free-text
@@ -454,7 +518,7 @@ Success is:
 **Planner loop (§1c) — priority for LLM-as-agent**
 
 1. `scan_regimes(universe)` helper (drop `trend_waning`)
-2. `run_graph(Goal)` MCP wrapping `agent.run` (policy + journal, not MCP `entry_*` alone)
+2. `run_graph(Goal)` / walk-as-job MCP wrapping `agent.run` and `agent.walk_*` (policy + journal, not MCP `entry_*` alone)
 3. Engine candidate list on `RunRecord` / tool trace (fires and non-fires)
 4. Natural language → `JobSpec` + preview; optional dashboard chat (no free-text argv)
 5. Remaining Lien chapters 10, 11, 12, 15 (news / session / `breakout_watch` policy)

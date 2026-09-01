@@ -12,6 +12,7 @@ Mode = Literal["signal", "paper"]
 Action = Literal["wait", "log_setup", "pending_exec"]
 FillStatus = Literal["pending", "filled_sim", "rejected"]
 ExitStatus = Literal["stop", "target", "window_end"]
+FillMode = Literal["close", "rest"]
 
 
 class Citation(BaseModel):
@@ -34,6 +35,7 @@ class Goal(BaseModel):
     open_risk_fraction: float = 0.0
     exposure_cap: float = 0.06
     value_per_price_unit: float = 1.0
+    fill_mode: FillMode = "close"
     source_filter: str = "lien-fx"
     top_k: int = 5
     mt4: bool = False
@@ -195,6 +197,7 @@ class PaperTrade(BaseModel):
     walk_id: str | None = None
     pnl: float | None = None
     equity_after: float | None = None
+    units: int | None = None
 
 
 class WalkEquity(BaseModel):

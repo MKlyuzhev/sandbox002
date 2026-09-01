@@ -20,6 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
 from agent.mtf_walk import walk_mtf  # noqa: E402
 from agent.schema import Goal  # noqa: E402
+from agent.walk_exec import add_fill_cli_args  # noqa: E402
 from app import indicators, oanda_client, regime_walk  # noqa: E402
 from app.walk_fetch import fetch_walk_bars  # noqa: E402
 
@@ -46,6 +47,7 @@ async def _async_main(args: argparse.Namespace) -> int:
                 args.from_time,
                 args.to_time,
                 args.lookback,
+                with_ba=False,
             ),
             fetch_walk_bars(
                 args.instrument,
@@ -53,6 +55,7 @@ async def _async_main(args: argparse.Namespace) -> int:
                 args.from_time,
                 args.to_time,
                 args.lookback,
+                with_ba=args.fill_mode == "rest",
             ),
         )
     except oanda_client.OandaError as exc:
@@ -74,6 +77,8 @@ async def _async_main(args: argparse.Namespace) -> int:
             risk_fraction=args.risk_fraction,
             balance=args.balance,
             exposure_cap=args.exposure_cap,
+            value_per_price_unit=args.value_per_price_unit,
+            fill_mode=args.fill_mode,
             no_rag=True,
             no_llm=True,
         )
@@ -112,6 +117,8 @@ async def _async_main(args: argparse.Namespace) -> int:
         "htf_bar_count": len(htf_bars),
         "ltf_bar_count": len(ltf_bars),
         "start_index": start_index,
+        "fill_mode": args.fill_mode,
+        "value_per_price_unit": args.value_per_price_unit,
         "walk_id": result.walk_id,
         "equity": result.equity.model_dump(mode="json"),
         "trades": [t.model_dump(mode="json") for t in result.trades],
@@ -155,6 +162,7 @@ def main() -> int:
     parser.add_argument("--balance", type=float, default=10_000.0)
     parser.add_argument("--risk-fraction", type=float, default=0.02)
     parser.add_argument("--exposure-cap", type=float, default=0.06)
+    add_fill_cli_args(parser)
     parser.add_argument("--journal", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--no-journal", action="store_true")
     parser.add_argument(

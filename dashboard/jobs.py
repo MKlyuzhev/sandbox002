@@ -92,6 +92,14 @@ SCHEMA_FIELDS: list[dict[str, Any]] = [
         "flag": "--mt4-ticket-prefix",
         "placeholder": "sbox.ticket.walk.",
     },
+    {
+        "name": "fill_mode",
+        "type": "enum",
+        "choices": ["close", "rest"],
+        "group": "walk",
+        "label": "fill",
+        "flag": "--fill",
+    },
     {"name": "watch", "type": "bool", "group": "executor", "label": "watch", "flag": "--watch"},
     {"name": "interval", "type": "float", "group": "executor", "label": "interval", "flag": "--interval", "placeholder": "5"},
 ]
@@ -132,6 +140,7 @@ class JobSpec(BaseModel):
     lookback: int | None = Field(default=None, ge=30, le=5000)
     mt4_show: Literal["ranges", "markers", "both"] | None = None
     mt4_ticket_prefix: str | None = None
+    fill_mode: Literal["close", "rest"] = "close"
     watch: bool = False
     interval: float | None = Field(default=None, ge=0.5, le=3600)
 
@@ -261,6 +270,8 @@ def build_argv(spec: JobSpec, python: str | None = None) -> list[str]:
             argv.extend(["--mt4-prefix", spec.mt4_prefix])
         if spec.mt4_ticket_prefix:
             argv.extend(["--mt4-ticket-prefix", spec.mt4_ticket_prefix])
+        if spec.fill_mode != "close":
+            argv.extend(["--fill", spec.fill_mode])
         if spec.quiet:
             argv.append("--quiet")
         if spec.no_journal:

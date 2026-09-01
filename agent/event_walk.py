@@ -22,6 +22,15 @@ from agent.paper_walk import (
     summarize_equity,
 )
 from agent.schema import Citation, Goal, PaperTrade, Proposal, WalkResult
+from agent.walk_exec import (
+    RestPending,
+    check_exit_rest,
+    fill_mode_of,
+    may_check_exit,
+    realize_rest_trade,
+    rest_journal_note,
+    window_end_price,
+)
 from app import indicators, regime as regime_mod, regime_walk
 
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
@@ -189,15 +198,40 @@ def walk_event(
     equity = starting
     trades: list[PaperTrade] = []
     open_trade: PaperTrade | None = None
+    pending: RestPending | None = None
     last_i = len(series) - 1
+    fill_mode = fill_mode_of(goal)
+    exit_fn = check_exit_rest if fill_mode == "rest" else check_exit
 
     for i in range(start_index, len(series)):
         bar = series[i]
         bar_time = str(bar.get("time") or "")
 
+        if pending is not None and i == pending.fill_index:
+            realized = realize_rest_trade(
+                pending, bar, i, bar_time, equity, goal, walk_id
+            )
+            if realized is not None:
+                open_trade, fill = realized
+                _journal_entry(
+                    journal,
+                    goal,
+                    pending.analysis,
+                    pending.proposal,
+                    pending.verdict,
+                    open_trade.run_id,
+                    bar_time,
+                    walk_id,
+                    fill_price=fill.price,
+                    fill_note=rest_journal_note(open_trade.side, fill.units),
+                )
+            pending = None
+
         exited_here = False
-        if open_trade is not None and i > open_trade.entry_index:
-            hit = check_exit(
+        if open_trade is not None and may_check_exit(
+            open_trade.entry_index, i, fill_mode
+        ):
+            hit = exit_fn(
                 open_trade.side, open_trade.stop, open_trade.target, bar
             )
             if hit is not None:
@@ -211,12 +245,14 @@ def walk_event(
                     journal=journal,
                     equity=equity,
                     risk_fraction=goal.risk_fraction,
+                    fill_mode=fill_mode,
+                    value_per_price_unit=goal.value_per_price_unit,
                 )
                 trades.append(open_trade)
                 open_trade = None
                 exited_here = True
 
-        if open_trade is None and not exited_here:
+        if open_trade is None and pending is None and not exited_here:
             window = series[: i + 1][-lookback:]
             analysis = dict(classify(window))
             analysis.setdefault("instrument", goal.instrument)
@@ -236,29 +272,43 @@ def walk_event(
             verdict = policy.evaluate(analysis, proposal, goal)
             if not verdict.ok:
                 continue
-            run_id = uuid.uuid4().hex
-            open_trade = PaperTrade(
-                run_id=run_id,
-                entry_index=i,
-                entry_time=bar_time,
-                side=proposal.side,  # type: ignore[arg-type]
-                play_class=proposal.play_class,
-                entry=float(ticket["entry"]),
-                stop=float(ticket["stop"]),
-                target=float(ticket["target"]),
-                reasons=list(verdict.reasons),
-                walk_id=walk_id,
-            )
-            _journal_entry(
-                journal,
-                goal,
-                analysis,
-                proposal,
-                verdict,
-                run_id,
-                bar_time,
-                walk_id,
-            )
+            if fill_mode == "rest":
+                if i + 1 < len(series):
+                    pending = RestPending(
+                        fill_index=i + 1,
+                        side=proposal.side,
+                        play_class=proposal.play_class,
+                        stop=float(ticket["stop"]),
+                        target=float(ticket["target"]),
+                        reasons=list(verdict.reasons),
+                        proposal=proposal,
+                        verdict=verdict,
+                        analysis=dict(analysis),
+                    )
+            else:
+                run_id = uuid.uuid4().hex
+                open_trade = PaperTrade(
+                    run_id=run_id,
+                    entry_index=i,
+                    entry_time=bar_time,
+                    side=proposal.side,  # type: ignore[arg-type]
+                    play_class=proposal.play_class,
+                    entry=float(ticket["entry"]),
+                    stop=float(ticket["stop"]),
+                    target=float(ticket["target"]),
+                    reasons=list(verdict.reasons),
+                    walk_id=walk_id,
+                )
+                _journal_entry(
+                    journal,
+                    goal,
+                    analysis,
+                    proposal,
+                    verdict,
+                    run_id,
+                    bar_time,
+                    walk_id,
+                )
 
     if open_trade is not None:
         last = series[last_i]
@@ -266,11 +316,13 @@ def walk_event(
             open_trade,
             exit_index=last_i,
             exit_time=str(last.get("time") or ""),
-            exit_price=float(last["close"]),
+            exit_price=window_end_price(last, open_trade.side, fill_mode),
             exit_status="window_end",
             journal=journal,
             equity=equity,
             risk_fraction=goal.risk_fraction,
+            fill_mode=fill_mode,
+            value_per_price_unit=goal.value_per_price_unit,
         )
         trades.append(open_trade)
 

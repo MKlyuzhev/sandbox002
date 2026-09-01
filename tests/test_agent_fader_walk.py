@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from agent.fader_walk import fader_decisions
+from agent.fader_walk import fader_decisions, walk_fader
 from agent.schema import Goal
 from app import regime_walk
 
@@ -163,6 +163,57 @@ class TestFaderDecisions(unittest.TestCase):
                 htf_classify_fn=lambda _w: _htf_ok(),
                 ltf_classify_fn=lambda _w: _ltf_quiet(),
             )
+
+
+def _with_spread(bars: list[dict], half: float = 0.0002) -> list[dict]:
+    out: list[dict] = []
+    for b in bars:
+        nb = dict(b)
+        nb["bid"] = {
+            "o": float(b["open"]) - half,
+            "h": float(b["high"]) - half,
+            "l": float(b["low"]) - half,
+            "c": float(b["close"]) - half,
+        }
+        nb["ask"] = {
+            "o": float(b["open"]) + half,
+            "h": float(b["high"]) + half,
+            "l": float(b["low"]) + half,
+            "c": float(b["close"]) + half,
+        }
+        out.append(nb)
+    return out
+
+
+class TestWalkFaderRest(unittest.TestCase):
+    def test_ba_required_on_ltf_only(self) -> None:
+        htf = _daily_bars(80)
+        ltf = _with_spread(_hourly_bars(80))
+        fire_t = str(ltf[50]["time"])
+
+        def htf_fn(_window: list) -> dict:
+            return _htf_ok()
+
+        def ltf_fn(window: list) -> dict:
+            t = str(window[-1]["time"])
+            if t == fire_t:
+                return _ltf_long_probe()
+            return _ltf_quiet()
+
+        result = walk_fader(
+            htf,
+            ltf,
+            _goal(fill_mode="rest"),
+            lookback=40,
+            start_index=39,
+            htf_classify_fn=htf_fn,
+            ltf_classify_fn=ltf_fn,
+        )
+        self.assertEqual(len(result.trades), 1)
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_index, 51)
+        self.assertAlmostEqual(trade.entry, ltf[51]["ask"]["o"])
+        self.assertIsNotNone(trade.units)
 
 
 if __name__ == "__main__":

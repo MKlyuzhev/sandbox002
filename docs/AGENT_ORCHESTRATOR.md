@@ -304,7 +304,7 @@ Same warmup + `[--from, --to]` fetch as `scripts/walk_regime.py`. Each decision
 uses only `bars[:i+1][-lookback:]` (no look-forward). No RAG / LLM.
 
 1. While **flat**, run skeleton + Ch. 7 geometry + policy (`mode=paper`).
-2. First `pending_exec` **fills at that bar’s close**.
+2. First `pending_exec` **fills at that bar’s close** (`--fill close`, default).
    **Every** fill is journaled (one `runs` row per trade, not only the last).
    `ts` and `proposal.at_time` are that decision bar, not wall-clock now.
 3. Hold **one** position. From the **next** bar, record stop or target (if both
@@ -312,16 +312,36 @@ uses only `bars[:i+1][-lookback:]` (no look-forward). No RAG / LLM.
 4. Still open at `--to` → `window_end` at last close. Then flatten.
 5. Next fill only after flat.
 
+`--fill rest` is an opt-in simulator closer to a v20 market order on historical
+OANDA candles (not broker P&L, not the MT4 tester in §9e, not `POST /orders`):
+
+| `--fill` | Signal | Fill | Exit | Equity |
+|----------|--------|------|------|--------|
+| `close` (default) | Mid close of bar `i` | That close | Next bar mid H/L; gap still at the stop | `pnl = equity * risk_fraction * R` |
+| `rest` | Mid close of bar `i` (ticket stop/target unchanged) | Bar `i+1` taking-side open (long **ask** / short **bid**). No next bar → drop. Fill on the wrong side of the stop → skip | Making side from the fill bar (long **bid**, short **ask**). Making-side **open** already through the stop → exit at that **open**. Stop still wins if both trade | `units = floor(position_size(...))`; `pnl = units * Δprice * value_per_price_unit`; still record `r_realized` |
+
+USD-quoted pairs in a USD account can leave `--value-per-price-unit` at `1.0`.
+Pairs like `USD_JPY` need that flag set; this pass does not auto-fetch OANDA
+conversion. Missing bid/ask in rest mode is a `WalkError` (no silent mid fallback).
+
+```bash
+.venv/bin/python -m agent.walk \
+  --instrument GBP_USD --granularity D --fill rest \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+```
+
 `--mt4` paints walk ranges (`sbox.regime.walk.`) plus, for **every** sequential
 fill, direction (arrow + `long`/`short` text), time-bounded stop (red dash) and
 take-profit (green dash) on `sbox.ticket.walk.`. Not chart-wide hlines. Every
 fill is a journal row; the list shows side / stop / target / R / simulated pnl
 and equity; detail includes the fill exit (`stop` / `target` / `window_end`).
 
-Simulated equity compounds per fill: `pnl = equity * risk_fraction * R`, then
-`equity += pnl` (default 2% of current equity). Each walk has a `walk_id`. The
-CLI JSON and `GET /api/journal/walks/{walk_id}` report n, win rate, sum/mean R,
-ending equity, and max drawdown. This is not broker P&L.
+Simulated equity compounds per fill. Default `--fill close`:
+`pnl = equity * risk_fraction * R`, then `equity += pnl` (default 2% of current
+equity). `--fill rest` compounds cash P&L from integer units instead (R is still
+recorded). Each walk has a `walk_id`. The CLI JSON and
+`GET /api/journal/walks/{walk_id}` report n, win rate, sum/mean R, ending equity,
+and max drawdown. This is not broker P&L.
 
 ```bash
 .venv/bin/python -m agent.walk \
@@ -366,7 +386,8 @@ tracking and resume hunting (multiple entries per walk allowed).
   --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
 ```
 
-Stdout JSON: `walk_id`, `trades`, compounded `equity` (same math as §9b).
+Stdout JSON: `walk_id`, `trades`, compounded `equity` (same `--fill` modes as
+§9b). Dual-TF rest fetch is **HTF mid only** (regime) and **LTF MBA** (execution).
 Journal rows use `proposal.engine=mtf` and peak confidence on the proposal.
 Research only; no broker orders.
 
@@ -377,7 +398,7 @@ Research only; no broker orders.
 Ch. 9 / 14 / 16 are **one-shot events** on the primary TF (`agent.event_walk`).
 Ch. 13 Fader steps the **lower TF** against a daily ADX gate (`agent.fader_walk`),
 first-fire like MTF `--entry-mode first_fire`. Same warmup + `[--from, --to]`
-fetch as §9b.
+fetch as §9b. `--fill close|rest` matches §9b; Ch.13 rest uses LTF bid/ask only.
 
 ```bash
 .venv/bin/python -m agent.walk_lien --chapter 16 --instrument USD_JPY \
@@ -411,6 +432,7 @@ Full workflow: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 `mtf_decisions` shares the `_PeakTracker` with `walk_mtf`, so decisions match the
 paper walk's confirmation logic. Orders exist only inside the tester (the EA
 refuses to run outside it via `IsTesting()`); the live bridge stays order-free.
+Walk `--fill rest` is a different venue (OANDA REST candles, no `OrderSend`).
 
 ---
 
@@ -478,9 +500,10 @@ No network. From repo root:
 ```bash
 .venv/bin/python -m unittest tests.test_agent_policy tests.test_agent_graph \
   tests.test_agent_journal tests.test_agent_executor tests.test_agent_levels \
-  tests.test_agent_paper_walk tests.test_agent_mtf_walk tests.test_mt4_tester \
-  tests.test_agent_mt4_clear tests.test_agent_dbb_walk tests.test_agent_event_walk \
-  tests.test_agent_fader_walk tests.test_lien_geometry tests.test_lien_chapters \
+  tests.test_agent_paper_walk tests.test_agent_walk_exec tests.test_agent_mtf_walk \
+  tests.test_mt4_tester tests.test_agent_mt4_clear tests.test_agent_dbb_walk \
+  tests.test_agent_event_walk tests.test_agent_fader_walk tests.test_walk_fetch \
+  tests.test_lien_geometry tests.test_lien_chapters \
   tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf \
   tests.test_entry_dbb tests.test_entry_fader tests.test_entry_breakout20 \
   tests.test_entry_perfect_order -v

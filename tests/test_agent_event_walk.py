@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from agent.event_walk import event_decisions
+from agent.event_walk import event_decisions, walk_event
 from agent.schema import Goal
 from app import regime_walk
 
@@ -168,6 +168,52 @@ class TestEventDecisions(unittest.TestCase):
     def test_unknown_engine(self) -> None:
         with self.assertRaises(regime_walk.WalkError):
             event_decisions(_daily_bars(50), _goal(), "nope", lookback=40)
+
+
+def _with_spread(bars: list[dict], half: float = 0.0002) -> list[dict]:
+    out: list[dict] = []
+    for b in bars:
+        nb = dict(b)
+        nb["bid"] = {
+            "o": float(b["open"]) - half,
+            "h": float(b["high"]) - half,
+            "l": float(b["low"]) - half,
+            "c": float(b["close"]) - half,
+        }
+        nb["ask"] = {
+            "o": float(b["open"]) + half,
+            "h": float(b["high"]) + half,
+            "l": float(b["low"]) + half,
+            "c": float(b["close"]) + half,
+        }
+        out.append(nb)
+    return out
+
+
+class TestWalkEventRest(unittest.TestCase):
+    def test_fill_is_next_bar_ask(self) -> None:
+        bars = _with_spread(_daily_bars(60))
+        t_fire = str(bars[45]["time"])
+
+        def classify(window: list) -> dict:
+            if str(window[-1]["time"]) == t_fire:
+                return _po_fire()
+            return _po_quiet()
+
+        result = walk_event(
+            bars,
+            _goal(fill_mode="rest"),
+            "perfect_order",
+            lookback=40,
+            start_index=39,
+            classify_fn=classify,
+        )
+        self.assertEqual(len(result.trades), 1)
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_index, 46)
+        self.assertAlmostEqual(trade.entry, bars[46]["ask"]["o"])
+        self.assertIsNotNone(trade.units)
+        self.assertGreaterEqual(trade.units, 1)
 
 
 if __name__ == "__main__":

@@ -154,6 +154,27 @@ class TestJobArgv(unittest.TestCase):
         self.assertNotIn("--mode", argv)
         self.assertNotIn("--no-llm", argv)
 
+    def test_walk_fill_rest_flag(self) -> None:
+        spec = JobSpec(
+            cmd="agent.walk",
+            instrument="GBP_USD",
+            from_time="2024-01-01T00:00:00Z",
+            to_time="2024-06-01T00:00:00Z",
+            fill_mode="rest",
+        )
+        argv = build_argv(spec, python="/opt/py")
+        self.assertEqual(argv[argv.index("--fill") + 1], "rest")
+
+    def test_walk_fill_close_omitted(self) -> None:
+        spec = JobSpec(
+            cmd="agent.walk",
+            instrument="GBP_USD",
+            from_time="2024-01-01T00:00:00Z",
+            to_time="2024-06-01T00:00:00Z",
+        )
+        argv = build_argv(spec, python="/opt/py")
+        self.assertNotIn("--fill", argv)
+
     def test_mt4_clear_argv(self) -> None:
         argv = build_argv(JobSpec(cmd="agent.mt4_clear"), python="/opt/py")
         self.assertEqual(

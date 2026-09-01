@@ -1,8 +1,12 @@
 """Causal one-position paper walk (no look-forward on the decision).
 
-Fill at the decision bar close after a policy pass. Stop / target are checked
-from the next bar onward. Window end marks still-open trades at last close.
-No RAG, no LLM, no broker orders. ``agent.executor`` is not used.
+``--fill close`` (default): fill at the decision bar close after a policy pass.
+Stop / target are checked from the next bar onward. Window end marks still-open
+trades at last close.
+
+``--fill rest``: engines still run on mids; fill waits for the next bar's
+taking-side open (long ask / short bid). Exits use the making side. Research
+only. No RAG, no LLM, no broker orders. ``agent.executor`` is not used.
 """
 
 from __future__ import annotations
@@ -15,6 +19,16 @@ from agent import levels as levels_mod
 from agent import policy, propose as propose_mod
 from agent.journal import Journal
 from agent.schema import Goal, PaperTrade, RunRecord, SimFill, WalkEquity, WalkResult
+from agent.walk_exec import (
+    RestPending,
+    check_exit_rest,
+    fill_mode_of,
+    may_check_exit,
+    realize_rest_trade,
+    rest_journal_note,
+    rest_pnl,
+    window_end_price,
+)
 from app import indicators, regime as regime_mod, regime_walk, risk as risk_lib
 
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
@@ -120,6 +134,8 @@ def _close_trade(
     journal: Journal | None,
     equity: float,
     risk_fraction: float,
+    fill_mode: str = "close",
+    value_per_price_unit: float = 1.0,
 ) -> tuple[PaperTrade, float]:
     try:
         r_realized = round(
@@ -127,8 +143,17 @@ def _close_trade(
         )
     except risk_lib.RiskError:
         r_realized = None
-    r_for_eq = 0.0 if r_realized is None else r_realized
-    pnl, equity_after = risk_lib.apply_r_to_equity(equity, risk_fraction, r_for_eq)
+    if fill_mode == "rest":
+        units = trade.units
+        if units is None or units < 1:
+            raise regime_walk.WalkError("rest exit requires integer units")
+        pnl = rest_pnl(
+            trade.side, trade.entry, exit_price, units, value_per_price_unit
+        )
+        equity_after = equity + pnl
+    else:
+        r_for_eq = 0.0 if r_realized is None else r_realized
+        pnl, equity_after = risk_lib.apply_r_to_equity(equity, risk_fraction, r_for_eq)
     pnl = round(pnl, 4)
     equity_after = round(equity_after, 4)
     closed = trade.model_copy(
@@ -171,11 +196,20 @@ def _journal_entry(
     run_id: str,
     bar_time: str,
     walk_id: str,
+    *,
+    fill_price: float | None = None,
+    fill_note: str | None = None,
 ) -> None:
     if journal is None:
         return
     if proposal is not None:
-        proposal = proposal.model_copy(update={"at_time": bar_time})
+        updates: dict[str, Any] = {"at_time": bar_time}
+        if fill_price is not None:
+            updates["entry"] = fill_price
+        if fill_note:
+            prior = getattr(proposal, "notes", "") or ""
+            updates["notes"] = f"{prior}; {fill_note}" if prior else fill_note
+        proposal = proposal.model_copy(update=updates)
     analysis = dict(analysis)
     analysis["last_time"] = bar_time
     record = RunRecord(
@@ -195,13 +229,18 @@ def _journal_entry(
         walk_id=walk_id,
     )
     journal.append_run(record, queue_fill=False)
+    price = (
+        fill_price
+        if fill_price is not None
+        else (float(proposal.entry) if proposal is not None else 0.0)
+    )
     journal.record_fill(
         SimFill(
             run_id=run_id,
             status="filled_sim",
-            fill_price=float(proposal.entry),
+            fill_price=price,
             ts=bar_time,
-            note="walk fill at decision-bar close; no broker",
+            note=fill_note or "walk fill at decision-bar close; no broker",
             walk_id=walk_id,
         )
     )
@@ -220,7 +259,8 @@ def walk_paper(
     """Walk causal windows; at most one open paper ticket at a time.
 
     Window at index ``i`` is ``bars[: i + 1][-lookback:]``. Step is always 1.
-    Equity compounds: ``pnl = equity * risk_fraction * R``.
+    ``fill_mode=close``: ``pnl = equity * risk_fraction * R``.
+    ``fill_mode=rest``: next-bar bid/ask fill; ``pnl`` from integer units.
     """
     if lookback < indicators.MIN_BARS:
         raise regime_walk.WalkError(
@@ -238,21 +278,46 @@ def walk_paper(
         raise regime_walk.WalkError("start_index is past the last complete bar")
 
     goal = _goal_for_walk(goal)
+    fill_mode = fill_mode_of(goal)
     classify = classify_fn or regime_mod.analyze_bars
     walk_id = walk_id or uuid.uuid4().hex
     starting = float(goal.balance)
     equity = starting
     trades: list[PaperTrade] = []
     open_trade: PaperTrade | None = None
+    pending: RestPending | None = None
     last_i = len(series) - 1
+    exit_fn = check_exit_rest if fill_mode == "rest" else check_exit
 
     for i in range(start_index, len(series)):
         bar = series[i]
         bar_time = str(bar.get("time") or "")
 
+        if pending is not None and i == pending.fill_index:
+            realized = realize_rest_trade(
+                pending, bar, i, bar_time, equity, goal, walk_id
+            )
+            if realized is not None:
+                open_trade, fill = realized
+                _journal_entry(
+                    journal,
+                    goal,
+                    pending.analysis,
+                    pending.proposal,
+                    pending.verdict,
+                    open_trade.run_id,
+                    bar_time,
+                    walk_id,
+                    fill_price=fill.price,
+                    fill_note=rest_journal_note(open_trade.side, fill.units),
+                )
+            pending = None
+
         exited_here = False
-        if open_trade is not None and i > open_trade.entry_index:
-            hit = check_exit(
+        if open_trade is not None and may_check_exit(
+            open_trade.entry_index, i, fill_mode
+        ):
+            hit = exit_fn(
                 open_trade.side, open_trade.stop, open_trade.target, bar
             )
             if hit is not None:
@@ -266,12 +331,14 @@ def walk_paper(
                     journal=journal,
                     equity=equity,
                     risk_fraction=goal.risk_fraction,
+                    fill_mode=fill_mode,
+                    value_per_price_unit=goal.value_per_price_unit,
                 )
                 trades.append(open_trade)
                 open_trade = None
                 exited_here = True
 
-        if open_trade is None and not exited_here:
+        if open_trade is None and pending is None and not exited_here:
             window = series[: i + 1][-lookback:]
             analysis = classify(window)
             analysis.setdefault("instrument", goal.instrument)
@@ -279,29 +346,43 @@ def walk_paper(
             entered = _maybe_enter(analysis, goal)
             if entered is not None:
                 proposal, verdict = entered
-                run_id = uuid.uuid4().hex
-                open_trade = PaperTrade(
-                    run_id=run_id,
-                    entry_index=i,
-                    entry_time=bar_time,
-                    side=proposal.side,
-                    play_class=proposal.play_class,
-                    entry=float(proposal.entry),
-                    stop=float(proposal.stop),
-                    target=float(proposal.target),
-                    reasons=list(verdict.reasons),
-                    walk_id=walk_id,
-                )
-                _journal_entry(
-                    journal,
-                    goal,
-                    analysis,
-                    proposal,
-                    verdict,
-                    run_id,
-                    bar_time,
-                    walk_id,
-                )
+                if fill_mode == "rest":
+                    if i + 1 < len(series):
+                        pending = RestPending(
+                            fill_index=i + 1,
+                            side=proposal.side,
+                            play_class=proposal.play_class,
+                            stop=float(proposal.stop),
+                            target=float(proposal.target),
+                            reasons=list(verdict.reasons),
+                            proposal=proposal,
+                            verdict=verdict,
+                            analysis=dict(analysis),
+                        )
+                else:
+                    run_id = uuid.uuid4().hex
+                    open_trade = PaperTrade(
+                        run_id=run_id,
+                        entry_index=i,
+                        entry_time=bar_time,
+                        side=proposal.side,
+                        play_class=proposal.play_class,
+                        entry=float(proposal.entry),
+                        stop=float(proposal.stop),
+                        target=float(proposal.target),
+                        reasons=list(verdict.reasons),
+                        walk_id=walk_id,
+                    )
+                    _journal_entry(
+                        journal,
+                        goal,
+                        analysis,
+                        proposal,
+                        verdict,
+                        run_id,
+                        bar_time,
+                        walk_id,
+                    )
 
     if open_trade is not None:
         last = series[last_i]
@@ -309,11 +390,13 @@ def walk_paper(
             open_trade,
             exit_index=last_i,
             exit_time=str(last.get("time") or ""),
-            exit_price=float(last["close"]),
+            exit_price=window_end_price(last, open_trade.side, fill_mode),
             exit_status="window_end",
             journal=journal,
             equity=equity,
             risk_fraction=goal.risk_fraction,
+            fill_mode=fill_mode,
+            value_per_price_unit=goal.value_per_price_unit,
         )
         trades.append(open_trade)
 

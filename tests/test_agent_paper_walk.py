@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -12,7 +13,8 @@ from agent.journal import Journal
 from agent.paper_walk import check_exit, summarize_equity, walk_paper
 from agent.schema import Goal, PaperTrade
 from app import mt4_bridge
-from app.risk import apply_r_to_equity
+from app.regime_walk import WalkError
+from app.risk import apply_r_to_equity, position_size
 from tests.test_indicators import _range_bars, _trend_bars
 
 
@@ -62,6 +64,57 @@ def _pass_up(bar: dict) -> dict:
 
 def _pass_up_window(window: list[dict]) -> dict:
     return _pass_up(window[-1])
+
+
+def _with_spread(bars: list[dict], half: float = 0.0002) -> list[dict]:
+    out: list[dict] = []
+    for b in bars:
+        nb = dict(b)
+        nb["bid"] = {
+            "o": float(b["open"]) - half,
+            "h": float(b["high"]) - half,
+            "l": float(b["low"]) - half,
+            "c": float(b["close"]) - half,
+        }
+        nb["ask"] = {
+            "o": float(b["open"]) + half,
+            "h": float(b["high"]) + half,
+            "l": float(b["low"]) + half,
+            "c": float(b["close"]) + half,
+        }
+        out.append(nb)
+    return out
+
+
+def _quiet(window: list[dict]) -> dict:
+    close = float(window[-1]["close"])
+    return {
+        "regime": "mixed",
+        "direction": "up",
+        "trend_waning": True,
+        "allowed_play_classes": ["breakout_watch"],
+        "last_close": close,
+        "snapshot": {"last_close": close},
+    }
+
+
+def _once_at(bars: list[dict], index: int, fire_fn):
+    t = str(bars[index]["time"])
+
+    def classify(window: list[dict]) -> dict:
+        if str(window[-1]["time"]) == t:
+            return fire_fn(window)
+        return _quiet(window)
+
+    return classify
+
+
+def _far_stop_classify(window: list[dict]) -> dict:
+    analysis = _pass_up(window[-1])
+    close = analysis["last_close"]
+    analysis["snapshot"]["low_n"] = close - 0.5
+    analysis["snapshot"]["high_n"] = close + 0.5
+    return analysis
 
 
 def _walk_trades(*args, **kwargs):
@@ -384,6 +437,146 @@ class TestEquityStats(unittest.TestCase):
         self.assertAlmostEqual(eq.ending_equity, 9988.16)
         self.assertAlmostEqual(eq.max_drawdown, 396.0)
         self.assertAlmostEqual(eq.max_drawdown_frac, 396.0 / 10_000.0)
+
+
+class TestWalkPaperRest(unittest.TestCase):
+    def test_fill_next_bar_ask_and_units_pnl(self) -> None:
+        bars = _with_spread(_stamp(_trend_bars(45, start=1.2, step=0.002)))
+        lookback = 40
+        result = walk_paper(
+            bars,
+            _goal(fill_mode="rest"),
+            lookback=lookback,
+            start_index=lookback - 1,
+            classify_fn=_far_stop_classify,
+        )
+        self.assertEqual(len(result.trades), 1)
+        trade = result.trades[0]
+        fill_bar = bars[lookback]
+        self.assertEqual(trade.entry_index, lookback)
+        self.assertAlmostEqual(trade.entry, fill_bar["ask"]["o"])
+        self.assertEqual(trade.exit_status, "window_end")
+        self.assertAlmostEqual(trade.exit_price, bars[-1]["bid"]["c"])
+        dist = abs(trade.entry - trade.stop)
+        expected_units = math.floor(
+            position_size(10_000.0, 0.02, dist, 1.0)
+        )
+        self.assertEqual(trade.units, expected_units)
+        expected_pnl = round(expected_units * (trade.exit_price - trade.entry), 4)
+        self.assertAlmostEqual(trade.pnl, expected_pnl)
+        self.assertAlmostEqual(trade.equity_after, 10_000.0 + expected_pnl)
+        self.assertIsNotNone(trade.r_realized)
+
+    def test_skip_if_fill_through_stop(self) -> None:
+        bars = _with_spread(_stamp(_trend_bars(45, start=1.2, step=0.002)))
+        lookback = 40
+        close_trades = _walk_trades(
+            bars,
+            _goal(),
+            lookback=lookback,
+            start_index=lookback - 1,
+            classify_fn=_once_at(bars, lookback - 1, _pass_up_window),
+        )
+        self.assertTrue(close_trades)
+        stop = close_trades[0].stop
+        fill = bars[lookback]
+        fill["ask"] = {
+            "o": stop - 0.01,
+            "h": stop - 0.005,
+            "l": stop - 0.02,
+            "c": stop - 0.01,
+        }
+        result = walk_paper(
+            bars,
+            _goal(fill_mode="rest"),
+            lookback=lookback,
+            start_index=lookback - 1,
+            classify_fn=_once_at(bars, lookback - 1, _pass_up_window),
+        )
+        self.assertEqual(result.trades, [])
+
+    def test_gap_at_open_exits_at_bid_open(self) -> None:
+        bars = _with_spread(_stamp(_trend_bars(45, start=1.2, step=0.002)))
+        lookback = 40
+        close_trades = _walk_trades(
+            bars,
+            _goal(),
+            lookback=lookback,
+            start_index=lookback - 1,
+            classify_fn=_once_at(bars, lookback - 1, _pass_up_window),
+        )
+        stop = close_trades[0].stop
+        fill = bars[lookback]
+        # Ask open still above the stop so we get in; bid open already through.
+        fill["ask"] = {
+            "o": stop + 0.01,
+            "h": stop + 0.02,
+            "l": stop + 0.005,
+            "c": stop + 0.01,
+        }
+        fill["bid"] = {
+            "o": stop - 0.01,
+            "h": stop - 0.005,
+            "l": stop - 0.02,
+            "c": stop - 0.01,
+        }
+        result = walk_paper(
+            bars,
+            _goal(fill_mode="rest"),
+            lookback=lookback,
+            start_index=lookback - 1,
+            classify_fn=_once_at(bars, lookback - 1, _pass_up_window),
+        )
+        self.assertEqual(len(result.trades), 1)
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_index, lookback)
+        self.assertEqual(trade.exit_index, lookback)
+        self.assertEqual(trade.exit_status, "stop")
+        self.assertAlmostEqual(trade.exit_price, fill["bid"]["o"])
+
+    def test_signal_on_last_bar_is_dropped(self) -> None:
+        bars = _with_spread(_stamp(_trend_bars(40, start=1.2, step=0.002)))
+        result = walk_paper(
+            bars,
+            _goal(fill_mode="rest"),
+            lookback=40,
+            start_index=39,
+            classify_fn=_far_stop_classify,
+        )
+        self.assertEqual(result.trades, [])
+
+    def test_missing_ba_raises(self) -> None:
+        bars = _stamp(_trend_bars(45, start=1.2, step=0.002))
+        with self.assertRaises(WalkError):
+            walk_paper(
+                bars,
+                _goal(fill_mode="rest"),
+                lookback=40,
+                start_index=39,
+                classify_fn=_far_stop_classify,
+            )
+
+    def test_journals_rest_fill_note(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        try:
+            journal = Journal(Path(tmp.name) / "runs.sqlite")
+            bars = _with_spread(_stamp(_trend_bars(45, start=1.2, step=0.002)))
+            result = walk_paper(
+                bars,
+                _goal(fill_mode="rest"),
+                lookback=40,
+                start_index=39,
+                journal=journal,
+                classify_fn=_far_stop_classify,
+            )
+            self.assertEqual(len(result.trades), 1)
+            loaded = journal.get_run(result.trades[0].run_id)
+            self.assertIn("walk fill rest next-open ask", loaded.proposal.notes)
+            self.assertIn(f"units={result.trades[0].units}", loaded.proposal.notes)
+            fill = journal.get_fill(result.trades[0].run_id)
+            self.assertAlmostEqual(fill.fill_price, result.trades[0].entry)
+        finally:
+            tmp.cleanup()
 
 
 if __name__ == "__main__":

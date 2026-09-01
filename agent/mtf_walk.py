@@ -27,6 +27,15 @@ from agent.paper_walk import (
     summarize_equity,
 )
 from agent.schema import Citation, Goal, PaperTrade, Proposal, WalkResult
+from agent.walk_exec import (
+    RestPending,
+    check_exit_rest,
+    fill_mode_of,
+    may_check_exit,
+    realize_rest_trade,
+    rest_journal_note,
+    window_end_price,
+)
 from app import indicators, regime as regime_mod, regime_walk
 
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
@@ -323,6 +332,70 @@ def _open_first_fire_trade(
     return open_trade
 
 
+def _pending_first_fire(
+    candidate: _PeakCandidate,
+    goal: Goal,
+    signal_index: int,
+    n_bars: int,
+) -> RestPending | None:
+    if signal_index + 1 >= n_bars:
+        return None
+    built = _build_entry_at_signal(candidate, goal)
+    if built is None:
+        return None
+    proposal, ticket, verdict = built
+    regime = dict(candidate.htf_analysis or {})
+    regime["ltf_analysis"] = candidate.ltf_analysis
+    regime["mtf"] = candidate.mtf_out
+    return RestPending(
+        fill_index=signal_index + 1,
+        side=candidate.side,
+        play_class="join_trend",
+        stop=float(ticket["stop"]),
+        target=float(ticket["target"]),
+        reasons=[
+            f"mtf first_fire confidence {candidate.conf} at LTF bar {candidate.index}",
+        ],
+        proposal=proposal,
+        verdict=verdict,
+        analysis=regime,
+    )
+
+
+def _pending_rollover(
+    peak: _PeakCandidate,
+    current_i: int,
+    ltf_series: list[dict[str, Any]],
+    rollover_eval: _BarEval,
+    goal: Goal,
+) -> RestPending | None:
+    if current_i + 1 >= len(ltf_series):
+        return None
+    bar_time = str(ltf_series[current_i].get("time") or "")
+    built = _build_entry(peak, rollover_eval, bar_time, goal)
+    if built is None:
+        return None
+    proposal, ticket, verdict = built
+    regime = dict(rollover_eval.htf_analysis or {})
+    regime["ltf_analysis"] = rollover_eval.ltf_analysis
+    regime["mtf"] = peak.mtf_out
+    regime["peak_time"] = peak.time
+    return RestPending(
+        fill_index=current_i + 1,
+        side=peak.side,
+        play_class="join_trend",
+        stop=float(ticket["stop"]),
+        target=float(ticket["target"]),
+        reasons=[
+            f"mtf peak confidence {peak.conf} at {peak.time} rolled over; "
+            f"entry at LTF bar {current_i}"
+        ],
+        proposal=proposal,
+        verdict=verdict,
+        analysis=regime,
+    )
+
+
 def walk_mtf(
     htf_bars: list[dict[str, Any]],
     ltf_bars: list[dict[str, Any]],
@@ -371,17 +444,42 @@ def walk_mtf(
     equity = starting
     trades: list[PaperTrade] = []
     open_trade: PaperTrade | None = None
+    pending: RestPending | None = None
     tracker = _PeakTracker()
     prev_had_candidate = False
     last_i = len(ltf_series) - 1
+    fill_mode = fill_mode_of(goal)
+    exit_fn = check_exit_rest if fill_mode == "rest" else check_exit
 
     for i in range(start_index, len(ltf_series)):
         bar = ltf_series[i]
         bar_time = str(bar.get("time") or "")
 
+        if pending is not None and i == pending.fill_index:
+            realized = realize_rest_trade(
+                pending, bar, i, bar_time, equity, goal, walk_id
+            )
+            if realized is not None:
+                open_trade, fill = realized
+                _journal_entry(
+                    journal,
+                    goal,
+                    pending.analysis,
+                    pending.proposal,
+                    pending.verdict,
+                    open_trade.run_id,
+                    bar_time,
+                    walk_id,
+                    fill_price=fill.price,
+                    fill_note=rest_journal_note(open_trade.side, fill.units),
+                )
+            pending = None
+
         exited_here = False
-        if open_trade is not None and i > open_trade.entry_index:
-            hit = check_exit(
+        if open_trade is not None and may_check_exit(
+            open_trade.entry_index, i, fill_mode
+        ):
+            hit = exit_fn(
                 open_trade.side, open_trade.stop, open_trade.target, bar
             )
             if hit is not None:
@@ -395,12 +493,14 @@ def walk_mtf(
                     journal=journal,
                     equity=equity,
                     risk_fraction=goal.risk_fraction,
+                    fill_mode=fill_mode,
+                    value_per_price_unit=goal.value_per_price_unit,
                 )
                 trades.append(open_trade)
                 open_trade = None
                 exited_here = True
 
-        if open_trade is None and not exited_here:
+        if open_trade is None and pending is None and not exited_here:
             bar_eval = _eval_mtf_at(
                 htf_series,
                 ltf_series,
@@ -412,24 +512,38 @@ def walk_mtf(
             )
             if entry_mode == "first_fire":
                 if bar_eval.candidate is not None and not prev_had_candidate:
-                    open_trade = _open_first_fire_trade(
-                        bar_eval.candidate,
-                        goal,
-                        journal,
-                        walk_id,
-                    )
+                    if fill_mode == "rest":
+                        pending = _pending_first_fire(
+                            bar_eval.candidate, goal, i, len(ltf_series)
+                        )
+                    else:
+                        open_trade = _open_first_fire_trade(
+                            bar_eval.candidate,
+                            goal,
+                            journal,
+                            walk_id,
+                        )
             else:
                 confirmed = tracker.update(bar_eval.conf, bar_eval.candidate)
                 if confirmed is not None:
-                    open_trade = _open_rollover_trade(
-                        confirmed,
-                        i,
-                        ltf_series,
-                        bar_eval,
-                        goal,
-                        journal,
-                        walk_id,
-                    )
+                    if fill_mode == "rest":
+                        pending = _pending_rollover(
+                            confirmed,
+                            i,
+                            ltf_series,
+                            bar_eval,
+                            goal,
+                        )
+                    else:
+                        open_trade = _open_rollover_trade(
+                            confirmed,
+                            i,
+                            ltf_series,
+                            bar_eval,
+                            goal,
+                            journal,
+                            walk_id,
+                        )
             prev_had_candidate = bar_eval.candidate is not None
 
     if open_trade is not None:
@@ -438,11 +552,13 @@ def walk_mtf(
             open_trade,
             exit_index=last_i,
             exit_time=str(last.get("time") or ""),
-            exit_price=float(last["close"]),
+            exit_price=window_end_price(last, open_trade.side, fill_mode),
             exit_status="window_end",
             journal=journal,
             equity=equity,
             risk_fraction=goal.risk_fraction,
+            fill_mode=fill_mode,
+            value_per_price_unit=goal.value_per_price_unit,
         )
         trades.append(open_trade)
 

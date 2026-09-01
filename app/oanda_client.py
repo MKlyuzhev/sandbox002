@@ -464,3 +464,46 @@ def candles_to_bars(payload: dict, prefer: str = "mid") -> list[dict]:
             }
         )
     return bars
+
+
+def _side_ohlc(component: dict) -> dict[str, float]:
+    return {
+        "o": float(component["o"]),
+        "h": float(component["h"]),
+        "l": float(component["l"]),
+        "c": float(component["c"]),
+    }
+
+
+def bars_with_ba(payload: dict) -> list[dict]:
+    """Mid OHLC bars plus ``bid`` / ``ask`` ``{o,h,l,c}`` from an MBA payload.
+
+    Candles missing mid are skipped (same as ``candles_to_bars``). Complete
+    candles missing bid or ask are still returned as mid-only; rest-mode walks
+    raise ``WalkError`` when they try to fill or exit those bars. Incomplete
+    candles without bid/ask are skipped.
+    """
+    bars: list[dict] = []
+    for c in payload.get("candles") or []:
+        mid = c.get("mid")
+        if not mid:
+            continue
+        complete = bool(c.get("complete", True))
+        bid = c.get("bid")
+        ask = c.get("ask")
+        if (not bid or not ask) and not complete:
+            continue
+        bar = {
+            "time": c.get("time"),
+            "open": float(mid["o"]),
+            "high": float(mid["h"]),
+            "low": float(mid["l"]),
+            "close": float(mid["c"]),
+            "volume": c.get("volume"),
+            "complete": complete,
+        }
+        if bid and ask:
+            bar["bid"] = _side_ohlc(bid)
+            bar["ask"] = _side_ohlc(ask)
+        bars.append(bar)
+    return bars

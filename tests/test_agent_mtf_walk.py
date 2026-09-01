@@ -382,6 +382,78 @@ class TestMtfWalkFirstFire(unittest.TestCase):
         self.assertEqual(decisions[1]["signal_time"], str(ltf[48]["time"]))
 
 
+def _with_spread(bars: list[dict], half: float = 0.0002) -> list[dict]:
+    out: list[dict] = []
+    for b in bars:
+        nb = dict(b)
+        nb["bid"] = {
+            "o": float(b["open"]) - half,
+            "h": float(b["high"]) - half,
+            "l": float(b["low"]) - half,
+            "c": float(b["close"]) - half,
+        }
+        nb["ask"] = {
+            "o": float(b["open"]) + half,
+            "h": float(b["high"]) + half,
+            "l": float(b["low"]) + half,
+            "c": float(b["close"]) + half,
+        }
+        out.append(nb)
+    return out
+
+
+class TestMtfWalkRest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.lookback = 40
+
+    def _htf_for_ltf(self, ltf: list[dict]) -> list[dict]:
+        first = datetime.fromisoformat(str(ltf[0]["time"]).replace("Z", "+00:00"))
+        htf_start = first - timedelta(days=self.lookback + 30)
+        span = (len(ltf) // 24) + self.lookback + 60
+        return _daily_bars(span, start=htf_start)
+
+    def test_first_fire_fills_next_ltf_ask(self) -> None:
+        ltf = _with_spread(_hourly_bars(50))
+        htf = self._htf_for_ltf(ltf)
+        t_peak = ltf[42]["time"]
+        rsi_map = {str(t_peak): 22.0}
+        result = walk_mtf(
+            htf,
+            ltf,
+            _goal(fill_mode="rest"),
+            lookback=self.lookback,
+            start_index=self.lookback - 1,
+            entry_mode="first_fire",
+            htf_classify_fn=_htf_stub,
+            ltf_classify_fn=_ltf_stub_factory(rsi_map),
+        )
+        self.assertEqual(len(result.trades), 1)
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_index, 43)
+        self.assertAlmostEqual(trade.entry, ltf[43]["ask"]["o"])
+        self.assertIsNotNone(trade.units)
+
+    def test_peak_fills_bar_after_rollover(self) -> None:
+        ltf = _with_spread(_hourly_bars(50))
+        htf = self._htf_for_ltf(ltf)
+        t_peak = ltf[42]["time"]
+        t_roll = ltf[43]["time"]
+        rsi_map = {str(t_peak): 22.0, str(t_roll): 30.0}
+        result = walk_mtf(
+            htf,
+            ltf,
+            _goal(fill_mode="rest"),
+            lookback=self.lookback,
+            start_index=self.lookback - 1,
+            entry_mode="peak",
+            htf_classify_fn=_htf_stub,
+            ltf_classify_fn=_ltf_stub_factory(rsi_map),
+        )
+        self.assertEqual(len(result.trades), 1)
+        self.assertEqual(result.trades[0].entry_index, 44)
+        self.assertAlmostEqual(result.trades[0].entry, ltf[44]["ask"]["o"])
+
+
 class TestMtfWalkConfidence(unittest.TestCase):
     def test_confidence_ordering_matches_engine(self) -> None:
         c22 = _conf_for_rsi(22.0)

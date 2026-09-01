@@ -21,6 +21,7 @@ if str(_REPO_ROOT) not in sys.path:
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
 from agent.paper_walk import walk_paper  # noqa: E402
 from agent.schema import Goal  # noqa: E402
+from agent.walk_exec import add_fill_cli_args  # noqa: E402
 from app import indicators, oanda_client, regime_walk  # noqa: E402
 from app.walk_fetch import fetch_walk_bars  # noqa: E402
 
@@ -46,6 +47,7 @@ async def _async_main(args: argparse.Namespace) -> int:
             args.from_time,
             args.to_time,
             args.lookback,
+            with_ba=args.fill_mode == "rest",
         )
     except oanda_client.OandaError as exc:
         print(f"OANDA error: {exc}", file=sys.stderr)
@@ -73,6 +75,8 @@ async def _async_main(args: argparse.Namespace) -> int:
             risk_fraction=args.risk_fraction,
             balance=args.balance,
             exposure_cap=args.exposure_cap,
+            value_per_price_unit=args.value_per_price_unit,
+            fill_mode=args.fill_mode,
             mt4=args.mt4,
             mt4_prefix=args.mt4_prefix,
             no_rag=True,
@@ -106,6 +110,8 @@ async def _async_main(args: argparse.Namespace) -> int:
         "lookback": args.lookback,
         "bar_count": len(bars),
         "start_index": start_index,
+        "fill_mode": args.fill_mode,
+        "value_per_price_unit": args.value_per_price_unit,
         "summary": collapsed["summary"],
         "runs": collapsed["runs"],
         "walk_id": result.walk_id,
@@ -167,6 +173,7 @@ def main() -> int:
     parser.add_argument("--balance", type=float, default=10_000.0)
     parser.add_argument("--risk-fraction", type=float, default=0.02)
     parser.add_argument("--exposure-cap", type=float, default=0.06)
+    add_fill_cli_args(parser)
     parser.add_argument(
         "--horizon",
         type=int,
