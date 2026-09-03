@@ -1,9 +1,9 @@
-"""Read-only OANDA (practice) MCP server.
+"""OANDA (practice) MCP server for research and paper-journal tools.
 
-Exposes FX market-data and account-context tools over stdio for use as a
-research MCP set in Cursor. Deliberately read-only: no order placement,
-modification, or position-closing tools are defined here. MT4 helpers only
-draw chart objects via a file inbox (see ``app.mt4_bridge``).
+Market-data, regime/entry peeks, and planner jobs (`scan_regimes`, `run_graph`,
+`run_walk`). No broker or MT4 order placement. Paper mode only queues sqlite
+`pending_exec`. MT4 helpers draw chart objects via a file inbox
+(see ``app.mt4_bridge``).
 
 Run directly (Cursor spawns it this way):
 
@@ -308,6 +308,167 @@ async def classify_regime(
     except indicators.IndicatorError as exc:
         return {"error": str(exc), "instrument": instrument, "granularity": granularity}
     return analysis
+
+
+def _parse_engines(engines: str) -> list[int] | None:
+    text = (engines or "").strip()
+    if not text:
+        return None
+    return [int(x) for x in text.split(",") if x.strip()]
+
+
+@mcp.tool()
+async def scan_regimes(
+    instruments: str = "",
+    granularity: str = "D",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+    drop_waning: bool = True,
+    play_class: str = "",
+) -> dict:
+    """Classify Lien Ch.7 regime for a small universe (sequential).
+
+    Default universe is the seven USD majors if ``instruments`` is empty.
+    At most 12 names. ``drop_waning`` (default true) puts waning pairs in
+    ``dropped`` with reason ``trend_waning``. Optional ``play_class`` keeps
+    only pairs whose ``allowed_play_classes`` include it. Compact rows — do
+    not recompute ADX/Bollinger in the model. Research only; no orders.
+    """
+    from agent.scan import ScanError, scan_regimes as _scan
+
+    try:
+        return await _scan(
+            instruments,
+            granularity=granularity,
+            count=count,
+            from_time=from_time,
+            to_time=to_time,
+            drop_waning=drop_waning,
+            play_class=play_class,
+        )
+    except ScanError as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+async def run_graph(
+    instrument: str,
+    granularity: str = "D",
+    ltf_granularity: str = "H1",
+    engines: str = "",
+    mode: str = "signal",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+    risk_fraction: float = 0.02,
+    balance: float = 10_000.0,
+    exposure_cap: float = 0.06,
+    no_llm: bool = True,
+    no_rag: bool = False,
+    mt4: bool = False,
+    use_account: bool = False,
+    source: str = "lien-fx",
+    top_k: int = 5,
+    no_journal: bool = False,
+) -> dict:
+    """Run the bounded Lien graph (regime → engines → policy → journal).
+
+    Same path as ``python -m agent.run``. Policy cannot be skipped. Default
+    ``mode=signal`` journals ``log_setup`` / ``wait`` only; ``paper`` queues
+    sqlite ``pending_exec`` (stub fills, no broker). ``no_llm`` defaults true
+    so prices stay on engines. Returns ``RunRecord`` JSON including
+    ``engine_candidates``. Research only; no orders.
+    """
+    from agent.graph import run as graph_run
+    from agent.journal import Journal
+    from agent.schema import Goal
+
+    if mode not in ("signal", "paper"):
+        return {"error": f"mode must be signal or paper; got {mode!r}"}
+    try:
+        engine_list = _parse_engines(engines)
+    except ValueError as exc:
+        return {"error": f"engines: {exc}"}
+    goal = Goal(
+        instrument=instrument,
+        granularity=granularity,
+        ltf_granularity=ltf_granularity,
+        engines=engine_list,
+        mode=mode,  # type: ignore[arg-type]
+        count=count,
+        from_time=from_time or None,
+        to_time=to_time or None,
+        risk_fraction=risk_fraction,
+        balance=balance,
+        exposure_cap=exposure_cap,
+        mt4=mt4,
+        no_rag=no_rag,
+        no_llm=no_llm,
+        use_account=use_account,
+        source_filter=source,
+        top_k=top_k,
+    )
+    journal = None if no_journal else Journal()
+    record = await graph_run(goal, journal=journal)
+    return record.model_dump(mode="json")
+
+
+@mcp.tool()
+async def run_walk(
+    kind: str,
+    instrument: str,
+    from_time: str,
+    to_time: str,
+    chapter: int = 0,
+    granularity: str = "D",
+    ltf_granularity: str = "H1",
+    lookback: int = 250,
+    fill_mode: str = "close",
+    balance: float = 10_000.0,
+    risk_fraction: float = 0.02,
+    exposure_cap: float = 0.06,
+    value_per_price_unit: float = 1.0,
+    no_journal: bool = False,
+) -> dict:
+    """Causal paper walk (ch7 / mtf / lien). Not the MT4 Strategy Tester.
+
+    Requires ``from_time`` and ``to_time`` (RFC3339). Lien ``chapter`` is
+    9, 13, 14, or 16. Unencoded chapters return an error. Response is
+    ``walk_id``, ``equity``, ``trade_count``, and a truncated trade list.
+    Can be expensive (OANDA history). Research only; no broker orders.
+    """
+    from agent.walk_jobs import (
+        WalkJobError,
+        WalkRuntime,
+        run_walk as _run_walk,
+        walk_job_error_payload,
+    )
+
+    if fill_mode not in ("close", "rest"):
+        return {"error": f"fill_mode must be close or rest; got {fill_mode!r}"}
+    ch = chapter if chapter else None
+    try:
+        return await _run_walk(
+            kind,
+            instrument,
+            from_time,
+            to_time,
+            chapter=ch,
+            granularity=granularity,
+            ltf_granularity=ltf_granularity,
+            lookback=lookback,
+            fill_mode=fill_mode,  # type: ignore[arg-type]
+            balance=balance,
+            risk_fraction=risk_fraction,
+            exposure_cap=exposure_cap,
+            value_per_price_unit=value_per_price_unit,
+            no_journal=no_journal,
+        )
+    except WalkJobError as exc:
+        return walk_job_error_payload(exc)
+    except WalkRuntime as exc:
+        return walk_job_error_payload(exc)
 
 
 @mcp.tool()

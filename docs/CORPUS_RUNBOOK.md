@@ -165,6 +165,13 @@ curl -s -X POST http://localhost:8000/query \
 Record pass/fail in `data/corpus/.ingest_state.json` notes or a local log. If a query
 misses, try higher `top_k` (8–10) or confirm the source was ingested.
 
+Pin Lien strategy chapters to encoded engines (no LLM):
+
+```bash
+.venv/bin/python -m agent.fidelity --pin
+.venv/bin/python -m agent.fidelity --corpus   # also search_knowledge source=lien-fx
+```
+
 ---
 
 ## 6. Troubleshooting

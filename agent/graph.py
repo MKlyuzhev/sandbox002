@@ -15,9 +15,9 @@ from typing import Any
 from agent import levels as levels_mod
 from agent import policy, propose as propose_mod, retrieve as retrieve_mod
 from agent.engines import registry as engine_registry
-from agent.engines.base import EngineContext, result_to_proposal
+from agent.engines.base import EngineContext, EngineResult, result_to_proposal
 from agent.journal import Journal
-from agent.schema import Citation, Goal, Proposal, RunRecord, ToolTrace
+from agent.schema import Citation, EngineCandidate, Goal, Proposal, RunRecord, ToolTrace
 from app import indicators, oanda_client, regime as regime_mod
 from app.config import settings
 
@@ -92,6 +92,21 @@ async def _default_fetch_analyses(
     return out
 
 
+def _candidates_from_results(results: list[EngineResult]) -> list[EngineCandidate]:
+    return [
+        EngineCandidate(
+            engine=r.engine,
+            chapter=r.chapter,
+            firing=r.firing,
+            signal=r.signal,
+            play_class=r.play_class,
+            confidence=r.confidence,
+            reason=r.reason,
+        )
+        for r in results
+    ]
+
+
 async def _dispatch_engines(
     proposal: Proposal | None,
     analysis: dict[str, Any],
@@ -100,7 +115,7 @@ async def _dispatch_engines(
     fetch_analyses_fn: FetchAnalysesFn | None,
     bars_injected: bool,
     used_bars: list[dict[str, Any]] | None = None,
-) -> Proposal | None:
+) -> tuple[Proposal | None, list[EngineCandidate]]:
     """Pick a regime-matched engine and merge its ticket into the proposal.
 
     Falls back to Ch. 7 geometry when no engine matches the regime (e.g.
@@ -110,7 +125,7 @@ async def _dispatch_engines(
     engines = engine_registry.select(analysis, goal)
     if not engines:
         traces.append(_trace("engines", started, "none matched -> ch7 geometry"))
-        return levels_mod.apply_geometry(proposal, analysis, goal.instrument)
+        return levels_mod.apply_geometry(proposal, analysis, goal.instrument), []
 
     analyses: dict[str, dict[str, Any]] = {goal.granularity: analysis}
     extra = engine_registry.required_timeframes(engines, goal) - {goal.granularity}
@@ -130,14 +145,15 @@ async def _dispatch_engines(
         analyses=analyses,
         bars={goal.granularity: used_bars} if used_bars else {},
     )
-    chosen, candidates = engine_registry.run_and_pick(engines, ctx)
+    chosen, results = engine_registry.run_and_pick(engines, ctx)
+    cands = _candidates_from_results(results)
     if chosen is None:
         detail = f"no firing; {len(engines)} engine(s)"
         traces.append(_trace("engines", started, detail))
-        fallback = candidates[0] if candidates else None
+        fallback = results[0] if results else None
         if fallback is None:
-            return proposal
-        return result_to_proposal(proposal, fallback, analysis)
+            return proposal, cands
+        return result_to_proposal(proposal, fallback, analysis), cands
 
     traces.append(
         _trace(
@@ -146,7 +162,7 @@ async def _dispatch_engines(
             f"chosen=ch{chosen.chapter} {chosen.engine} conf={chosen.confidence}",
         )
     )
-    return result_to_proposal(proposal, chosen, analysis)
+    return result_to_proposal(proposal, chosen, analysis), cands
 
 
 async def _maybe_use_account(goal: Goal) -> Goal:
@@ -176,6 +192,7 @@ async def run(
     traces: list[ToolTrace] = []
     chunks: list[dict[str, Any]] = []
     proposal: Proposal | None = None
+    engine_candidates: list[EngineCandidate] = []
     error: str | None = None
     analysis: dict[str, Any] = {}
     used_bars: list[dict[str, Any]] = bars or []
@@ -309,7 +326,7 @@ async def run(
                     settings.ollama_llm_model,
                 )
                 proposal = await propose_mod.llm_propose(analysis, chunks, goal)
-            proposal = await _dispatch_engines(
+            proposal, engine_candidates = await _dispatch_engines(
                 proposal,
                 analysis,
                 goal,
@@ -422,6 +439,7 @@ async def run(
         risk=verdict,
         citations=citations,
         tool_trace=traces,
+        engine_candidates=engine_candidates,
         error=error,
     )
     if journal is not None:

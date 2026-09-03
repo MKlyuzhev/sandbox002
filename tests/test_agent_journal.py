@@ -59,6 +59,38 @@ class TestJournal(unittest.TestCase):
         self.assertEqual(loaded.regime["last_close"], 1.27)
         self.assertEqual(self.journal.list_pending(), [])
 
+    def test_engine_candidates_round_trip(self) -> None:
+        from agent.schema import EngineCandidate
+
+        original = _record()
+        original = original.model_copy(
+            update={
+                "engine_candidates": [
+                    EngineCandidate(
+                        engine="mtf",
+                        chapter=8,
+                        firing=False,
+                        reason="no ltf",
+                    ),
+                    EngineCandidate(
+                        engine="ch7_geometry",
+                        chapter=7,
+                        firing=True,
+                        signal="long",
+                        play_class="join_trend",
+                        confidence=0.3,
+                    ),
+                ]
+            }
+        )
+        self.journal.append_run(original)
+        loaded = self.journal.get_run("run1")
+        self.assertEqual(len(loaded.engine_candidates), 2)
+        self.assertEqual(loaded.engine_candidates[0].engine, "mtf")
+        self.assertFalse(loaded.engine_candidates[0].firing)
+        self.assertTrue(loaded.engine_candidates[1].firing)
+        self.assertEqual(loaded.engine_candidates[1].chapter, 7)
+
     def test_pending_exec_enqueues_fill(self) -> None:
         self.journal.append_run(_record(action="pending_exec", run_id="run2"))
         pending = self.journal.list_pending()

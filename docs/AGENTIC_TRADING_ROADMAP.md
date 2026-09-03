@@ -139,14 +139,14 @@ practice host. See [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b.
 
 | Job | Example | Tooling today |
 |-----|---------|----------------|
-| Scan a universe | Majors on D; drop `trend_waning` | N× `classify_regime` in Cursor — no `scan_regimes` helper |
-| Snapshot signal | "Does MTF fire on GBP_USD now?" | `entry_mtf` / `entry_dbb` / `entry_lien`; or `agent.run` to journal |
-| Strategy test (walk) | Ch. 16 on USD_JPY, 2023–2026 | `python -m agent.walk_lien --chapter 16 …` (CLI; **not** an MCP tool yet) |
-| Try other instruments | Same engine, next pair that passed the scan | Repeat walk / `agent.run` with a new `--instrument` |
-| Parameter trial | H1 vs H4 LTF; `rsi_os` 30 vs 40; `--lookback` 250 vs 120 | Same CLIs with different flags. **No** `sweep()` helper — the planner loops |
+| Scan a universe | Majors on D; drop `trend_waning` | MCP `scan_regimes` (max 12; default USD majors) |
+| Snapshot signal | "Does MTF fire on GBP_USD now?" | `entry_mtf` / `entry_dbb` / `entry_lien` peek; or `run_graph` to journal |
+| Strategy test (walk) | Ch. 16 on USD_JPY, 2023–2026 | MCP `run_walk(kind=lien, chapter=16, …)` or CLI `agent.walk_lien` |
+| Try other instruments | Same engine, next pair that passed the scan | Repeat `run_walk` / `run_graph` with a new instrument |
+| Parameter trial | H1 vs H4 LTF; `rsi_os` 30 vs 40; `--lookback` 250 vs 120 | Same tools with different flags. **No** `sweep()` helper — the planner loops |
 | Analyze results | Win rate, mean R, max DD, "fader fired while daily ADX was 28" | Walk JSON `equity`, journal `GET /api/journal/walks/{id}`, tester report. Numbers come from code |
-| Book → engine | Lien Ch. 13 after a range regime | `search_knowledge`, then `--engines 13` / `entry_lien` — not a prose ticket |
-| Compare candidates | "MTF fired, DBB did not — Lien-consistent?" | One `agent.run` winner today; candidate list on `RunRecord` is a gap |
+| Book → engine | Lien Ch. 13 after a range regime | `search_knowledge(..., source="lien-fx")`, `python -m agent.fidelity --pin`, then `--engines 13` / `entry_lien` / `run_graph` — not a prose ticket |
+| Compare candidates | "MTF fired, DBB did not — Lien-consistent?" | `RunRecord.engine_candidates` (fires and non-fires) |
 | Natural language → `Goal` | Sentence to instrument, window, snapshot vs walk, engine allow-list | Type flags; dashboard has no free-text |
 
 **Research campaign (the loop you described)**
@@ -154,7 +154,7 @@ practice host. See [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b.
 A typical planner session is not one `agent.run`. It is a **campaign**:
 
 1. **Intent** — e.g. "Is the Fader worth paper-journaling on quieter majors in 2024?"
-2. **Filter** — `classify_regime` on a small universe; keep `fade_range`, drop waning.
+2. **Filter** — `scan_regimes` on a small universe; keep `fade_range`, drop waning.
 3. **Baseline test** — one causal walk per survivor (`walk_lien --chapter 13`) with
    **book defaults** (ADX&lt;20, 15-pip probe, 2R). Record `WalkEquity`.
 4. **Cross-section** — same engine, other pairs / another year. Still defaults.
@@ -199,8 +199,8 @@ secret edge.
 **MCP side door:** `classify_regime` and `entry_*` do **not** run
 `agent/policy.py` or write the journal. A planner that only calls those tools is
 not bound by the graph. The allowed "act" for a journaled setup or a measured
-walk is submitting a `Goal` / walk argv to the orchestrator (CLI or, later,
-`run_graph`). Snapshot `entry_*` is a peek; equity comes from `walk_*`.
+walk is `run_graph` / `run_walk` (or the matching CLI). Snapshot `entry_*` is a
+peek; equity comes from `run_walk`.
 
 **MTF vs DBB inside one run:** the registry already runs matching engines and
 keeps the highest-confidence fire. ReAct is not required to pick the winner on
@@ -210,25 +210,27 @@ stats without re-computing them.
 
 | Capability | Today | Gap |
 |------------|--------|-----|
-| Scan pairs, drop waning | N× `classify_regime` in Cursor | No `scan_regimes(universe)` |
+| Scan pairs, drop waning | MCP `scan_regimes` (max 12) | — |
 | After `wait`, other LTF / chapter | Human or Cursor changes flags | Graph is one-shot; no retry node |
-| Retrieve then choose engine | RAG MCP + manual `--engines` | No book → engine-id helper |
-| Compare MTF vs DBB (one bar) | Two CLIs or one `agent.run` winner | No candidate list on `RunRecord` |
-| Strategy test over `--from`/`--to` | `agent.walk` / `walk_mtf` / `walk_lien` / tester CLI | No `run_walk` MCP; dashboard whitelist only |
-| Cross-instrument campaign | Repeat CLI with a new `--instrument` | No basket helper |
+| Retrieve then choose engine | RAG MCP `source=` + `python -m agent.fidelity` (claims × chunk × engine) | No auto book → engine-id in the graph |
+| Compare MTF vs DBB (one bar) | `RunRecord.engine_candidates` | — |
+| Strategy test over `--from`/`--to` | MCP `run_walk` (`ch7` / `mtf` / `lien`); CLI + tester still exist | No tester MCP; dashboard whitelist still `agent.walk` only |
+| Cross-instrument campaign | Repeat `run_walk` with a new instrument | No basket helper |
 | Parameter grid | Manual flag loops in Cursor | No `sweep` tool; easy to overfit |
 | Read walk / journal stats | Walk JSON, `GET /api/journal/walks/{id}` | Planner must be given the artifact; no `analyze_walk` summarizer |
 | Sentence → `Goal` | Type RFC3339 flags | No parser; dashboard has no free-text |
 | `entry_dbb` / `entry_lien` as MCP | **Done** — Ch. 9 `entry_dbb`; Ch. 13/14/16 `entry_lien` | Ch. 10/11/12/15 still unencoded |
-| `agent.run` / walks as MCP | CLI / dashboard whitelist only | No `run_graph(Goal)` tool |
+| `agent.run` / walks as MCP | **Done** — `run_graph`, `run_walk` (not tester) | Tester stays CLI |
 
 **Practical order**
 
-1. Use Cursor as this planner now (MCP + playbook + CLI). Example: scan majors
-   on D, drop waning, `entry_*` peek, then **one** `walk_lien` on a pair that
-   matched the play class.
-2. Planner-facing tools: `run_graph(Goal)`, walk/tester as callable jobs,
-   `scan_regimes`, richer engine-candidate output. Do not loosen policy.
+1. Use Cursor as this planner now (MCP + playbook + CLI). Start a Lien campaign
+   with `search_knowledge(..., source="lien-fx")` and `python -m agent.fidelity`
+   (static always; `--pin` against Chroma). Example: scan majors on D, drop
+   waning, `entry_*` peek, then **one** `walk_lien` on a pair that matched the
+   play class.
+2. Planner-facing tools: `run_graph`, `run_walk`, `scan_regimes`, and
+   `engine_candidates` are **done**. Tester MCP is still CLI. Do not loosen policy.
 3. Natural language → `JobSpec` + preview (dashboard/CLI). Confirmed walk or
    basket of classify calls — not a free shell and not an unbounded sweep.
 4. Encode remaining chapters (10, 11, 12, 15) when news/session/`breakout_watch`
@@ -263,7 +265,7 @@ RAG pipeline.
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| `search_knowledge(query, top_k)` | Text + figure captions from ingested corpus | **Done** — `app/rag_mcp.py` (MCP), `agent/retrieve.py` (graph) |
+| `search_knowledge(query, top_k, source?)` | Text + figure captions; optional `source` filter (e.g. `lien-fx`) | **Done** — `app/rag_mcp.py` (MCP), `agent/retrieve.py` (graph) |
 | `get_source_chunk(source, id)` | Full chunk for citation | **Done** — `app/rag_mcp.py` |
 | `corpus_stats()` | Chunk counts by source | **Done** — `app/rag_mcp.py` |
 | `get_figure(page)` | Load figure image + stored caption | Not built |
@@ -287,7 +289,8 @@ Murphy is theory; trading needs live or historical market state.
 | Tool | Examples | Status |
 |------|----------|--------|
 | `get_candles` / bars | OHLCV for indicators | **Done** — OANDA MCP + `agent/graph.py` |
-| `classify_regime` / `indicator_snapshot` | Ch. 7 governing layer | **Done** — `app/regime.py`, OANDA MCP |
+| `classify_regime` / `scan_regimes` / `indicator_snapshot` | Ch. 7 governing layer | **Done** — `app/regime.py`, `agent/scan.py`, OANDA MCP |
+| `run_graph` / `run_walk` | Journaled snapshot + causal walks | **Done** — MCP wraps `agent.graph` / `agent/walk_jobs.py` |
 | `entry_mtf` | Ch. 8 two-timeframe signal | **Done** — MCP + `agent/engines/mtf.py` |
 | `entry_dbb` | Ch. 9 double Bollinger signal | **Done** — MCP + `agent/engines/dbb.py` |
 | `entry_lien` | Ch. 13/14/16 (fader, 20-day, perfect order) | **Done** — MCP + `scripts/entry_lien.py` |
@@ -300,7 +303,7 @@ Murphy is theory; trading needs live or historical market state.
 **Rule:** indicators and P&L should be computed by deterministic code (pandas,
 TA-Lib, etc.). The **planner** chooses *which* engine or tool to call; it
 should not do floating-point math. MCP `entry_*` tools are research snapshots;
-journaled actions still go through `agent.run` / policy.
+journaled actions still go through `run_graph` / `agent.run` / policy.
 
 ---
 
@@ -326,16 +329,16 @@ act → journal) still applies, but **around** the graph, not inside
 
 1. **Intent** — e.g. "Look for MTF entries on GBP_USD from 2023-01-01 to 2026-01-01"
 2. **Plan** — parse to `Goal` / `JobSpec` (instrument, engines, snapshot vs walk, optional knob trial)
-3. **Observe** — `classify_regime` / `scan_regimes` (drop `trend_waning`)
+3. **Observe** — `scan_regimes` (drop `trend_waning`) or `classify_regime`
 4. **Retrieve** — `search_knowledge` when choosing an unencoded or next chapter
-5. **Run** — `entry_*` for a peek, or `agent.run` / `agent.walk_*` / tester to journal a measured test
+5. **Run** — `entry_*` for a peek, or `run_graph` / `run_walk` to journal a measured test
 6. **Compare** — engine candidates; walk `WalkEquity`; mismatch vs Lien
 7. **Retry or stop** — other pair, LTF, chapter, or one flag; cap rounds; do not unbounded-sweep
 8. **Act** — only the graph / walk may set `pending_exec` or simulated fills
 
 Multi-iteration ReAct is this outer loop (research-only). It is **not** a later
 rewrite of `agent/graph.py`. Cursor + MCP is the prototype; dashboard free-text
-and `run_graph` MCP are not built. See §1c.
+is not built. See §1c.
 
 ---
 
@@ -420,11 +423,13 @@ paper walks: `agent.walk` (Ch. 7), `agent.walk_mtf` (Ch. 8), `agent.walk_lien`
 
 ### Phase B2 — Planner ReAct — **prototype** (intended LLM agent)
 
-- **Done:** Cursor can call MCP (`classify_regime`, `entry_mtf`, `entry_dbb`,
-  `entry_lien`, `search_knowledge`, `list_instruments`) and iterate in chat
-- **Not done:** `scan_regimes`, `run_graph`, candidate-engine table, natural
-  language → `JobSpec` + preview, dashboard free-text
-- **Still no** broker orders; journaled acts only via the graph
+- **Done:** Cursor can call MCP (`classify_regime`, `scan_regimes`, `run_graph`,
+  `run_walk`, `entry_mtf`, `entry_dbb`, `entry_lien`, `search_knowledge` with
+  `source=`, `list_instruments`); `RunRecord.engine_candidates`;
+  `python -m agent.fidelity` pins Lien claims to chunks/engines
+- **Not done:** tester MCP, natural language → `JobSpec` + preview, dashboard
+  free-text, `analyze_walk`
+- **Still no** broker orders; journaled acts only via the graph / walks
 
 See §1c.
 
@@ -505,7 +510,9 @@ Success is:
 
 | Item | Where |
 |------|-------|
-| `search_knowledge` / `get_source_chunk` MCP tools | `app/rag_mcp.py` |
+| `search_knowledge` / `get_source_chunk` MCP tools | `app/rag_mcp.py` (`source=` filter; text preferred over figure captions) |
+| `scan_regimes` / `run_graph` / `run_walk` MCP | `app/oanda_mcp.py` (no broker orders; paper journal sqlite only) |
+| Engine candidate list on `RunRecord` | `engine_candidates` + journal `candidates_json` |
 | `agent/` package — bounded graph | `python -m agent.run` |
 | Decision journal + stub paper executor | `data/journal/runs.sqlite`, `python -m agent.executor` |
 | Ch. 7 regime + risk policy gate | `app/regime.py`, `agent/policy.py` |
@@ -515,13 +522,12 @@ Success is:
 
 ### Later
 
-**Planner loop (§1c) — priority for LLM-as-agent**
+**Planner loop (§1c) — remaining**
 
-1. `scan_regimes(universe)` helper (drop `trend_waning`)
-2. `run_graph(Goal)` / walk-as-job MCP wrapping `agent.run` and `agent.walk_*` (policy + journal, not MCP `entry_*` alone)
-3. Engine candidate list on `RunRecord` / tool trace (fires and non-fires)
-4. Natural language → `JobSpec` + preview; optional dashboard chat (no free-text argv)
-5. Remaining Lien chapters 10, 11, 12, 15 (news / session / `breakout_watch` policy)
+1. Natural language → `JobSpec` + preview; optional dashboard chat (no free-text argv)
+2. Remaining Lien chapters 10, 11, 12, 15 (news / session / `breakout_watch` policy)
+3. MT4 tester as MCP (still CLI: `agent.tester_backtest`)
+4. `analyze_walk` summarizer; dashboard whitelist for `walk_lien` / `walk_mtf`
 
 **Other**
 
@@ -572,18 +578,20 @@ clients (interchangeable; own no indicator / policy / order logic)
 - **`agent/`** — bounded analysis graph (`python -m agent.run`), entry engines
   (Ch. 8 MTF, Ch. 9 DBB, Ch. 13 Fader, Ch. 14 20-day, Ch. 16 perfect order,
   Ch. 7 geometry fallback), causal walks
-  (`agent.walk`, `agent.walk_mtf`, `agent.walk_lien`), MT4 tester bridge (`agent.tester_backtest`),
+  (`agent.walk`, `agent.walk_mtf`, `agent.walk_lien`; MCP `run_walk`),
+  MT4 tester bridge (`agent.tester_backtest`),
   SQLite journal, and stub executor (`python -m agent.executor`) that records
   simulated fills only. Default `--mode signal` never enqueues fills. See
   [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
 - **`app/indicators.py` / `app/regime.py`** — Lien Ch. 7 governing layer:
   Wilder ADX, double Bollinger, MA stack, oscillators in code; checklist
-  classifier (trend / range / mixed). MCP: `classify_regime`,
-  `indicator_snapshot`, `mt4_draw_regime`, `mt4_draw_ticket`, `entry_mtf`,
-  `entry_dbb`, `entry_lien`. See
+  classifier (trend / range / mixed). MCP: `classify_regime`, `scan_regimes`,
+  `indicator_snapshot`, `run_graph`, `run_walk`, `mt4_draw_regime`,
+  `mt4_draw_ticket`, `entry_mtf`, `entry_dbb`, `entry_lien`. See
   [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 - **`app/patterns.py`** — early formation geometry; see
   [FORMATION_ANALYSIS.md](FORMATION_ANALYSIS.md).
 
-Both MCP servers are read-only and registered in `.cursor/mcp.json`. Execution
-(order placement) is deliberately absent and remains a separate, gated step.
+Both MCP servers are registered in `.cursor/mcp.json`. OANDA tools include
+planner jobs that may write the sqlite journal. Broker/MT4 order placement is
+deliberately absent and remains a separate, gated step.

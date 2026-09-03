@@ -18,14 +18,15 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from agent.event_walk import walk_event  # noqa: E402
-from agent.fader_walk import walk_fader  # noqa: E402
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
-from agent.lien_chapters import CHAPTER_TO_ENGINE, EVENT_ENGINES  # noqa: E402
-from agent.schema import Goal  # noqa: E402
 from agent.walk_exec import add_fill_cli_args  # noqa: E402
-from app import indicators, oanda_client, regime_walk  # noqa: E402
-from app.walk_fetch import fetch_walk_bars  # noqa: E402
+from agent.walk_jobs import (
+    WalkJobError,
+    WalkRuntime,
+    compact_walk_payload,
+    execute_walk,
+)  # noqa: E402
+from app import oanda_client, regime_walk  # noqa: E402
 
 
 def _configure_logging(quiet: bool) -> None:
@@ -42,156 +43,39 @@ def _configure_logging(quiet: bool) -> None:
 
 async def _async_main(args: argparse.Namespace) -> int:
     logger = logging.getLogger("agent.walk_lien")
-    engine = CHAPTER_TO_ENGINE.get(args.chapter)
-    if engine is None:
-        print(
-            f"walk_lien: chapter {args.chapter} is not encoded "
-            "(use 9, 13, 14, or 16).",
-            file=sys.stderr,
-        )
-        return 2
-
     journal = None if args.no_journal else Journal(args.journal)
-
     try:
-        if engine == "fader":
-            htf_bars, ltf_bars = await asyncio.gather(
-                fetch_walk_bars(
-                    args.instrument,
-                    args.granularity,
-                    args.from_time,
-                    args.to_time,
-                    args.lookback,
-                    with_ba=False,
-                ),
-                fetch_walk_bars(
-                    args.instrument,
-                    args.ltf_granularity,
-                    args.from_time,
-                    args.to_time,
-                    args.lookback,
-                    with_ba=args.fill_mode == "rest",
-                ),
-            )
-            start_index = regime_walk.first_index_on_or_after(
-                ltf_bars, args.from_time
-            )
-            goal = Goal(
-                instrument=args.instrument,
-                granularity=args.granularity,
-                ltf_granularity=args.ltf_granularity,
-                mode="paper",
-                from_time=args.from_time,
-                to_time=args.to_time,
-                risk_fraction=args.risk_fraction,
-                balance=args.balance,
-                exposure_cap=args.exposure_cap,
-                value_per_price_unit=args.value_per_price_unit,
-                fill_mode=args.fill_mode,
-                no_rag=True,
-                no_llm=True,
-            )
-            logger.info(
-                "fader walk %s htf=%s ltf=%s start=%s",
-                args.instrument,
-                args.granularity,
-                args.ltf_granularity,
-                start_index,
-            )
-            result = walk_fader(
-                htf_bars,
-                ltf_bars,
-                goal,
-                lookback=args.lookback,
-                start_index=start_index,
-                journal=journal,
-            )
-            payload = {
-                "chapter": args.chapter,
-                "engine": engine,
-                "instrument": args.instrument,
-                "granularity": args.granularity,
-                "ltf_granularity": args.ltf_granularity,
-                "htf_bar_count": len(htf_bars),
-                "ltf_bar_count": len(ltf_bars),
-                "from_time": args.from_time,
-                "to_time": args.to_time,
-                "lookback": args.lookback,
-                "start_index": start_index,
-                "fill_mode": args.fill_mode,
-                "value_per_price_unit": args.value_per_price_unit,
-                "walk_id": result.walk_id,
-                "equity": result.equity.model_dump(mode="json"),
-                "trades": [t.model_dump(mode="json") for t in result.trades],
-                "trade_count": len(result.trades),
-            }
-        else:
-            if engine not in EVENT_ENGINES:
-                print(f"walk_lien: engine {engine} is not an event walk", file=sys.stderr)
-                return 2
-            bars = await fetch_walk_bars(
-                args.instrument,
-                args.granularity,
-                args.from_time,
-                args.to_time,
-                args.lookback,
-                with_ba=args.fill_mode == "rest",
-            )
-            start_index = regime_walk.first_index_on_or_after(bars, args.from_time)
-            goal = Goal(
-                instrument=args.instrument,
-                granularity=args.granularity,
-                mode="paper",
-                from_time=args.from_time,
-                to_time=args.to_time,
-                risk_fraction=args.risk_fraction,
-                balance=args.balance,
-                exposure_cap=args.exposure_cap,
-                value_per_price_unit=args.value_per_price_unit,
-                fill_mode=args.fill_mode,
-                no_rag=True,
-                no_llm=True,
-            )
-            logger.info(
-                "event walk ch%s %s %s bars=%s start=%s",
-                args.chapter,
-                args.instrument,
-                args.granularity,
-                len(bars),
-                start_index,
-            )
-            result = walk_event(
-                bars,
-                goal,
-                engine,
-                lookback=args.lookback,
-                start_index=start_index,
-                journal=journal,
-            )
-            payload = {
-                "chapter": args.chapter,
-                "engine": engine,
-                "instrument": args.instrument,
-                "granularity": args.granularity,
-                "bar_count": len(bars),
-                "from_time": args.from_time,
-                "to_time": args.to_time,
-                "lookback": args.lookback,
-                "start_index": start_index,
-                "fill_mode": args.fill_mode,
-                "value_per_price_unit": args.value_per_price_unit,
-                "walk_id": result.walk_id,
-                "equity": result.equity.model_dump(mode="json"),
-                "trades": [t.model_dump(mode="json") for t in result.trades],
-                "trade_count": len(result.trades),
-            }
+        result, meta = await execute_walk(
+            "lien",
+            args.instrument,
+            args.from_time,
+            args.to_time,
+            chapter=args.chapter,
+            granularity=args.granularity,
+            ltf_granularity=args.ltf_granularity,
+            lookback=args.lookback,
+            fill_mode=args.fill_mode,
+            balance=args.balance,
+            risk_fraction=args.risk_fraction,
+            exposure_cap=args.exposure_cap,
+            value_per_price_unit=args.value_per_price_unit,
+            journal=journal,
+            no_journal=args.no_journal,
+        )
     except oanda_client.OandaError as exc:
         print(f"OANDA error: {exc}", file=sys.stderr)
         return 2
-    except (regime_walk.WalkError, indicators.IndicatorError) as exc:
+    except (WalkJobError, WalkRuntime) as exc:
         print(f"Walk error: {exc}", file=sys.stderr)
-        return 1
+        return 2 if "not encoded" in str(exc) else 1
 
+    logger.info(
+        "lien walk ch%s %s start=%s",
+        args.chapter,
+        args.instrument,
+        meta.get("start_index"),
+    )
+    payload = compact_walk_payload(result, meta, truncate=False)
     print(json.dumps(payload, indent=2, default=str))
     return 0
 

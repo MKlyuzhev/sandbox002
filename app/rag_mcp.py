@@ -27,28 +27,19 @@ os.chdir(_REPO_ROOT)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-from app import ollama_client, store  # noqa: E402
+from agent import retrieve  # noqa: E402
+from app import store  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("rag-knowledge")
-
-
-def _to_str(value) -> str | None:
-    return None if value is None else str(value)
-
-
-def _to_int(value) -> int | None:
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
 
 mcp = FastMCP("rag-knowledge")
 
 
 @mcp.tool()
-async def search_knowledge(query: str, top_k: int = 5) -> list[dict]:
+async def search_knowledge(
+    query: str, top_k: int = 5, source: str = ""
+) -> list[dict]:
     """Retrieve the most relevant corpus chunks for a query (no answer synthesis).
 
     Embeds the query with the configured Ollama embedding model and runs a
@@ -58,47 +49,24 @@ async def search_knowledge(query: str, top_k: int = 5) -> list[dict]:
     Args:
         query: Natural-language question or topic, e.g. "position sizing rules".
         top_k: Number of chunks to return (default 5).
+        source: Optional corpus id to restrict hits (e.g. "lien-fx"). Empty
+            searches the whole collection. Use this for Lien fidelity tests so
+            Murphy / Laidi chunks cannot leak into a Lien pin.
 
     Each result includes: source, chunk_index, page, chunk_type, title, author,
     asset_class, topics, evidence_level, distance (cosine; lower is closer), and
     the full chunk text.
     """
-    query_vector = await ollama_client.embed(query)
-    collection = store.get_collection()
-    results = collection.query(
-        query_embeddings=[query_vector],
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
+    return await retrieve.search_knowledge(
+        query, top_k=top_k, source=source or None
     )
-
-    documents = results.get("documents", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
-    distances = results.get("distances", [[]])[0]
-
-    chunks: list[dict] = []
-    for doc, meta, dist in zip(documents, metadatas, distances):
-        meta = meta or {}
-        chunks.append(
-            {
-                "source": _to_str(meta.get("source")) or "unknown",
-                "chunk_index": _to_int(meta.get("chunk_index")),
-                "page": _to_int(meta.get("page")),
-                "chunk_type": _to_str(meta.get("chunk_type")),
-                "title": _to_str(meta.get("title")),
-                "author": _to_str(meta.get("author")),
-                "asset_class": _to_str(meta.get("asset_class")),
-                "topics": _to_str(meta.get("topics")),
-                "evidence_level": _to_str(meta.get("evidence_level")),
-                "distance": float(dist) if dist is not None else None,
-                "text": doc,
-            }
-        )
-    return chunks
 
 
 @mcp.tool()
 async def get_source_chunk(source: str, chunk_index: int) -> dict:
     """Fetch a single stored chunk by its source and chunk_index for exact citation.
+
+    Prefers ``chunk_type=text`` when a figure caption shares the same index.
 
     Args:
         source: The document identifier (matches the ``source`` field returned
@@ -107,27 +75,7 @@ async def get_source_chunk(source: str, chunk_index: int) -> dict:
 
     Returns the chunk text and metadata, or an ``error`` field if not found.
     """
-    collection = store.get_collection()
-    results = collection.get(
-        where={"$and": [{"source": source}, {"chunk_index": chunk_index}]},
-        include=["documents", "metadatas"],
-    )
-    documents = results.get("documents") or []
-    metadatas = results.get("metadatas") or []
-    if not documents:
-        return {
-            "error": f"No chunk found for source={source!r} chunk_index={chunk_index}",
-        }
-    meta = metadatas[0] or {}
-    return {
-        "source": _to_str(meta.get("source")) or source,
-        "chunk_index": _to_int(meta.get("chunk_index")),
-        "page": _to_int(meta.get("page")),
-        "chunk_type": _to_str(meta.get("chunk_type")),
-        "title": _to_str(meta.get("title")),
-        "author": _to_str(meta.get("author")),
-        "text": documents[0],
-    }
+    return retrieve.get_source_chunk(source, chunk_index)
 
 
 @mcp.tool()

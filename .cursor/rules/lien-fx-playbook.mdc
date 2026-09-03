@@ -9,10 +9,16 @@ Research only. No orders. Full strategy tables: [docs/LIEN_FX_STRATEGIES.md](doc
 
 ## Before any Lien technical setup
 
-1. Call `classify_regime` (oanda-research) on the instrument. Default granularity **D**. Do not compute ADX, Bollinger, SMA, RSI, stochastics, or MACD in the model.
+1. For one pair: `classify_regime` (oanda-research). For a universe: `scan_regimes`
+   (max 12; default USD majors). Default granularity **D**. Do not compute ADX,
+   Bollinger, SMA, RSI, stochastics, or MACD in the model. Drop `trend_waning`.
 2. Match the play class to the result: `join_trend`, `fade_range`, or `breakout_watch`. If `trend_waning` is true, do not aggress.
 3. Optional: `mt4_draw_regime` on a **matching** symbol/timeframe chart (prefix `sbox.regime.`). Oscillators stay in JSON; the overlay is bands, MA stack, 10-bar high/low, and a regime label. Paper/signal tickets: `mt4_draw_ticket` (prefix `sbox.ticket.`; hlines only, no orders).
-4. Cite `lien-fx` via `rag-knowledge` (`search_knowledge` / `get_source_chunk`). Evidence is heuristic.
+4. Cite `lien-fx` via `rag-knowledge` (`search_knowledge` with `source="lien-fx"`,
+   then `get_source_chunk`). Evidence is heuristic. Pin claims × chunk × engine
+   with `python -m agent.fidelity` (add `--pin` when the corpus is ingested).
+5. Journaled snapshot: `run_graph` (policy + `engine_candidates`). Measured test:
+   `run_walk` (`ch7` / `mtf` / `lien`). MCP `entry_*` is a peek only.
 
 ## Risk template (library, not MCP)
 

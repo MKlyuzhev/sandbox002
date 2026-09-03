@@ -145,6 +145,18 @@ class ToolTrace(BaseModel):
     detail: str = ""
 
 
+class EngineCandidate(BaseModel):
+    """One engine's verdict on a snapshot bar (fire or non-fire)."""
+
+    engine: str
+    chapter: int
+    firing: bool = False
+    signal: Side = "none"
+    play_class: PlayClass = "breakout_watch"
+    confidence: float = 0.0
+    reason: str = ""
+
+
 class RunRecord(BaseModel):
     run_id: str
     ts: str
@@ -158,6 +170,7 @@ class RunRecord(BaseModel):
     risk: RiskVerdict
     citations: list[Citation] = Field(default_factory=list)
     tool_trace: list[ToolTrace] = Field(default_factory=list)
+    engine_candidates: list[EngineCandidate] = Field(default_factory=list)
     error: str | None = None
     walk_id: str | None = None
 

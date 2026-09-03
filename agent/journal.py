@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent.schema import RunRecord, SimFill
+from agent.schema import EngineCandidate, RunRecord, SimFill
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = _REPO_ROOT / "data" / "journal" / "runs.sqlite"
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS fills (
 );
 """
 
-_RUN_EXTRAS = (("walk_id", "TEXT"),)
+_RUN_EXTRAS = (("walk_id", "TEXT"), ("candidates_json", "TEXT"))
 _FILL_EXTRAS = (
     ("exit_status", "TEXT"),
     ("exit_price", "REAL"),
@@ -97,8 +97,9 @@ class Journal:
                 INSERT INTO runs (
                     id, ts, mode, instrument, granularity, action,
                     goal_json, regime_json, proposal_json, risk_json,
-                    citations_json, trace_json, error, walk_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    citations_json, trace_json, error, walk_id,
+                    candidates_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.run_id,
@@ -115,6 +116,7 @@ class Journal:
                     json.dumps(payload["tool_trace"]),
                     record.error,
                     record.walk_id,
+                    json.dumps(payload.get("engine_candidates") or []),
                 ),
             )
             if queue_fill and record.action == "pending_exec":
@@ -282,6 +284,10 @@ class Journal:
 
 def _row_to_record(row: sqlite3.Row) -> RunRecord:
     proposal = json.loads(row["proposal_json"]) if row["proposal_json"] else None
+    keys = set(row.keys())
+    raw_cands = []
+    if "candidates_json" in keys and row["candidates_json"]:
+        raw_cands = json.loads(row["candidates_json"])
     return RunRecord(
         run_id=row["id"],
         ts=row["ts"],
@@ -295,8 +301,9 @@ def _row_to_record(row: sqlite3.Row) -> RunRecord:
         risk=json.loads(row["risk_json"]),
         citations=json.loads(row["citations_json"] or "[]"),
         tool_trace=json.loads(row["trace_json"] or "[]"),
+        engine_candidates=[EngineCandidate.model_validate(c) for c in raw_cands],
         error=row["error"],
-        walk_id=row["walk_id"] if "walk_id" in row.keys() else None,
+        walk_id=row["walk_id"] if "walk_id" in keys else None,
     )
 
 

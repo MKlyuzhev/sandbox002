@@ -137,6 +137,7 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(called["n"], 0)
         self.assertEqual(record.action, "wait")
         self.assertIsNone(record.proposal)
+        self.assertEqual(record.engine_candidates, [])
 
     def test_paper_mode_journals_pending(self) -> None:
         tmp = tempfile.TemporaryDirectory()
@@ -167,6 +168,10 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(record.proposal.side, "long")
         self.assertIsNotNone(record.proposal.entry)
         self.assertTrue(record.risk.ok)
+        names = [c.engine for c in record.engine_candidates]
+        self.assertIn("ch7_geometry", names)
+        self.assertTrue(any(c.firing for c in record.engine_candidates))
+        self.assertTrue(all(c.chapter >= 7 for c in record.engine_candidates))
 
     def test_no_llm_range_fades(self) -> None:
         record = asyncio.run(

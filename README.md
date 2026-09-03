@@ -188,26 +188,30 @@ Test figure extraction on the Murphy PDF (first 5 pages):
 bash scripts/test_pdf_figures.sh
 ```
 
-## Research MCP (OANDA, read-only)
+## Research MCP (OANDA)
 
 A local [Model Context Protocol](https://modelcontextprotocol.io) server exposes
-broker-accurate FX data to Cursor for FOREX research. It is **read-only**: it
-wraps OANDA's v20 REST API for market data and account context only, and defines
+broker-accurate FX data to Cursor for FOREX research. It wraps OANDA's v20 REST
+API for market data and account context, plus planner jobs. It defines
 **no order placement, modification, or position-closing tools**. It defaults to
-the `practice` environment.
+the `practice` environment. `run_graph` / `run_walk` may write the sqlite
+journal (`log_setup` / `pending_exec` stub fills only).
 
 Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`,
 `get_candles`, `get_open_positions`, `get_open_trades`, `get_order_book`,
-`get_position_book`, Lien governing-layer helpers `classify_regime`,
-`indicator_snapshot`, `mt4_draw_regime`, plus MT4 display helpers `mt4_status`,
-`mt4_upsert_objects`, `mt4_delete_objects`, `mt4_clear_layer`,
-`mt4_draw_formation`, `mt4_draw_ticket` (chart objects via a file inbox; no MT4 orders).
+`get_position_book`, Lien helpers `classify_regime`, `scan_regimes`,
+`indicator_snapshot`, `run_graph`, `run_walk`, `mt4_draw_regime`, plus MT4
+display helpers `mt4_status`, `mt4_upsert_objects`, `mt4_delete_objects`,
+`mt4_clear_layer`, `mt4_draw_formation`, `mt4_draw_ticket` (chart objects via a
+file inbox; no MT4 orders). `entry_mtf`, `entry_dbb`, and `entry_lien` are
+snapshot peeks (no policy/journal).
 
 A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
-ingested corpus for retrieval: `search_knowledge`, `get_source_chunk`, and
-`corpus_stats`. It performs pure retrieval (no answer synthesis) so any agent -
-frontier or a local model - reasons with its own weights. Both servers are
-registered in `.cursor/mcp.json`.
+ingested corpus for retrieval: `search_knowledge` (optional `source` filter,
+e.g. `lien-fx`), `get_source_chunk`, and `corpus_stats`. It performs pure
+retrieval (no answer synthesis) so any agent - frontier or a local model -
+reasons with its own weights. Both servers are registered in `.cursor/mcp.json`.
+Lien claim pins: `python -m agent.fidelity` (static) or `--pin` / `--corpus`.
 
 Setup:
 

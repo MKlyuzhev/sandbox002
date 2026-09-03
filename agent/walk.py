@@ -19,11 +19,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
-from agent.paper_walk import walk_paper  # noqa: E402
-from agent.schema import Goal  # noqa: E402
 from agent.walk_exec import add_fill_cli_args  # noqa: E402
-from app import indicators, oanda_client, regime_walk  # noqa: E402
-from app.walk_fetch import fetch_walk_bars  # noqa: E402
+from agent.walk_jobs import WalkJobError, WalkRuntime, execute_walk  # noqa: E402
+from app import oanda_client, regime_walk  # noqa: E402
 
 
 def _configure_logging(quiet: bool) -> None:
@@ -40,68 +38,48 @@ def _configure_logging(quiet: bool) -> None:
 
 async def _async_main(args: argparse.Namespace) -> int:
     logger = logging.getLogger("agent.walk")
+    journal = None if args.no_journal else Journal(args.journal)
     try:
-        bars = await fetch_walk_bars(
+        result, meta = await execute_walk(
+            "ch7",
             args.instrument,
-            args.granularity,
             args.from_time,
             args.to_time,
-            args.lookback,
-            with_ba=args.fill_mode == "rest",
+            granularity=args.granularity,
+            lookback=args.lookback,
+            fill_mode=args.fill_mode,
+            balance=args.balance,
+            risk_fraction=args.risk_fraction,
+            exposure_cap=args.exposure_cap,
+            value_per_price_unit=args.value_per_price_unit,
+            journal=journal,
+            no_journal=args.no_journal,
         )
     except oanda_client.OandaError as exc:
         print(f"OANDA error: {exc}", file=sys.stderr)
         return 2
-    except regime_walk.WalkError as exc:
+    except (WalkJobError, WalkRuntime) as exc:
         print(f"Walk error: {exc}", file=sys.stderr)
         return 1
 
-    try:
-        start_index = regime_walk.first_index_on_or_after(bars, args.from_time)
-        collapsed = regime_walk.walk_and_collapse(
-            bars,
-            lookback=args.lookback,
-            step=1,
-            start_index=start_index,
-            horizon=args.horizon,
-            min_n=args.min_n,
-        )
-        goal = Goal(
-            instrument=args.instrument,
-            granularity=args.granularity,
-            mode="paper",
-            from_time=args.from_time,
-            to_time=args.to_time,
-            risk_fraction=args.risk_fraction,
-            balance=args.balance,
-            exposure_cap=args.exposure_cap,
-            value_per_price_unit=args.value_per_price_unit,
-            fill_mode=args.fill_mode,
-            mt4=args.mt4,
-            mt4_prefix=args.mt4_prefix,
-            no_rag=True,
-            no_llm=True,
-        )
-        journal = None if args.no_journal else Journal(args.journal)
-        logger.info(
-            "paper walk %s %s bars=%s start=%s lookback=%s",
-            args.instrument,
-            args.granularity,
-            len(bars),
-            start_index,
-            args.lookback,
-        )
-        result = walk_paper(
-            bars,
-            goal,
-            lookback=args.lookback,
-            start_index=start_index,
-            journal=journal,
-        )
-    except (regime_walk.WalkError, indicators.IndicatorError) as exc:
-        print(f"Walk error: {exc}", file=sys.stderr)
-        return 1
-
+    bars = meta["bars"]
+    start_index = meta["start_index"]
+    logger.info(
+        "paper walk %s %s bars=%s start=%s lookback=%s",
+        args.instrument,
+        args.granularity,
+        len(bars),
+        start_index,
+        args.lookback,
+    )
+    collapsed = regime_walk.walk_and_collapse(
+        bars,
+        lookback=args.lookback,
+        step=1,
+        start_index=start_index,
+        horizon=args.horizon,
+        min_n=args.min_n,
+    )
     payload = {
         "instrument": args.instrument,
         "granularity": args.granularity,

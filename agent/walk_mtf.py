@@ -18,11 +18,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
-from agent.mtf_walk import walk_mtf  # noqa: E402
-from agent.schema import Goal  # noqa: E402
 from agent.walk_exec import add_fill_cli_args  # noqa: E402
-from app import indicators, oanda_client, regime_walk  # noqa: E402
-from app.walk_fetch import fetch_walk_bars  # noqa: E402
+from agent.walk_jobs import (
+    WalkJobError,
+    WalkRuntime,
+    compact_walk_payload,
+    execute_walk,
+)  # noqa: E402
+from app import oanda_client, regime_walk  # noqa: E402
 
 
 def _configure_logging(quiet: bool) -> None:
@@ -39,91 +42,43 @@ def _configure_logging(quiet: bool) -> None:
 
 async def _async_main(args: argparse.Namespace) -> int:
     logger = logging.getLogger("agent.walk_mtf")
+    journal = None if args.no_journal else Journal(args.journal)
     try:
-        htf_bars, ltf_bars = await asyncio.gather(
-            fetch_walk_bars(
-                args.instrument,
-                args.granularity,
-                args.from_time,
-                args.to_time,
-                args.lookback,
-                with_ba=False,
-            ),
-            fetch_walk_bars(
-                args.instrument,
-                args.ltf_granularity,
-                args.from_time,
-                args.to_time,
-                args.lookback,
-                with_ba=args.fill_mode == "rest",
-            ),
+        result, meta = await execute_walk(
+            "mtf",
+            args.instrument,
+            args.from_time,
+            args.to_time,
+            granularity=args.granularity,
+            ltf_granularity=args.ltf_granularity,
+            lookback=args.lookback,
+            fill_mode=args.fill_mode,
+            balance=args.balance,
+            risk_fraction=args.risk_fraction,
+            exposure_cap=args.exposure_cap,
+            value_per_price_unit=args.value_per_price_unit,
+            journal=journal,
+            no_journal=args.no_journal,
+            entry_mode=args.entry_mode,
         )
     except oanda_client.OandaError as exc:
         print(f"OANDA error: {exc}", file=sys.stderr)
         return 2
-    except regime_walk.WalkError as exc:
+    except (WalkJobError, WalkRuntime) as exc:
         print(f"Walk error: {exc}", file=sys.stderr)
         return 1
 
-    try:
-        start_index = regime_walk.first_index_on_or_after(ltf_bars, args.from_time)
-        goal = Goal(
-            instrument=args.instrument,
-            granularity=args.granularity,
-            ltf_granularity=args.ltf_granularity,
-            mode="paper",
-            from_time=args.from_time,
-            to_time=args.to_time,
-            risk_fraction=args.risk_fraction,
-            balance=args.balance,
-            exposure_cap=args.exposure_cap,
-            value_per_price_unit=args.value_per_price_unit,
-            fill_mode=args.fill_mode,
-            no_rag=True,
-            no_llm=True,
-        )
-        journal = None if args.no_journal else Journal(args.journal)
-        logger.info(
-            "mtf walk %s htf=%s ltf=%s htf_bars=%s ltf_bars=%s start=%s lookback=%s",
-            args.instrument,
-            args.granularity,
-            args.ltf_granularity,
-            len(htf_bars),
-            len(ltf_bars),
-            start_index,
-            args.lookback,
-        )
-        result = walk_mtf(
-            htf_bars,
-            ltf_bars,
-            goal,
-            lookback=args.lookback,
-            start_index=start_index,
-            entry_mode=args.entry_mode,
-            journal=journal,
-        )
-    except (regime_walk.WalkError, indicators.IndicatorError) as exc:
-        print(f"Walk error: {exc}", file=sys.stderr)
-        return 1
-
-    payload = {
-        "instrument": args.instrument,
-        "granularity": args.granularity,
-        "ltf_granularity": args.ltf_granularity,
-        "from_time": args.from_time,
-        "to_time": args.to_time,
-        "lookback": args.lookback,
-        "entry_mode": args.entry_mode,
-        "htf_bar_count": len(htf_bars),
-        "ltf_bar_count": len(ltf_bars),
-        "start_index": start_index,
-        "fill_mode": args.fill_mode,
-        "value_per_price_unit": args.value_per_price_unit,
-        "walk_id": result.walk_id,
-        "equity": result.equity.model_dump(mode="json"),
-        "trades": [t.model_dump(mode="json") for t in result.trades],
-        "trade_count": len(result.trades),
-    }
+    logger.info(
+        "mtf walk %s htf=%s ltf=%s htf_bars=%s ltf_bars=%s start=%s lookback=%s",
+        args.instrument,
+        args.granularity,
+        args.ltf_granularity,
+        meta.get("htf_bar_count"),
+        meta.get("ltf_bar_count"),
+        meta.get("start_index"),
+        args.lookback,
+    )
+    payload = compact_walk_payload(result, meta, truncate=False)
     print(json.dumps(payload, indent=2, default=str))
     return 0
 

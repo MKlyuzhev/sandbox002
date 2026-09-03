@@ -19,8 +19,11 @@ OANDA candles → indicators.py → regime.py → JSON
        └──────→ mt4_bridge (prefix sbox.regime.) → EA objects (--mt4)
 ```
 
-Cite book text via `rag-knowledge` (`search_knowledge` / `get_source_chunk` on
-source `lien-fx`). Do not invent ADX, Bollinger, or MA values in the model.
+Cite book text via `rag-knowledge` (`search_knowledge` with `source="lien-fx"`,
+then `get_source_chunk`). Do not invent ADX, Bollinger, or MA values in the
+model. Pin claims to engines: `python -m agent.fidelity` (add `--pin` if
+`lien-fx` is ingested). Universe scan: `scan_regimes`. Journaled snapshot:
+`run_graph`. Causal walk: `run_walk`.
 
 Headless loop (regime → retrieve → propose → policy → journal):
 [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
@@ -36,6 +39,7 @@ Headless loop (regime → retrieve → propose → policy → journal):
 | Evidence | heuristic |
 | Highest-signal Ch. 3 chunks | 28–30, 36–38, 41–43 (what moves FX) |
 | Strategy chapters | 7 (regime) then 8–16 (technical), 17–25 (fundamental) |
+| Fidelity CLI | `python -m agent.fidelity` (static); `--pin` / `--corpus` if ingested |
 
 ---
 

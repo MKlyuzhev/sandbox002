@@ -11,6 +11,8 @@ Related: [Lien FX Strategies](LIEN_FX_STRATEGIES.md) (Ch. 7 governing layer),
 [Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) (architecture; §1c is the
 intended LLM **planner** around this CLI, not inside it),
 [Corpus Runbook](CORPUS_RUNBOOK.md) (ingest `lien-fx`).
+Lien RAG pins: `python -m agent.fidelity` (engine citations always;
+`--pin` against ingested chunks).
 
 ---
 
@@ -165,6 +167,7 @@ Look at `action` first, then `risk.reasons` if it is `wait`.
 | `risk` | `ok`, planned R, `size_units`, `stop_distance`, `reasons` |
 | `citations` | `{source, chunk_index, distance}` from retrieve |
 | `tool_trace` | Node name + latency_ms + short detail |
+| `engine_candidates` | Every selected engine's fire/non-fire (`engine`, `chapter`, `firing`, `signal`, `play_class`, `confidence`, `reason`) |
 | `error` | Fetch/classify/parse failure, or null |
 
 **Do not** treat `regime.risk_reversals` or `implied_vol` as numbers; they are
@@ -216,7 +219,9 @@ The chosen engine overwrites the proposal's `play_class`, `side`, and
 
 The standalone tools/CLIs (`entry_mtf`, `entry_dbb`, `entry_lien`,
 `scripts/entry_mtf.py`, `scripts/entry_lien.py`) still exist for a direct
-signal outside the graph. Causal walks: `python -m agent.walk_mtf` (Ch. 8),
+signal outside the graph. Planner MCP: `scan_regimes`, `run_graph` (this
+graph, policy + journal), `run_walk` (`ch7` / `mtf` / `lien`; not the MT4
+tester). Causal walks: `python -m agent.walk_mtf` (Ch. 8),
 `python -m agent.walk_lien --chapter 9|13|14|16`.
 
 ---
@@ -506,5 +511,7 @@ No network. From repo root:
   tests.test_lien_geometry tests.test_lien_chapters \
   tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf \
   tests.test_entry_dbb tests.test_entry_fader tests.test_entry_breakout20 \
-  tests.test_entry_perfect_order -v
+  tests.test_entry_perfect_order tests.test_agent_fidelity \
+  tests.test_agent_retrieve tests.test_agent_scan tests.test_agent_walk_jobs \
+  tests.test_oanda_mcp_planner -v
 ```
