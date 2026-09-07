@@ -10,7 +10,8 @@ captions at ingest). Example corpora: `lien-fx` (agent default citations),
 `murphy-digital` (Murphy technical analysis, text + embedded chart captions).
 Headless orchestrator: `python -m agent.run` — see
 [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md). Intended LLM agent: a
-**planner** in front of that graph (Cursor via MCP today) — see §1c.
+**planner** in front of that graph (Cursor via MCP today) — see §1c and the
+operator manual [AGENT_PLANNER.md](AGENT_PLANNER.md).
 
 ---
 
@@ -113,6 +114,10 @@ APIs. MCP servers are the **planner's toolbox**, not a second graph.
 
 ### 1c. Planner — the intended LLM agent
 
+How to run this loop in Cursor (tools, campaign recipe, peek vs act):
+[AGENT_PLANNER.md](AGENT_PLANNER.md). This section is the architecture
+summary.
+
 The useful LLM is a **searcher and experimenter in front of the graph**, not a
 decision node inside it. Encoding remaining Lien chapters (10, 11, 12, 15)
 expands the toolbox; it does not replace this loop. A human typing flags and a
@@ -139,7 +144,7 @@ practice host. See [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) §9b.
 
 | Job | Example | Tooling today |
 |-----|---------|----------------|
-| Scan a universe | Majors on D; drop `trend_waning` | MCP `scan_regimes` (max 12; default USD majors) |
+| Scan a universe | Majors on D; drop `trend_waning` | MCP `scan_regimes` (max 32; default USD majors; `lien-fx` pool) |
 | Snapshot signal | "Does MTF fire on GBP_USD now?" | `entry_mtf` / `entry_dbb` / `entry_lien` peek; or `run_graph` to journal |
 | Strategy test (walk) | Ch. 16 on USD_JPY, 2023–2026 | MCP `run_walk(kind=lien, chapter=16, …)` or CLI `agent.walk_lien` |
 | Try other instruments | Same engine, next pair that passed the scan | Repeat `run_walk` / `run_graph` with a new instrument |
@@ -210,7 +215,7 @@ stats without re-computing them.
 
 | Capability | Today | Gap |
 |------------|--------|-----|
-| Scan pairs, drop waning | MCP `scan_regimes` (max 12) | — |
+| Scan pairs, drop waning | MCP `scan_regimes` (max 32) | — |
 | After `wait`, other LTF / chapter | Human or Cursor changes flags | Graph is one-shot; no retry node |
 | Retrieve then choose engine | RAG MCP `source=` + `python -m agent.fidelity` (claims × chunk × engine) | No auto book → engine-id in the graph |
 | Compare MTF vs DBB (one bar) | `RunRecord.engine_candidates` | — |
@@ -422,6 +427,8 @@ paper walks: `agent.walk` (Ch. 7), `agent.walk_mtf` (Ch. 8), `agent.walk_lien`
 11, 12, and 15 remain documentation-only.
 
 ### Phase B2 — Planner ReAct — **prototype** (intended LLM agent)
+
+Operator manual: [AGENT_PLANNER.md](AGENT_PLANNER.md).
 
 - **Done:** Cursor can call MCP (`classify_regime`, `scan_regimes`, `run_graph`,
   `run_walk`, `entry_mtf`, `entry_dbb`, `entry_lien`, `search_knowledge` with

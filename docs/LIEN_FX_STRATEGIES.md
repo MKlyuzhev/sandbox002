@@ -27,6 +27,10 @@ model. Pin claims to engines: `python -m agent.fidelity` (add `--pin` if
 
 Headless loop (regime → retrieve → propose → policy → journal):
 [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
+Planner campaign (scan → peek → `run_graph` / `run_walk`):
+[AGENT_PLANNER.md](AGENT_PLANNER.md).
+Sibling `trend_trade` / `cycle_trade` vs this corpus:
+[sandbox001 vs RAG](SANDBOX001_RAG_CORRELATION.md).
 
 ---
 
@@ -40,6 +44,7 @@ Headless loop (regime → retrieve → propose → policy → journal):
 | Highest-signal Ch. 3 chunks | 28–30, 36–38, 41–43 (what moves FX) |
 | Strategy chapters | 7 (regime) then 8–16 (technical), 17–25 (fundamental) |
 | Fidelity CLI | `python -m agent.fidelity` (static); `--pin` / `--corpus` if ingested |
+| Research pair pool | [`agent/lien_pairs.py`](../agent/lien_pairs.py) / [`data/lien_fx_pairs.json`](../data/lien_fx_pairs.json) — 21 OANDA names mentioned in the book. Scan aliases: empty → 7 USD majors; `lien-fx-ch4` → Ch. 4 board; `lien-fx` → full pool. Cap 32; CSV of other OANDA names allowed. |
 
 ---
 

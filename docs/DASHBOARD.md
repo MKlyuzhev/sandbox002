@@ -10,9 +10,10 @@ RAG FastAPI (unchanged)      →  http://127.0.0.1:8000
 ```
 
 Related: [Agent Orchestrator](AGENT_ORCHESTRATOR.md),
+[Agent Planner](AGENT_PLANNER.md) (Cursor ReAct; this UI has no
+natural-language box on purpose),
 [Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) §14 (clients own no
-indicator / policy / order logic) and §1c (planner ReAct is Cursor today; this
-UI has no natural-language box on purpose).
+indicator / policy / order logic) and §1c.
 
 ---
 

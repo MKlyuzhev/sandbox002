@@ -8,18 +8,12 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
+from agent.lien_pairs import USD_MAJORS, expand_instruments
 from app import indicators, oanda_client, regime as regime_mod
 
-MAX_INSTRUMENTS = 12
-DEFAULT_UNIVERSE: tuple[str, ...] = (
-    "EUR_USD",
-    "GBP_USD",
-    "USD_JPY",
-    "AUD_USD",
-    "USD_CAD",
-    "USD_CHF",
-    "NZD_USD",
-)
+# Sequential OANDA classify. Large enough for RESEARCH_POOL plus a few extras.
+MAX_INSTRUMENTS = 32
+DEFAULT_UNIVERSE: tuple[str, ...] = USD_MAJORS
 
 ClassifyFn = Callable[[str, str, int, str, str], Awaitable[dict[str, Any]]]
 
@@ -29,7 +23,16 @@ class ScanError(ValueError):
 
 
 def parse_instruments(instruments: str | Sequence[str] | None) -> list[str]:
-    """Split a comma-separated universe; empty → default majors."""
+    """Split a comma-separated universe; empty → USD majors.
+
+    A single token may be a pool alias from ``agent.lien_pairs``:
+    ``usd-majors``, ``lien-fx-ch4`` (Ch. 4 board), or ``lien-fx`` (full
+    research pool). Arbitrary OANDA names are allowed up to
+    ``MAX_INSTRUMENTS``.
+    """
+    expanded = expand_instruments(instruments)
+    if expanded is not None:
+        return expanded
     if instruments is None:
         return list(DEFAULT_UNIVERSE)
     if isinstance(instruments, str):

@@ -3,7 +3,9 @@
 Guide for acquiring, placing, and ingesting the MVP trading-knowledge corpus into the
 local RAG server.
 
-See also: [RAG User Guide](RAG_USER_GUIDE.md), [manifest](../data/corpus/manifest.yaml).
+See also: [RAG User Guide](RAG_USER_GUIDE.md), [manifest](../data/corpus/manifest.yaml),
+sibling-repo pin [sandbox001 vs RAG](SANDBOX001_RAG_CORRELATION.md)
+(`trend_trade` / `cycle_trade` vs these sources).
 
 ---
 

@@ -17,6 +17,10 @@ Kathy Lien regime filter and strategy playbook:
 [Lien FX Strategies](docs/LIEN_FX_STRATEGIES.md).
 Agent orchestrator (regime → propose → Ch.7 geometry → journal → stub fill):
 [Agent Orchestrator](docs/AGENT_ORCHESTRATOR.md).
+Planner (Cursor ReAct: scan, peek, `run_graph` / `run_walk`):
+[Agent Planner](docs/AGENT_PLANNER.md).
+sandbox001 `trend_trade` / `cycle_trade` vs this corpus:
+[sandbox001 vs RAG](docs/SANDBOX001_RAG_CORRELATION.md).
 Ops dashboard (status strip, terminal, journal, GPU):
 [Dashboard](docs/DASHBOARD.md).
 
@@ -276,7 +280,8 @@ Caveats:
 
 Headless Lien analysis graph: regime → optional RAG → proposal → risk gate →
 journal. No broker orders. Usage, flags, journal, and stub executor:
-[Agent Orchestrator](docs/AGENT_ORCHESTRATOR.md).
+[Agent Orchestrator](docs/AGENT_ORCHESTRATOR.md). Cursor ReAct (scan, peek,
+journaled graph/walk): [Agent Planner](docs/AGENT_PLANNER.md).
 
 ```bash
 .venv/bin/python -m agent.run --instrument GBP_USD --granularity D --no-llm

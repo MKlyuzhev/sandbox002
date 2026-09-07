@@ -43,6 +43,21 @@ class TestParseInstruments(unittest.TestCase):
             ["EUR_USD", "GBP_USD"],
         )
 
+    def test_lien_fx_pool_alias_scans(self) -> None:
+        names = parse_instruments("lien-fx")
+        self.assertLessEqual(len(names), MAX_INSTRUMENTS)
+        seen: list[str] = []
+
+        async def classify(name, *_rest):
+            seen.append(name)
+            return _row(name)
+
+        out = asyncio.run(
+            scan_regimes("lien-fx", drop_waning=False, classify_fn=classify)
+        )
+        self.assertEqual(seen, names)
+        self.assertEqual(out["kept"], names)
+
 
 class TestScanRegimes(unittest.TestCase):
     def test_cap(self) -> None:

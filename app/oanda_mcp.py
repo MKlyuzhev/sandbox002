@@ -330,10 +330,13 @@ async def scan_regimes(
     """Classify Lien Ch.7 regime for a small universe (sequential).
 
     Default universe is the seven USD majors if ``instruments`` is empty.
-    At most 12 names. ``drop_waning`` (default true) puts waning pairs in
-    ``dropped`` with reason ``trend_waning``. Optional ``play_class`` keeps
-    only pairs whose ``allowed_play_classes`` include it. Compact rows — do
-    not recompute ADX/Bollinger in the model. Research only; no orders.
+    At most 32 names. Aliases: ``usd-majors``, ``lien-fx-ch4`` (Ch. 4 board),
+    ``lien-fx`` (full research pool). Any OANDA names (crosses, SGD, etc.)
+    may be passed as a CSV. ``drop_waning`` (default true) puts waning pairs
+    in ``dropped`` with reason ``trend_waning``. Optional ``play_class``
+    keeps only pairs whose ``allowed_play_classes`` include it. Compact
+    rows — do not recompute ADX/Bollinger in the model. Research only; no
+    orders.
     """
     from agent.scan import ScanError, scan_regimes as _scan
 

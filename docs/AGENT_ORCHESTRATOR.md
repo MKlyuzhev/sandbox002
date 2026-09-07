@@ -10,6 +10,7 @@ output as a replayable brief, not a signal service.
 Related: [Lien FX Strategies](LIEN_FX_STRATEGIES.md) (Ch. 7 governing layer),
 [Agentic Trading Roadmap](AGENTIC_TRADING_ROADMAP.md) (architecture; §1c is the
 intended LLM **planner** around this CLI, not inside it),
+[Agent Planner](AGENT_PLANNER.md) (Cursor ReAct operator manual),
 [Corpus Runbook](CORPUS_RUNBOOK.md) (ingest `lien-fx`).
 Lien RAG pins: `python -m agent.fidelity` (engine citations always;
 `--pin` against ingested chunks).

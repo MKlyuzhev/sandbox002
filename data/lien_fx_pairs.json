@@ -1,0 +1,59 @@
+{
+  "source": "lien-fx",
+  "title": "Day Trading and Swing Trading the Currency Market",
+  "compiled": "2026-09-07",
+  "method": "Regex over ingested Chroma chunks; ISO 4217 pairs; inversions folded to OANDA BASE_QUOTE.",
+  "note": "Heuristic book mentions, not a tradable ranking. scan_regimes default is usd-majors; aliases lien-fx-ch4 and lien-fx (full pool) fit the 32-name cap. Research only; no orders.",
+  "aliases": {
+    "usd-majors": [
+      "EUR_USD",
+      "GBP_USD",
+      "USD_JPY",
+      "AUD_USD",
+      "USD_CAD",
+      "USD_CHF",
+      "NZD_USD"
+    ],
+    "lien-fx-ch4": [
+      "EUR_GBP",
+      "AUD_USD",
+      "NZD_USD",
+      "USD_CAD",
+      "EUR_USD",
+      "EUR_CHF",
+      "AUD_JPY",
+      "GBP_USD",
+      "USD_CHF",
+      "USD_JPY",
+      "GBP_CHF",
+      "GBP_JPY"
+    ]
+  },
+  "research_pool": [
+    {"instrument": "EUR_USD", "mentions": 398, "note": "includes USDEUR figure/axis glue and inverted quotes"},
+    {"instrument": "USD_JPY", "mentions": 248},
+    {"instrument": "GBP_USD", "mentions": 226, "note": "includes USDGBP correlation example"},
+    {"instrument": "USD_CAD", "mentions": 118, "note": "includes CADUSD oil/gold charts"},
+    {"instrument": "AUD_USD", "mentions": 113},
+    {"instrument": "NZD_USD", "mentions": 74},
+    {"instrument": "EUR_CHF", "mentions": 73},
+    {"instrument": "USD_CHF", "mentions": 72, "note": "includes CHFUSD gold-correlation mention"},
+    {"instrument": "EUR_GBP", "mentions": 56},
+    {"instrument": "CHF_JPY", "mentions": 30},
+    {"instrument": "GBP_JPY", "mentions": 24},
+    {"instrument": "AUD_NZD", "mentions": 18},
+    {"instrument": "GBP_CHF", "mentions": 18},
+    {"instrument": "NZD_CAD", "mentions": 17},
+    {"instrument": "AUD_CHF", "mentions": 14},
+    {"instrument": "EUR_CAD", "mentions": 14},
+    {"instrument": "AUD_JPY", "mentions": 12},
+    {"instrument": "AUD_CAD", "mentions": 10},
+    {"instrument": "USD_SGD", "mentions": 9, "note": "Ch.16 perfect-order example"},
+    {"instrument": "EUR_JPY", "mentions": 4},
+    {"instrument": "NZD_JPY", "mentions": 2, "note": "carry-trade list"}
+  ],
+  "historical": [
+    {"instrument": "GBP_DEM", "mentions": 8, "note": "Soros / ERM; not OANDA"},
+    {"instrument": "DEM_JPY", "mentions": 2, "note": "Plaza Accord chart; not OANDA"}
+  ]
+}
