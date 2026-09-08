@@ -296,8 +296,10 @@ async def classify_regime(
     unavailable. Research only; no orders.
 
     Returns regime (trend|range|mixed), direction, checklist X-counts,
-    allowed_play_classes, last-bar snapshot, and notes. On too few bars,
-    returns an ``error`` field.
+    allowed_play_classes, last-bar snapshot, compact ``visual`` channel
+    rails (trendline + parallel, or 10-bar high/low box), and notes.
+    ``visual`` is display geometry only — not a Ch.15 entry. On too few
+    bars, returns an ``error`` field.
     """
     from app import indicators
 
@@ -335,8 +337,8 @@ async def scan_regimes(
     may be passed as a CSV. ``drop_waning`` (default true) puts waning pairs
     in ``dropped`` with reason ``trend_waning``. Optional ``play_class``
     keeps only pairs whose ``allowed_play_classes`` include it. Compact
-    rows — do not recompute ADX/Bollinger in the model. Research only; no
-    orders.
+    rows (no ``visual`` geometry) — do not recompute ADX/Bollinger in the
+    model. Research only; no orders.
     """
     from agent.scan import ScanError, scan_regimes as _scan
 
@@ -692,13 +694,14 @@ async def mt4_draw_regime(
     to_time: str = "",
     prefix: str = "sbox.regime.",
 ) -> dict:
-    """Classify Lien regime and draw bands / SMA stack on the MT4 chart.
+    """Classify Lien regime and draw bands / SMA stack / channel rails on MT4.
 
     Price pane only: double Bollinger, SMA 10/20/50 (100/200 dashed), 10-bar
-    high/low, corner regime label, and a color legend. Does not draw
-    ADX/RSI/MACD panes. Prefix sbox.regime. does not clear sbox.formation.
-    Refuses if the EA chart symbol/timeframe does not match (Daily
-    classification needs D1).
+    high/low, trendline+parallel (or 10-bar box) channel rails, corner
+    regime label, and a color legend. Does not draw ADX/RSI/MACD panes.
+    Prefix sbox.regime. does not clear sbox.formation. Channel rails are
+    display only (not a Ch.15 entry). Refuses if the EA chart
+    symbol/timeframe does not match (Daily classification needs D1).
     """
     return await mt4_bridge.draw_regime(
         instrument,

@@ -44,7 +44,7 @@ def parse_instruments(instruments: str | Sequence[str] | None) -> list[str]:
 
 
 def compact_row(analysis: dict[str, Any], instrument: str) -> dict[str, Any]:
-    """Planner-facing row: labels only, not the full indicator snapshot."""
+    """Planner-facing row: labels only, not snapshot or channel ``visual``."""
     return {
         "instrument": instrument,
         "regime": analysis.get("regime"),

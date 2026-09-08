@@ -18,6 +18,9 @@ class TestClassifyFromLiveSnapshots(unittest.TestCase):
         self.assertGreaterEqual(result["trend_x_count"], 3)
         self.assertEqual(result["direction"], "up")
         self.assertEqual(result["snapshot"]["risk_reversals"], "unavailable")
+        self.assertIn("visual", result)
+        self.assertIn("upper", result["visual"])
+        self.assertIn("lower", result["visual"])
 
     def test_tight_range_is_fade_range(self) -> None:
         bars = _range_bars(80, amp=0.0003)

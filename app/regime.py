@@ -187,12 +187,18 @@ def classify(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 def analyze_bars(bars: list[dict]) -> dict[str, Any]:
     """Snapshot + classification. Raises ``IndicatorError`` if too few bars."""
+    from app import regime_visual
+
     snap = indicators.snapshot(bars)
     classified = classify(snap)
-    return {
+    result = {
         **classified,
         "snapshot": snap,
         "bar_count": snap["bar_count"],
         "last_time": snap["last_time"],
         "last_close": snap["last_close"],
     }
+    visual = regime_visual.channel_geometry(result, bars)
+    if visual is not None:
+        result["visual"] = visual
+    return result

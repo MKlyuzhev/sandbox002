@@ -147,7 +147,9 @@ scores only forecasts whose horizon has already elapsed (never the live
 `--mt4` requires `SandboxChartBridge.mq4` on a matching symbol/timeframe chart
 (AutoTrading can stay off). Overlay prefix: `sbox.regime.` (does not clear
 `sbox.formation.`). Corner labels: regime/ADX status plus a color legend
-(SMA 10/20/50/100/200, BB 1sd/2sd, 10-bar high/low).
+(SMA 10/20/50/100/200, BB 1sd/2sd, 10-bar high/low, channel rails).
+`classify_regime` also returns compact `visual` rails (trendline + parallel,
+or the last 10-bar high/low box). Display only — not a Ch. 15 entry.
 
 MCP (`oanda-research`): `classify_regime`, `indicator_snapshot`,
 `mt4_draw_regime`, `mt4_draw_ticket`. Same heartbeat / symbol / TF gate as
@@ -156,15 +158,16 @@ formation drawing.
 Unit tests (no network):
 
 ```bash
-.venv/bin/python -m unittest tests.test_indicators tests.test_regime tests.test_regime_walk tests.test_mt4_bridge -v
+.venv/bin/python -m unittest tests.test_indicators tests.test_regime tests.test_regime_visual tests.test_regime_walk tests.test_mt4_bridge -v
 ```
 
 ---
 
 ## Technical strategies (Ch. 8–16)
 
-Ch. 8, 9, 13, 14, and 16 are coded (see below); Ch. 10, 11, 12, and 15 are
-documented, not coded.
+Ch. 8, 9, 13, 14, and 16 are coded (see below); Ch. 10, 11, 12, and 15
+entries are documented, not coded. Ch. 15 channel rails appear on the
+regime overlay as display only.
 
 | Ch | Strategy | Timeframe | Idea | Use when | Avoid when |
 |----|----------|-----------|------|----------|------------|
@@ -175,7 +178,7 @@ documented, not coded.
 | **12** | Inside-days breakout | Daily (hourly only before London/US) | ≥2 nested inside days; enter ±10 pips; **stop-and-reverse** on false break | Compression, tighter pairs (EURGBP, USDCAD, EURCHF, EURCAD, AUDCAD) | Chasing without nested insides |
 | **13** *(coded)* | Fader | Daily ADX + hourly entry | ADX(14) &lt; 20: fade a ≥15-pip probe beyond prior day H/L | Range regime | ADX trending |
 | **14** *(coded)* | 20-day breakout | Daily | 20-day extreme → 2-day pullback → rebreak within 3 days | Trend / expansion | First touch of the 20-day without shakeout |
-| **15** | Channels | Intraday or daily | Narrow channel; enter ±10 pips; stop opposite rail; target 2R | Asian channel into London/US, or data at the rail | Fade a channel extreme into a big number |
+| **15** | Channels | Intraday or daily | Narrow channel; enter ±10 pips; stop opposite rail; target 2R. **Not an engine** — overlay rails on `classify_regime` / `mt4_draw_regime` are display only. | Asian channel into London/US, or data at the rail | Fade a channel extreme into a big number |
 | **16** *(coded)* | Perfect order | Daily | SMA stack 10&gt;20&gt;50&gt;100&gt;200; ADX rising, ideally &gt;20; enter 5 bars after stack forms; exit when stack breaks | Early trend | High frequency / tight stops (low hit rate) |
 
 Recurring execution pattern across these chapters: **two-lot scale-out** (half at
@@ -375,7 +378,9 @@ MCP: `entry_lien(chapter=16, ...)`.
 ## Out of scope / later
 
 - Encoding Ch. 10 (double zeros — news cannot be coded), 11 (London session
-  clock), 12 (inside days), and 15 (channels). 12/15 need a `breakout_watch` →
+  clock), 12 (inside days), and 15 (channel **entries**). Overlay rails reuse
+  the Ch. 15 trendline+parallel construction as display only; they do not
+  fire ±10-pip breakout tickets. 12/15 need a `breakout_watch` →
   `pending_exec` policy change this pass did not make.
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)

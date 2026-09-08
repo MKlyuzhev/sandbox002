@@ -107,5 +107,32 @@ class TestScanRegimes(unittest.TestCase):
         self.assertIn("fetch failed", out["rows"][1]["error"])
 
 
+class TestCompactRow(unittest.TestCase):
+    def test_omits_visual_and_snapshot(self) -> None:
+        from agent.scan import compact_row
+
+        row = compact_row(
+            {
+                "regime": "trend",
+                "direction": "up",
+                "trend_waning": False,
+                "allowed_play_classes": ["join_trend"],
+                "confidence": 0.5,
+                "last_close": 1.2,
+                "snapshot": {"adx": {"adx": 30}},
+                "visual": {
+                    "kind": "trend_channel",
+                    "upper": {"t1": "x", "p1": 1.3, "t2": "y", "p2": 1.4},
+                    "lower": {"t1": "x", "p1": 1.1, "t2": "y", "p2": 1.2},
+                },
+            },
+            "GBP_USD",
+        )
+        self.assertNotIn("visual", row)
+        self.assertNotIn("snapshot", row)
+        self.assertEqual(row["instrument"], "GBP_USD")
+        self.assertEqual(row["regime"], "trend")
+
+
 if __name__ == "__main__":
     unittest.main()

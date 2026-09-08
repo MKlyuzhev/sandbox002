@@ -54,6 +54,7 @@ REGIME_LEGEND = (
     ("bb1", "cyan", "BB 1sd dash"),
     ("high_n", "green", "10-bar high dot"),
     ("low_n", "orange", "10-bar low dot"),
+    ("channel", "white", "channel rails"),
 )
 REGIME_LABEL_X = 8
 REGIME_LABEL_Y = 18
@@ -890,6 +891,64 @@ def _polyline_segments(
     return objects
 
 
+def _visual_rail_broker_times(
+    rail: dict[str, Any],
+    bars: list[dict[str, Any]],
+    offset_seconds: int,
+) -> tuple[int | None, int | None]:
+    """RFC3339 rail times → broker unix; fall back to bar indices."""
+    t1 = parse_rfc3339_utc(rail.get("t1") if isinstance(rail.get("t1"), str) else None)
+    t2 = parse_rfc3339_utc(rail.get("t2") if isinstance(rail.get("t2"), str) else None)
+    if t1 is not None and t2 is not None:
+        return broker_time(t1, offset_seconds), broker_time(t2, offset_seconds)
+    i1, i2 = rail.get("i1"), rail.get("i2")
+    if i1 is None or i2 is None:
+        return None, None
+    return (
+        _bar_broker_time(bars, int(i1), offset_seconds),
+        _bar_broker_time(bars, int(i2), offset_seconds),
+    )
+
+
+def _channel_objects(
+    analysis: dict[str, Any],
+    bars: list[dict[str, Any]],
+    offset_seconds: int,
+    prefix: str,
+) -> list[dict[str, Any]]:
+    """Trendline + parallel (or 10-bar box) from ``analysis['visual']``."""
+    visual = analysis.get("visual") or {}
+    color = _run_color(analysis)
+    objects: list[dict[str, Any]] = []
+    for key in ("upper", "lower"):
+        rail = visual.get(key)
+        if not isinstance(rail, dict):
+            continue
+        p1, p2 = rail.get("p1"), rail.get("p2")
+        if p1 is None or p2 is None:
+            continue
+        t1, t2 = _visual_rail_broker_times(rail, bars, offset_seconds)
+        if t1 is None or t2 is None:
+            continue
+        if t1 == t2:
+            t2 = t1 + 1
+        objects.append(
+            {
+                "name": f"{prefix}channel.{key}",
+                "type": "trend",
+                "t1": t1,
+                "p1": float(p1),
+                "t2": t2,
+                "p2": float(p2),
+                "color": color,
+                "style": "solid",
+                "width": 2,
+                "ray": False,
+            }
+        )
+    return objects
+
+
 def _regime_legend_objects(prefix: str) -> list[dict[str, Any]]:
     """Corner labels mapping overlay colors to SMA / Bollinger / 10-bar levels."""
     objects: list[dict[str, Any]] = []
@@ -915,7 +974,11 @@ def regime_to_objects(
     lookback: int = REGIME_LOOKBACK,
     stride: int = REGIME_STRIDE,
 ) -> list[dict[str, Any]]:
-    """Map Lien regime snapshot to MT4 price-pane objects (no oscillator panes)."""
+    """Map Lien regime snapshot to MT4 price-pane objects (no oscillator panes).
+
+    Includes double Bollinger, SMA stack, 10-bar high/low, and compact
+    channel rails from ``analysis['visual']`` (display only).
+    """
     from app import indicators
 
     series = indicators.plot_series(bars, lookback=lookback)
@@ -1001,6 +1064,8 @@ def regime_to_objects(
                 "width": 1,
             }
         )
+
+    objects.extend(_channel_objects(analysis, bars, offset_seconds, prefix))
 
     adx = (snap.get("adx") or {})
     plays = analysis.get("allowed_play_classes") or []

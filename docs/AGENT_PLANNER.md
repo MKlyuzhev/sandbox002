@@ -95,7 +95,7 @@ stochastics, or MACD in the model — they are already in code.
 
 | Tool | When | Notes |
 |------|------|--------|
-| `classify_regime` | One pair | Default granularity **D**, `count=250`. Full checklist + snapshot. |
+| `classify_regime` | One pair | Default granularity **D**, `count=250`. Full checklist + snapshot + compact `visual` channel rails (display only). |
 | `scan_regimes` | Universe | Max **32** names; empty `instruments` → seven USD majors. Aliases: `usd-majors`, `lien-fx-ch4` (Ch. 4 board), `lien-fx` (full research pool, 21 names). Any other OANDA names as a CSV. Sequential classify. `drop_waning=true` by default. Optional `play_class` filter. Returns compact `rows` plus **`kept` / `dropped`** — do not re-filter in prose. |
 | `indicator_snapshot` | Debug numbers without Lien labels | Same last-bar indicators as classify. |
 | `list_instruments` | Discover OANDA names | Use `GBP_USD`, not `GBPUSD`. |
@@ -105,7 +105,8 @@ Match the play class to the result: `join_trend`, `fade_range`, or
 
 Optional chart overlay (matching symbol/timeframe): `mt4_draw_regime` (prefix
 `sbox.regime.`). Oscillators stay in JSON; the overlay is bands, MA stack,
-10-bar high/low, and a regime label.
+10-bar high/low, **channel rails** (trendline + parallel, or the 10-bar box),
+and a regime label. Rails are display only — Ch. 15 is not an entry engine.
 
 ### 3b. Peek (no policy, no journal)
 
