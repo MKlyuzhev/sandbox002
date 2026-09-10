@@ -1,0 +1,1681 @@
+{
+  "window": "2015-01-01T00:00:00Z to 2026-09-10T00:00:00Z",
+  "fill_mode": "rest",
+  "ch7": "excluded",
+  "mtf_entry_mode": "peak",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "pairs": {
+    "USD_JPY": {
+      "value_per_price_unit": 0.006666666666666667,
+      "engines": {
+        "mtf": {
+          "chapter": 8,
+          "trade_count": 221,
+          "ending_equity": 14012.9071,
+          "mean_r": 0.0958,
+          "win_rate": 0.3846,
+          "max_drawdown_frac": 0.1555,
+          "wins": 85,
+          "losses": 136,
+          "sliced": true,
+          "years": [
+            {
+              "year": "2015",
+              "n": 19,
+              "mean_r": 0.0133,
+              "end": 9981.5612
+            },
+            {
+              "year": "2016",
+              "n": 28,
+              "mean_r": 0.2083,
+              "end": 11091.339
+            },
+            {
+              "year": "2017",
+              "n": 15,
+              "mean_r": 0.1717,
+              "end": 11605.6101
+            },
+            {
+              "year": "2018",
+              "n": 17,
+              "mean_r": -0.1526,
+              "end": 10953.9449
+            },
+            {
+              "year": "2019",
+              "n": 13,
+              "mean_r": 0.3579,
+              "end": 11952.4539
+            },
+            {
+              "year": "2020",
+              "n": 13,
+              "mean_r": 0.0078,
+              "end": 11921.9987
+            },
+            {
+              "year": "2021",
+              "n": 18,
+              "mean_r": -0.0368,
+              "end": 11687.487
+            },
+            {
+              "year": "2022",
+              "n": 36,
+              "mean_r": 0.1476,
+              "end": 12819.1387
+            },
+            {
+              "year": "2023",
+              "n": 17,
+              "mean_r": 0.7148,
+              "end": 16206.274
+            },
+            {
+              "year": "2024",
+              "n": 25,
+              "mean_r": 0.0673,
+              "end": 16593.7994
+            },
+            {
+              "year": "2025",
+              "n": 10,
+              "mean_r": -0.1106,
+              "end": 16171.3347
+            },
+            {
+              "year": "2026",
+              "n": 10,
+              "mean_r": -0.7034,
+              "end": 14012.9071
+            }
+          ],
+          "exits": null,
+          "naive_2r": 0.1538,
+          "mean_r_minus_naive": -0.058
+        },
+        "dbb": {
+          "chapter": 9,
+          "trade_count": 195,
+          "ending_equity": 3312.3227,
+          "mean_r": -0.2631,
+          "win_rate": 0.2513,
+          "max_drawdown_frac": 0.6985,
+          "wins": 49,
+          "losses": 146,
+          "sliced": false,
+          "naive_2r": -0.2461,
+          "mean_r_minus_naive": -0.017
+        },
+        "fader": {
+          "chapter": 13,
+          "trade_count": 148,
+          "ending_equity": 8003.6713,
+          "mean_r": -0.0542,
+          "win_rate": 0.3311,
+          "max_drawdown_frac": 0.1996,
+          "wins": 49,
+          "losses": 99,
+          "sliced": true,
+          "years": [
+            {
+              "year": "2015",
+              "n": 9,
+              "mean_r": -0.3354,
+              "end": 9386.2581
+            },
+            {
+              "year": "2016",
+              "n": 10,
+              "mean_r": -0.1262,
+              "end": 9119.8924
+            },
+            {
+              "year": "2017",
+              "n": 13,
+              "mean_r": -0.2738,
+              "end": 8458.7892
+            },
+            {
+              "year": "2018",
+              "n": 9,
+              "mean_r": -0.0286,
+              "end": 8387.1961
+            },
+            {
+              "year": "2019",
+              "n": 7,
+              "mean_r": 0.1761,
+              "end": 8568.5669
+            },
+            {
+              "year": "2020",
+              "n": 7,
+              "mean_r": 0.2658,
+              "end": 8866.3571
+            },
+            {
+              "year": "2021",
+              "n": 3,
+              "mean_r": -0.0073,
+              "end": 8852.1515
+            },
+            {
+              "year": "2022",
+              "n": 4,
+              "mean_r": -0.258,
+              "end": 8659.5145
+            },
+            {
+              "year": "2023",
+              "n": 16,
+              "mean_r": 0.0995,
+              "end": 8882.8011
+            },
+            {
+              "year": "2024",
+              "n": 6,
+              "mean_r": 0.4663,
+              "end": 9367.7755
+            },
+            {
+              "year": "2025",
+              "n": 48,
+              "mean_r": -0.0471,
+              "end": 8734.7191
+            },
+            {
+              "year": "2026",
+              "n": 16,
+              "mean_r": -0.256,
+              "end": 8003.6713
+            }
+          ],
+          "exits": null,
+          "naive_2r": -0.0067,
+          "mean_r_minus_naive": -0.0475
+        },
+        "breakout20": {
+          "chapter": 14,
+          "trade_count": 13,
+          "ending_equity": 8613.246,
+          "mean_r": -0.5604,
+          "win_rate": 0.1538,
+          "max_drawdown_frac": 0.1387,
+          "wins": 2,
+          "losses": 11,
+          "sliced": false,
+          "naive_2r": -0.5386,
+          "mean_r_minus_naive": -0.0218
+        },
+        "perfect_order": {
+          "chapter": 16,
+          "trade_count": 10,
+          "ending_equity": 9735.4209,
+          "mean_r": -0.1159,
+          "win_rate": 0.3,
+          "max_drawdown_frac": 0.0443,
+          "wins": 3,
+          "losses": 7,
+          "sliced": false,
+          "naive_2r": -0.1,
+          "mean_r_minus_naive": -0.0159
+        }
+      }
+    },
+    "GBP_USD": {
+      "value_per_price_unit": 1.0,
+      "engines": {
+        "mtf": {
+          "trade_count": 208,
+          "ending_equity": 13101.2503,
+          "mean_r": 0.0844,
+          "win_rate": 0.3846,
+          "max_drawdown_frac": 0.2173,
+          "wins": 80,
+          "losses": 128,
+          "exits": {
+            "stop": 127,
+            "target": 79,
+            "window_end": 2
+          },
+          "naive_2r": 0.1538,
+          "mean_r_minus_naive": -0.0694,
+          "years": [
+            {
+              "year": "2015",
+              "n": 15,
+              "mean_r": 0.1762,
+              "end": 10477.2847,
+              "wins": 6,
+              "losses": 9
+            },
+            {
+              "year": "2016",
+              "n": 19,
+              "mean_r": 0.3877,
+              "end": 12036.9424,
+              "wins": 9,
+              "losses": 10
+            },
+            {
+              "year": "2017",
+              "n": 10,
+              "mean_r": -0.565,
+              "end": 10704.5727,
+              "wins": 2,
+              "losses": 8
+            },
+            {
+              "year": "2018",
+              "n": 18,
+              "mean_r": -0.339,
+              "end": 9420.9243,
+              "wins": 4,
+              "losses": 14
+            },
+            {
+              "year": "2019",
+              "n": 22,
+              "mean_r": 0.0278,
+              "end": 9459.704,
+              "wins": 8,
+              "losses": 14
+            },
+            {
+              "year": "2020",
+              "n": 13,
+              "mean_r": 0.8083,
+              "end": 11592.1232,
+              "wins": 8,
+              "losses": 5
+            },
+            {
+              "year": "2021",
+              "n": 11,
+              "mean_r": 0.0205,
+              "end": 11598.206,
+              "wins": 4,
+              "losses": 7
+            },
+            {
+              "year": "2022",
+              "n": 28,
+              "mean_r": 0.0442,
+              "end": 11760.7598,
+              "wins": 10,
+              "losses": 18
+            },
+            {
+              "year": "2023",
+              "n": 10,
+              "mean_r": 0.3958,
+              "end": 12676.0981,
+              "wins": 5,
+              "losses": 5
+            },
+            {
+              "year": "2024",
+              "n": 21,
+              "mean_r": 0.0328,
+              "end": 12757.5936,
+              "wins": 8,
+              "losses": 13
+            },
+            {
+              "year": "2025",
+              "n": 30,
+              "mean_r": 0.0472,
+              "end": 12973.7467,
+              "wins": 11,
+              "losses": 19
+            },
+            {
+              "year": "2026",
+              "n": 11,
+              "mean_r": 0.0595,
+              "end": 13101.2503,
+              "wins": 5,
+              "losses": 6
+            }
+          ]
+        },
+        "fader": {
+          "trade_count": 255,
+          "ending_equity": 9226.4323,
+          "mean_r": 0.0034,
+          "win_rate": 0.3412,
+          "max_drawdown_frac": 0.5111,
+          "wins": 87,
+          "losses": 168,
+          "exits": {
+            "stop": 167,
+            "target": 86,
+            "window_end": 2
+          },
+          "naive_2r": 0.0236,
+          "mean_r_minus_naive": -0.0202,
+          "years": [
+            {
+              "year": "2015",
+              "n": 21,
+              "mean_r": 0.1191,
+              "end": 10424.0015,
+              "wins": 8,
+              "losses": 13
+            },
+            {
+              "year": "2016",
+              "n": 23,
+              "mean_r": 0.1587,
+              "end": 11106.3763,
+              "wins": 9,
+              "losses": 14
+            },
+            {
+              "year": "2017",
+              "n": 25,
+              "mean_r": -0.0794,
+              "end": 10578.4647,
+              "wins": 8,
+              "losses": 17
+            },
+            {
+              "year": "2018",
+              "n": 18,
+              "mean_r": -0.3456,
+              "end": 9287.0148,
+              "wins": 4,
+              "losses": 14
+            },
+            {
+              "year": "2019",
+              "n": 26,
+              "mean_r": 0.0183,
+              "end": 9281.8902,
+              "wins": 9,
+              "losses": 17
+            },
+            {
+              "year": "2020",
+              "n": 46,
+              "mean_r": -0.3001,
+              "end": 6937.6887,
+              "wins": 11,
+              "losses": 35
+            },
+            {
+              "year": "2021",
+              "n": 28,
+              "mean_r": 0.2633,
+              "end": 7943.2421,
+              "wins": 12,
+              "losses": 16
+            },
+            {
+              "year": "2022",
+              "n": 17,
+              "mean_r": 0.2245,
+              "end": 8513.325,
+              "wins": 7,
+              "losses": 10
+            },
+            {
+              "year": "2023",
+              "n": 30,
+              "mean_r": 0.1788,
+              "end": 9359.1369,
+              "wins": 12,
+              "losses": 18
+            },
+            {
+              "year": "2024",
+              "n": 10,
+              "mean_r": 0.7725,
+              "end": 10865.4028,
+              "wins": 6,
+              "losses": 4
+            },
+            {
+              "year": "2025",
+              "n": 8,
+              "mean_r": -0.6296,
+              "end": 9802.9191,
+              "wins": 1,
+              "losses": 7
+            },
+            {
+              "year": "2026",
+              "n": 3,
+              "mean_r": -1.0,
+              "end": 9226.4323,
+              "wins": 0,
+              "losses": 3
+            }
+          ]
+        },
+        "dbb": {
+          "trade_count": 226,
+          "ending_equity": 4351.4704,
+          "mean_r": -0.1679,
+          "win_rate": 0.3097,
+          "max_drawdown_frac": 0.6452,
+          "wins": 70,
+          "losses": 156,
+          "exits": {
+            "target": 70,
+            "stop": 156
+          },
+          "sides": {
+            "short": 123,
+            "long": 103
+          },
+          "naive_2r": -0.0709,
+          "mean_r_minus_naive": -0.097
+        },
+        "breakout20": {
+          "trade_count": 12,
+          "ending_equity": 9244.1939,
+          "mean_r": -0.3123,
+          "win_rate": 0.25,
+          "max_drawdown_frac": 0.1332,
+          "wins": 3,
+          "losses": 9,
+          "exits": {
+            "stop": 9,
+            "target": 3
+          },
+          "sides": {
+            "long": 6,
+            "short": 6
+          },
+          "naive_2r": -0.25,
+          "mean_r_minus_naive": -0.0623
+        },
+        "perfect_order": {
+          "trade_count": 11,
+          "ending_equity": 9872.7111,
+          "mean_r": -0.0417,
+          "win_rate": 0.3636,
+          "max_drawdown_frac": 0.0638,
+          "wins": 4,
+          "losses": 7,
+          "exits": {
+            "target": 4,
+            "stop": 7
+          },
+          "sides": {
+            "short": 7,
+            "long": 4
+          },
+          "naive_2r": 0.0908,
+          "mean_r_minus_naive": -0.1325
+        }
+      }
+    },
+    "EUR_USD": {
+      "value_per_price_unit": 1.0,
+      "engines": {
+        "mtf": {
+          "trade_count": 221,
+          "ending_equity": 5487.3437,
+          "mean_r": -0.1181,
+          "win_rate": 0.3032,
+          "max_drawdown_frac": 0.4625,
+          "wins": 67,
+          "losses": 154,
+          "exits": {
+            "target": 66,
+            "stop": 152,
+            "window_end": 3
+          },
+          "naive_2r": -0.0904,
+          "mean_r_minus_naive": -0.0277,
+          "years": [
+            {
+              "year": "2015",
+              "n": 31,
+              "mean_r": 0.0304,
+              "end": 10070.3049,
+              "wins": 11,
+              "losses": 20
+            },
+            {
+              "year": "2016",
+              "n": 24,
+              "mean_r": -0.1571,
+              "end": 9261.3977,
+              "wins": 7,
+              "losses": 17
+            },
+            {
+              "year": "2017",
+              "n": 18,
+              "mean_r": -0.1933,
+              "end": 8585.9014,
+              "wins": 5,
+              "losses": 13
+            },
+            {
+              "year": "2018",
+              "n": 16,
+              "mean_r": -0.4564,
+              "end": 7384.1945,
+              "wins": 3,
+              "losses": 13
+            },
+            {
+              "year": "2019",
+              "n": 4,
+              "mean_r": -0.2586,
+              "end": 7223.1502,
+              "wins": 1,
+              "losses": 3
+            },
+            {
+              "year": "2020",
+              "n": 19,
+              "mean_r": -0.0283,
+              "end": 7096.5708,
+              "wins": 6,
+              "losses": 13
+            },
+            {
+              "year": "2021",
+              "n": 27,
+              "mean_r": 0.3063,
+              "end": 8274.0775,
+              "wins": 12,
+              "losses": 15
+            },
+            {
+              "year": "2022",
+              "n": 16,
+              "mean_r": 0.0856,
+              "end": 8450.7732,
+              "wins": 6,
+              "losses": 10
+            },
+            {
+              "year": "2023",
+              "n": 17,
+              "mean_r": -0.1301,
+              "end": 8035.3935,
+              "wins": 5,
+              "losses": 12
+            },
+            {
+              "year": "2024",
+              "n": 21,
+              "mean_r": -0.3213,
+              "end": 6974.8015,
+              "wins": 5,
+              "losses": 16
+            },
+            {
+              "year": "2025",
+              "n": 8,
+              "mean_r": -0.4641,
+              "end": 6462.9279,
+              "wins": 2,
+              "losses": 6
+            },
+            {
+              "year": "2026",
+              "n": 20,
+              "mean_r": -0.3945,
+              "end": 5487.3437,
+              "wins": 4,
+              "losses": 16
+            }
+          ]
+        },
+        "fader": {
+          "trade_count": 125,
+          "ending_equity": 6197.9865,
+          "mean_r": -0.172,
+          "win_rate": 0.288,
+          "max_drawdown_frac": 0.4894,
+          "wins": 36,
+          "losses": 89,
+          "exits": {
+            "stop": 88,
+            "target": 36,
+            "window_end": 1
+          },
+          "naive_2r": -0.136,
+          "mean_r_minus_naive": -0.036,
+          "years": [
+            {
+              "year": "2015",
+              "n": 20,
+              "mean_r": -0.8741,
+              "end": 6986.1176,
+              "wins": 2,
+              "losses": 18
+            },
+            {
+              "year": "2016",
+              "n": 16,
+              "mean_r": 0.1156,
+              "end": 7201.5523,
+              "wins": 6,
+              "losses": 10
+            },
+            {
+              "year": "2017",
+              "n": 10,
+              "mean_r": 0.1796,
+              "end": 7433.8091,
+              "wins": 4,
+              "losses": 6
+            },
+            {
+              "year": "2018",
+              "n": 10,
+              "mean_r": -0.4195,
+              "end": 6814.8855,
+              "wins": 2,
+              "losses": 8
+            },
+            {
+              "year": "2019",
+              "n": 15,
+              "mean_r": 0.0267,
+              "end": 6831.6624,
+              "wins": 5,
+              "losses": 10
+            },
+            {
+              "year": "2020",
+              "n": 7,
+              "mean_r": -1.0,
+              "end": 5930.7606,
+              "wins": 0,
+              "losses": 7
+            },
+            {
+              "year": "2021",
+              "n": 7,
+              "mean_r": -0.591,
+              "end": 5449.4349,
+              "wins": 1,
+              "losses": 6
+            },
+            {
+              "year": "2022",
+              "n": 16,
+              "mean_r": 0.1137,
+              "end": 5614.3673,
+              "wins": 6,
+              "losses": 10
+            },
+            {
+              "year": "2023",
+              "n": 9,
+              "mean_r": 0.9634,
+              "end": 6643.9147,
+              "wins": 6,
+              "losses": 3
+            },
+            {
+              "year": "2024",
+              "n": 4,
+              "mean_r": -0.2576,
+              "end": 6499.5182,
+              "wins": 1,
+              "losses": 3
+            },
+            {
+              "year": "2025",
+              "n": 10,
+              "mean_r": -0.4088,
+              "end": 5970.7185,
+              "wins": 2,
+              "losses": 8
+            },
+            {
+              "year": "2026",
+              "n": 1,
+              "mean_r": 1.9032,
+              "end": 6197.9865,
+              "wins": 1,
+              "losses": 0
+            }
+          ]
+        },
+        "dbb": {
+          "trade_count": 232,
+          "ending_equity": 2795.044,
+          "mean_r": -0.2585,
+          "win_rate": 0.2672,
+          "max_drawdown_frac": 0.7351,
+          "wins": 62,
+          "losses": 170,
+          "exits": {
+            "target": 61,
+            "stop": 170,
+            "window_end": 1
+          },
+          "sides": {
+            "short": 104,
+            "long": 128
+          },
+          "naive_2r": -0.1984,
+          "mean_r_minus_naive": -0.0601
+        },
+        "breakout20": {
+          "trade_count": 18,
+          "ending_equity": 8246.7261,
+          "mean_r": -0.5213,
+          "win_rate": 0.1667,
+          "max_drawdown_frac": 0.2464,
+          "wins": 3,
+          "losses": 15,
+          "exits": {
+            "target": 3,
+            "stop": 15
+          },
+          "sides": {
+            "short": 9,
+            "long": 9
+          },
+          "naive_2r": -0.4999,
+          "mean_r_minus_naive": -0.0214
+        },
+        "perfect_order": {
+          "trade_count": 15,
+          "ending_equity": 10202.1991,
+          "mean_r": 0.0848,
+          "win_rate": 0.4,
+          "max_drawdown_frac": 0.0776,
+          "wins": 6,
+          "losses": 9,
+          "exits": {
+            "stop": 9,
+            "target": 6
+          },
+          "sides": {
+            "short": 7,
+            "long": 8
+          },
+          "naive_2r": 0.2,
+          "mean_r_minus_naive": -0.1152
+        }
+      }
+    },
+    "AUD_USD": {
+      "value_per_price_unit": 1.0,
+      "engines": {
+        "mtf": {
+          "trade_count": 193,
+          "ending_equity": 10416.6663,
+          "mean_r": 0.0293,
+          "win_rate": 0.3575,
+          "max_drawdown_frac": 0.2498,
+          "wins": 69,
+          "losses": 124,
+          "exits": {
+            "stop": 122,
+            "target": 67,
+            "window_end": 4
+          },
+          "naive_2r": 0.0725,
+          "mean_r_minus_naive": -0.0432,
+          "years": [
+            {
+              "year": "2015",
+              "n": 27,
+              "mean_r": -0.0363,
+              "end": 9708.6278,
+              "wins": 9,
+              "losses": 18
+            },
+            {
+              "year": "2016",
+              "n": 12,
+              "mean_r": 0.184,
+              "end": 10098.8767,
+              "wins": 5,
+              "losses": 7
+            },
+            {
+              "year": "2017",
+              "n": 15,
+              "mean_r": 0.1669,
+              "end": 10552.5503,
+              "wins": 6,
+              "losses": 9
+            },
+            {
+              "year": "2018",
+              "n": 17,
+              "mean_r": -0.1335,
+              "end": 10022.5536,
+              "wins": 5,
+              "losses": 12
+            },
+            {
+              "year": "2019",
+              "n": 23,
+              "mean_r": 0.143,
+              "end": 10604.5605,
+              "wins": 9,
+              "losses": 14
+            },
+            {
+              "year": "2020",
+              "n": 21,
+              "mean_r": 0.1142,
+              "end": 11032.6145,
+              "wins": 8,
+              "losses": 13
+            },
+            {
+              "year": "2021",
+              "n": 35,
+              "mean_r": -0.2343,
+              "end": 9261.2287,
+              "wins": 10,
+              "losses": 25
+            },
+            {
+              "year": "2022",
+              "n": 11,
+              "mean_r": -0.196,
+              "end": 8836.4034,
+              "wins": 3,
+              "losses": 8
+            },
+            {
+              "year": "2023",
+              "n": 4,
+              "mean_r": -0.0681,
+              "end": 8778.0663,
+              "wins": 1,
+              "losses": 3
+            },
+            {
+              "year": "2024",
+              "n": 16,
+              "mean_r": 0.6416,
+              "end": 10693.8705,
+              "wins": 9,
+              "losses": 7
+            },
+            {
+              "year": "2025",
+              "n": 3,
+              "mean_r": -0.6814,
+              "end": 10261.3071,
+              "wins": 0,
+              "losses": 3
+            },
+            {
+              "year": "2026",
+              "n": 9,
+              "mean_r": 0.1016,
+              "end": 10416.6663,
+              "wins": 4,
+              "losses": 5
+            }
+          ]
+        },
+        "fader": {
+          "trade_count": 120,
+          "ending_equity": 11027.3659,
+          "mean_r": 0.0604,
+          "win_rate": 0.3583,
+          "max_drawdown_frac": 0.2017,
+          "wins": 43,
+          "losses": 77,
+          "exits": {
+            "stop": 76,
+            "target": 43,
+            "window_end": 1
+          },
+          "naive_2r": 0.0749,
+          "mean_r_minus_naive": -0.0145,
+          "years": [
+            {
+              "year": "2015",
+              "n": 9,
+              "mean_r": 0.0543,
+              "end": 10065.611,
+              "wins": 3,
+              "losses": 6
+            },
+            {
+              "year": "2016",
+              "n": 25,
+              "mean_r": 0.295,
+              "end": 11538.4643,
+              "wins": 11,
+              "losses": 14
+            },
+            {
+              "year": "2017",
+              "n": 2,
+              "mean_r": -1.0,
+              "end": 11081.5439,
+              "wins": 0,
+              "losses": 2
+            },
+            {
+              "year": "2018",
+              "n": 4,
+              "mean_r": -0.2608,
+              "end": 10838.0284,
+              "wins": 1,
+              "losses": 3
+            },
+            {
+              "year": "2019",
+              "n": 1,
+              "mean_r": -1.0,
+              "end": 10621.268,
+              "wins": 0,
+              "losses": 1
+            },
+            {
+              "year": "2020",
+              "n": 10,
+              "mean_r": -0.699,
+              "end": 9211.3597,
+              "wins": 1,
+              "losses": 9
+            },
+            {
+              "year": "2021",
+              "n": 6,
+              "mean_r": 0.9375,
+              "end": 10274.7585,
+              "wins": 4,
+              "losses": 2
+            },
+            {
+              "year": "2022",
+              "n": 21,
+              "mean_r": -0.0194,
+              "end": 10110.3496,
+              "wins": 7,
+              "losses": 14
+            },
+            {
+              "year": "2023",
+              "n": 21,
+              "mean_r": -0.0143,
+              "end": 9969.2773,
+              "wins": 7,
+              "losses": 14
+            },
+            {
+              "year": "2024",
+              "n": 5,
+              "mean_r": 0.1776,
+              "end": 10126.8074,
+              "wins": 2,
+              "losses": 3
+            },
+            {
+              "year": "2025",
+              "n": 14,
+              "mean_r": 0.2621,
+              "end": 10832.2635,
+              "wins": 6,
+              "losses": 8
+            },
+            {
+              "year": "2026",
+              "n": 2,
+              "mean_r": 0.4697,
+              "end": 11027.3659,
+              "wins": 1,
+              "losses": 1
+            }
+          ]
+        },
+        "dbb": {
+          "trade_count": 235,
+          "ending_equity": 2213.5237,
+          "mean_r": -0.3055,
+          "win_rate": 0.2638,
+          "max_drawdown_frac": 0.7984,
+          "wins": 62,
+          "losses": 173,
+          "exits": {
+            "stop": 172,
+            "target": 63
+          },
+          "sides": {
+            "long": 110,
+            "short": 125
+          },
+          "naive_2r": -0.2086,
+          "mean_r_minus_naive": -0.0969
+        },
+        "breakout20": {
+          "trade_count": 16,
+          "ending_equity": 8926.5745,
+          "mean_r": -0.3405,
+          "win_rate": 0.25,
+          "max_drawdown_frac": 0.1333,
+          "wins": 4,
+          "losses": 12,
+          "exits": {
+            "stop": 12,
+            "target": 4
+          },
+          "sides": {
+            "short": 10,
+            "long": 6
+          },
+          "naive_2r": -0.25,
+          "mean_r_minus_naive": -0.0905
+        },
+        "perfect_order": {
+          "trade_count": 13,
+          "ending_equity": 9517.6555,
+          "mean_r": -0.1745,
+          "win_rate": 0.3077,
+          "max_drawdown_frac": 0.1025,
+          "wins": 4,
+          "losses": 9,
+          "exits": {
+            "stop": 9,
+            "target": 4
+          },
+          "sides": {
+            "short": 10,
+            "long": 3
+          },
+          "naive_2r": -0.0769,
+          "mean_r_minus_naive": -0.0976
+        }
+      }
+    },
+    "USD_CHF": {
+      "value_per_price_unit": 1.1111111111111112,
+      "engines": {
+        "mtf": {
+          "trade_count": 198,
+          "ending_equity": 10068.1237,
+          "mean_r": 0.02,
+          "win_rate": 0.3636,
+          "max_drawdown_frac": 0.3213,
+          "wins": 72,
+          "losses": 126,
+          "exits": {
+            "stop": 125,
+            "target": 70,
+            "window_end": 3
+          },
+          "naive_2r": 0.0908,
+          "mean_r_minus_naive": -0.0708,
+          "years": [
+            {
+              "year": "2015",
+              "n": 11,
+              "mean_r": 0.2676,
+              "end": 10560.0758,
+              "wins": 5,
+              "losses": 6
+            },
+            {
+              "year": "2016",
+              "n": 16,
+              "mean_r": -0.4095,
+              "end": 9226.7871,
+              "wins": 4,
+              "losses": 12
+            },
+            {
+              "year": "2017",
+              "n": 14,
+              "mean_r": -0.5804,
+              "end": 7812.3536,
+              "wins": 2,
+              "losses": 12
+            },
+            {
+              "year": "2018",
+              "n": 17,
+              "mean_r": 0.1677,
+              "end": 8215.9155,
+              "wins": 7,
+              "losses": 10
+            },
+            {
+              "year": "2019",
+              "n": 14,
+              "mean_r": -0.2303,
+              "end": 7669.2635,
+              "wins": 4,
+              "losses": 10
+            },
+            {
+              "year": "2020",
+              "n": 21,
+              "mean_r": -0.0531,
+              "end": 7444.2626,
+              "wins": 7,
+              "losses": 14
+            },
+            {
+              "year": "2021",
+              "n": 14,
+              "mean_r": 0.6728,
+              "end": 8924.4892,
+              "wins": 8,
+              "losses": 6
+            },
+            {
+              "year": "2022",
+              "n": 21,
+              "mean_r": 0.0876,
+              "end": 9184.8181,
+              "wins": 8,
+              "losses": 13
+            },
+            {
+              "year": "2023",
+              "n": 15,
+              "mean_r": 0.3408,
+              "end": 10108.4436,
+              "wins": 7,
+              "losses": 8
+            },
+            {
+              "year": "2024",
+              "n": 27,
+              "mean_r": 0.1851,
+              "end": 11047.8902,
+              "wins": 11,
+              "losses": 16
+            },
+            {
+              "year": "2025",
+              "n": 16,
+              "mean_r": -0.4204,
+              "end": 9616.7239,
+              "wins": 4,
+              "losses": 12
+            },
+            {
+              "year": "2026",
+              "n": 12,
+              "mean_r": 0.2119,
+              "end": 10068.1237,
+              "wins": 5,
+              "losses": 7
+            }
+          ]
+        },
+        "fader": {
+          "trade_count": 117,
+          "ending_equity": 6971.0971,
+          "mean_r": -0.1366,
+          "win_rate": 0.2991,
+          "max_drawdown_frac": 0.3346,
+          "wins": 35,
+          "losses": 82,
+          "exits": {
+            "stop": 81,
+            "target": 34,
+            "window_end": 2
+          },
+          "naive_2r": -0.1027,
+          "mean_r_minus_naive": -0.0339,
+          "years": [
+            {
+              "year": "2015",
+              "n": 24,
+              "mean_r": -0.2687,
+              "end": 8720.0622,
+              "wins": 6,
+              "losses": 18
+            },
+            {
+              "year": "2016",
+              "n": 16,
+              "mean_r": -0.085,
+              "end": 8436.6722,
+              "wins": 5,
+              "losses": 11
+            },
+            {
+              "year": "2017",
+              "n": 12,
+              "mean_r": 0.2441,
+              "end": 8900.7154,
+              "wins": 5,
+              "losses": 7
+            },
+            {
+              "year": "2018",
+              "n": 7,
+              "mean_r": 0.6536,
+              "end": 9720.4334,
+              "wins": 4,
+              "losses": 3
+            },
+            {
+              "year": "2019",
+              "n": 9,
+              "mean_r": -0.3556,
+              "end": 9091.9503,
+              "wins": 2,
+              "losses": 7
+            },
+            {
+              "year": "2020",
+              "n": 11,
+              "mean_r": 0.0581,
+              "end": 9169.5885,
+              "wins": 4,
+              "losses": 7
+            },
+            {
+              "year": "2021",
+              "n": 4,
+              "mean_r": -1.0,
+              "end": 8457.7451,
+              "wins": 0,
+              "losses": 4
+            },
+            {
+              "year": "2022",
+              "n": 12,
+              "mean_r": -0.76,
+              "end": 7027.035,
+              "wins": 1,
+              "losses": 11
+            },
+            {
+              "year": "2023",
+              "n": 13,
+              "mean_r": 0.1291,
+              "end": 7228.673,
+              "wins": 5,
+              "losses": 8
+            },
+            {
+              "year": "2024",
+              "n": 2,
+              "mean_r": 0.4772,
+              "end": 7361.0222,
+              "wins": 1,
+              "losses": 1
+            },
+            {
+              "year": "2025",
+              "n": 5,
+              "mean_r": -1.0,
+              "end": 6653.7936,
+              "wins": 0,
+              "losses": 5
+            },
+            {
+              "year": "2026",
+              "n": 2,
+              "mean_r": 1.184,
+              "end": 6971.0971,
+              "wins": 2,
+              "losses": 0
+            }
+          ]
+        },
+        "dbb": {
+          "trade_count": 193,
+          "ending_equity": 2507.0764,
+          "mean_r": -0.3375,
+          "win_rate": 0.2694,
+          "max_drawdown_frac": 0.7559,
+          "wins": 52,
+          "losses": 141,
+          "exits": {
+            "stop": 141,
+            "target": 52
+          },
+          "sides": {
+            "short": 100,
+            "long": 93
+          },
+          "naive_2r": -0.1918,
+          "mean_r_minus_naive": -0.1457
+        },
+        "breakout20": {
+          "trade_count": 7,
+          "ending_equity": 9176.6423,
+          "mean_r": -0.6006,
+          "win_rate": 0.1429,
+          "max_drawdown_frac": 0.0961,
+          "wins": 1,
+          "losses": 6,
+          "exits": {
+            "stop": 6,
+            "target": 1
+          },
+          "sides": {
+            "short": 4,
+            "long": 3
+          },
+          "naive_2r": -0.5713,
+          "mean_r_minus_naive": -0.0293
+        },
+        "perfect_order": {
+          "trade_count": 11,
+          "ending_equity": 8484.4532,
+          "mean_r": -0.7346,
+          "win_rate": 0.0909,
+          "max_drawdown_frac": 0.1516,
+          "wins": 1,
+          "losses": 10,
+          "exits": {
+            "stop": 10,
+            "target": 1
+          },
+          "sides": {
+            "long": 5,
+            "short": 6
+          },
+          "naive_2r": -0.7273,
+          "mean_r_minus_naive": -0.0073
+        }
+      }
+    },
+    "EUR_JPY": {
+      "value_per_price_unit": 0.006666666666666667,
+      "engines": {
+        "mtf": {
+          "trade_count": 234,
+          "ending_equity": 10502.9608,
+          "mean_r": 0.0296,
+          "win_rate": 0.3547,
+          "max_drawdown_frac": 0.3823,
+          "wins": 83,
+          "losses": 151,
+          "exits": {
+            "stop": 150,
+            "target": 83,
+            "window_end": 1
+          },
+          "naive_2r": 0.0641,
+          "mean_r_minus_naive": -0.0345,
+          "years": [
+            {
+              "year": "2015",
+              "n": 20,
+              "mean_r": 0.0303,
+              "end": 10043.3166,
+              "wins": 7,
+              "losses": 13
+            },
+            {
+              "year": "2016",
+              "n": 24,
+              "mean_r": -0.3838,
+              "end": 8290.5366,
+              "wins": 5,
+              "losses": 19
+            },
+            {
+              "year": "2017",
+              "n": 17,
+              "mean_r": -0.1377,
+              "end": 7863.3773,
+              "wins": 5,
+              "losses": 12
+            },
+            {
+              "year": "2018",
+              "n": 17,
+              "mean_r": -0.1452,
+              "end": 7439.9333,
+              "wins": 5,
+              "losses": 12
+            },
+            {
+              "year": "2019",
+              "n": 26,
+              "mean_r": -0.2204,
+              "end": 6573.4125,
+              "wins": 7,
+              "losses": 19
+            },
+            {
+              "year": "2020",
+              "n": 19,
+              "mean_r": 0.0805,
+              "end": 6729.1825,
+              "wins": 7,
+              "losses": 12
+            },
+            {
+              "year": "2021",
+              "n": 24,
+              "mean_r": 0.2079,
+              "end": 7362.2743,
+              "wins": 10,
+              "losses": 14
+            },
+            {
+              "year": "2022",
+              "n": 23,
+              "mean_r": 0.3752,
+              "end": 8662.0098,
+              "wins": 11,
+              "losses": 12
+            },
+            {
+              "year": "2023",
+              "n": 21,
+              "mean_r": 0.527,
+              "end": 10701.61,
+              "wins": 11,
+              "losses": 10
+            },
+            {
+              "year": "2024",
+              "n": 17,
+              "mean_r": 0.0225,
+              "end": 10714.7522,
+              "wins": 6,
+              "losses": 11
+            },
+            {
+              "year": "2025",
+              "n": 18,
+              "mean_r": 0.1265,
+              "end": 11134.1614,
+              "wins": 7,
+              "losses": 11
+            },
+            {
+              "year": "2026",
+              "n": 8,
+              "mean_r": -0.3507,
+              "end": 10502.9608,
+              "wins": 2,
+              "losses": 6
+            }
+          ]
+        },
+        "fader": {
+          "trade_count": 233,
+          "ending_equity": 4920.2948,
+          "mean_r": -0.1342,
+          "win_rate": 0.3047,
+          "max_drawdown_frac": 0.6266,
+          "wins": 71,
+          "losses": 162,
+          "exits": {
+            "target": 69,
+            "stop": 162,
+            "window_end": 2
+          },
+          "naive_2r": -0.0859,
+          "mean_r_minus_naive": -0.0483,
+          "years": [
+            {
+              "year": "2015",
+              "n": 13,
+              "mean_r": -0.1032,
+              "end": 9689.6606,
+              "wins": 4,
+              "losses": 9
+            },
+            {
+              "year": "2016",
+              "n": 24,
+              "mean_r": 0.025,
+              "end": 9718.5389,
+              "wins": 9,
+              "losses": 15
+            },
+            {
+              "year": "2017",
+              "n": 26,
+              "mean_r": 0.068,
+              "end": 9969.6415,
+              "wins": 10,
+              "losses": 16
+            },
+            {
+              "year": "2018",
+              "n": 22,
+              "mean_r": -0.2098,
+              "end": 9023.0675,
+              "wins": 6,
+              "losses": 16
+            },
+            {
+              "year": "2019",
+              "n": 3,
+              "mean_r": -1.0,
+              "end": 8492.4425,
+              "wins": 0,
+              "losses": 3
+            },
+            {
+              "year": "2020",
+              "n": 16,
+              "mean_r": -0.3138,
+              "end": 7636.5457,
+              "wins": 4,
+              "losses": 12
+            },
+            {
+              "year": "2021",
+              "n": 4,
+              "mean_r": -0.2785,
+              "end": 7458.5805,
+              "wins": 1,
+              "losses": 3
+            },
+            {
+              "year": "2022",
+              "n": 20,
+              "mean_r": -0.5599,
+              "end": 5928.0856,
+              "wins": 3,
+              "losses": 17
+            },
+            {
+              "year": "2023",
+              "n": 41,
+              "mean_r": -0.3726,
+              "end": 4308.8952,
+              "wins": 9,
+              "losses": 32
+            },
+            {
+              "year": "2024",
+              "n": 15,
+              "mean_r": 0.1795,
+              "end": 4518.9175,
+              "wins": 6,
+              "losses": 9
+            },
+            {
+              "year": "2025",
+              "n": 37,
+              "mean_r": -0.2402,
+              "end": 3735.83,
+              "wins": 10,
+              "losses": 27
+            },
+            {
+              "year": "2026",
+              "n": 12,
+              "mean_r": 1.1765,
+              "end": 4920.2948,
+              "wins": 9,
+              "losses": 3
+            }
+          ]
+        },
+        "dbb": {
+          "trade_count": 210,
+          "ending_equity": 3015.1325,
+          "mean_r": -0.2704,
+          "win_rate": 0.281,
+          "max_drawdown_frac": 0.7147,
+          "wins": 59,
+          "losses": 151,
+          "exits": {
+            "stop": 150,
+            "target": 60
+          },
+          "sides": {
+            "short": 118,
+            "long": 92
+          },
+          "naive_2r": -0.157,
+          "mean_r_minus_naive": -0.1134
+        },
+        "breakout20": {
+          "trade_count": 11,
+          "ending_equity": 9407.0542,
+          "mean_r": -0.2626,
+          "win_rate": 0.2727,
+          "max_drawdown_frac": 0.1012,
+          "wins": 3,
+          "losses": 8,
+          "exits": {
+            "stop": 8,
+            "target": 3
+          },
+          "sides": {
+            "short": 5,
+            "long": 6
+          },
+          "naive_2r": -0.1819,
+          "mean_r_minus_naive": -0.0807
+        },
+        "perfect_order": {
+          "trade_count": 9,
+          "ending_equity": 9920.8651,
+          "mean_r": -0.0254,
+          "win_rate": 0.3333,
+          "max_drawdown_frac": 0.0454,
+          "wins": 3,
+          "losses": 6,
+          "exits": {
+            "stop": 6,
+            "target": 3
+          },
+          "sides": {
+            "short": 5,
+            "long": 4
+          },
+          "naive_2r": -0.0001,
+          "mean_r_minus_naive": -0.0253
+        }
+      }
+    }
+  }
+}

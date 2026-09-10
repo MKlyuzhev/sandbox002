@@ -1,0 +1,75 @@
+{
+  "instrument": "USD_JPY",
+  "window": "2015-01-01 to 2026-09-09",
+  "fill_mode": "rest",
+  "value_per_price_unit": 0.006666666666666667,
+  "value_per_price_unit_note": "USD per 1.0 USDJPY move per 1 unit; JPY\u2192USD at 150. Scales cash P&L and size, not R.",
+  "ch7": "excluded",
+  "mtf_entry_mode": "peak",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "tester_decisions_for_comparison": {
+    "mtf": 396,
+    "dbb": 273,
+    "fader": 190,
+    "breakout20": 14,
+    "perfect_order": 11
+  },
+  "engines": {
+    "mtf": {
+      "chapter": 8,
+      "trade_count": 221,
+      "ending_equity": 14012.9071,
+      "mean_r": 0.0958,
+      "win_rate": 0.3846,
+      "max_drawdown_frac": 0.1555,
+      "wins": 85,
+      "losses": 136,
+      "sliced": true
+    },
+    "dbb": {
+      "chapter": 9,
+      "trade_count": 195,
+      "ending_equity": 3312.3227,
+      "mean_r": -0.2631,
+      "win_rate": 0.2513,
+      "max_drawdown_frac": 0.6985,
+      "wins": 49,
+      "losses": 146,
+      "sliced": false
+    },
+    "fader": {
+      "chapter": 13,
+      "trade_count": 148,
+      "ending_equity": 8003.6713,
+      "mean_r": -0.0542,
+      "win_rate": 0.3311,
+      "max_drawdown_frac": 0.1996,
+      "wins": 49,
+      "losses": 99,
+      "sliced": true
+    },
+    "breakout20": {
+      "chapter": 14,
+      "trade_count": 13,
+      "ending_equity": 8613.246,
+      "mean_r": -0.5604,
+      "win_rate": 0.1538,
+      "max_drawdown_frac": 0.1387,
+      "wins": 2,
+      "losses": 11,
+      "sliced": false
+    },
+    "perfect_order": {
+      "chapter": 16,
+      "trade_count": 10,
+      "ending_equity": 9735.4209,
+      "mean_r": -0.1159,
+      "win_rate": 0.3,
+      "max_drawdown_frac": 0.0443,
+      "wins": 3,
+      "losses": 7,
+      "sliced": false
+    }
+  }
+}

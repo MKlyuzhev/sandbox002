@@ -1,0 +1,595 @@
+{
+  "tag": "mtf",
+  "instrument": "EUR_JPY",
+  "kind": "mtf",
+  "entry_mode": "peak",
+  "fill_mode": "rest",
+  "value_per_price_unit": 0.006666666666666667,
+  "starting_equity": 10000.0,
+  "ending_equity": 10502.9608,
+  "slice_count": 24,
+  "trade_count": 234,
+  "wins": 83,
+  "losses": 151,
+  "win_rate": 0.3547,
+  "mean_r": 0.0296,
+  "sum_r": 6.9279,
+  "max_drawdown_frac_chained": 0.3823,
+  "exits": {
+    "stop": 150,
+    "target": 83,
+    "window_end": 1
+  },
+  "note": "H1 sliced at 6 months (OANDA 5000-bar cap). window_end at slice edges. Balance chained.",
+  "slices": [
+    {
+      "i": 0,
+      "from_time": "2015-01-01T00:00:00Z",
+      "to_time": "2015-07-01T00:00:00Z",
+      "walk_id": "559032cf118f45fa9f8b0941f6bbf2a8",
+      "starting_equity": 10000.0,
+      "ending_equity": 10128.6304,
+      "trade_count": 11,
+      "wins": 4,
+      "losses": 7,
+      "mean_r": 0.0782,
+      "win_rate": 0.3636,
+      "max_drawdown_frac": 0.0414,
+      "sides": {
+        "short": 7,
+        "long": 4
+      },
+      "exits": {
+        "stop": 7,
+        "target": 4
+      },
+      "ltf_bar_count": 3325,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 1,
+      "from_time": "2015-07-01T00:00:00Z",
+      "to_time": "2016-01-01T00:00:00Z",
+      "walk_id": "3f9d85dbd3364344bc22e9c09bda22b2",
+      "starting_equity": 10128.6304,
+      "ending_equity": 10043.3166,
+      "trade_count": 9,
+      "wins": 3,
+      "losses": 6,
+      "mean_r": -0.0283,
+      "win_rate": 0.3333,
+      "max_drawdown_frac": 0.0776,
+      "sides": {
+        "short": 9
+      },
+      "exits": {
+        "stop": 6,
+        "target": 3
+      },
+      "ltf_bar_count": 3386,
+      "htf_bar_count": 381
+    },
+    {
+      "i": 2,
+      "from_time": "2016-01-01T00:00:00Z",
+      "to_time": "2016-07-01T00:00:00Z",
+      "walk_id": "3c33bb38fdf94271bf9a1a06b6436075",
+      "starting_equity": 10043.3166,
+      "ending_equity": 9380.3224,
+      "trade_count": 15,
+      "wins": 4,
+      "losses": 11,
+      "mean_r": -0.2102,
+      "win_rate": 0.2667,
+      "max_drawdown_frac": 0.1155,
+      "sides": {
+        "short": 14,
+        "long": 1
+      },
+      "exits": {
+        "target": 4,
+        "stop": 11
+      },
+      "ltf_bar_count": 3349,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 3,
+      "from_time": "2016-07-01T00:00:00Z",
+      "to_time": "2017-01-01T00:00:00Z",
+      "walk_id": "bf5fefb587a7431f8102a72abd5252e5",
+      "starting_equity": 9380.3224,
+      "ending_equity": 8290.5366,
+      "trade_count": 9,
+      "wins": 1,
+      "losses": 8,
+      "mean_r": -0.673,
+      "win_rate": 0.1111,
+      "max_drawdown_frac": 0.1492,
+      "sides": {
+        "short": 8,
+        "long": 1
+      },
+      "exits": {
+        "stop": 8,
+        "target": 1
+      },
+      "ltf_bar_count": 3366,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 4,
+      "from_time": "2017-01-01T00:00:00Z",
+      "to_time": "2017-07-01T00:00:00Z",
+      "walk_id": "7011f54435bb4e37ad372eb063c55754",
+      "starting_equity": 8290.5366,
+      "ending_equity": 7745.3419,
+      "trade_count": 12,
+      "wins": 3,
+      "losses": 9,
+      "mean_r": -0.2667,
+      "win_rate": 0.25,
+      "max_drawdown_frac": 0.0776,
+      "sides": {
+        "short": 4,
+        "long": 8
+      },
+      "exits": {
+        "stop": 9,
+        "target": 3
+      },
+      "ltf_bar_count": 3345,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 5,
+      "from_time": "2017-07-01T00:00:00Z",
+      "to_time": "2018-01-01T00:00:00Z",
+      "walk_id": "568d0c1c4e544c08beebf7e609e7280f",
+      "starting_equity": 7745.3419,
+      "ending_equity": 7863.3773,
+      "trade_count": 5,
+      "wins": 2,
+      "losses": 3,
+      "mean_r": 0.1719,
+      "win_rate": 0.4,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "long": 5
+      },
+      "exits": {
+        "target": 2,
+        "stop": 3
+      },
+      "ltf_bar_count": 3348,
+      "htf_bar_count": 381
+    },
+    {
+      "i": 6,
+      "from_time": "2018-01-01T00:00:00Z",
+      "to_time": "2018-07-01T00:00:00Z",
+      "walk_id": "356c79da97dc43c48a7313a99a83af2b",
+      "starting_equity": 7863.3773,
+      "ending_equity": 7622.4459,
+      "trade_count": 13,
+      "wins": 4,
+      "losses": 9,
+      "mean_r": -0.1016,
+      "win_rate": 0.3077,
+      "max_drawdown_frac": 0.1319,
+      "sides": {
+        "short": 13
+      },
+      "exits": {
+        "target": 4,
+        "stop": 9
+      },
+      "ltf_bar_count": 3346,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 7,
+      "from_time": "2018-07-01T00:00:00Z",
+      "to_time": "2019-01-01T00:00:00Z",
+      "walk_id": "e1651e15e016457487dc2b7faae83457",
+      "starting_equity": 7622.4459,
+      "ending_equity": 7439.9333,
+      "trade_count": 4,
+      "wins": 1,
+      "losses": 3,
+      "mean_r": -0.287,
+      "win_rate": 0.25,
+      "max_drawdown_frac": 0.0396,
+      "sides": {
+        "long": 2,
+        "short": 2
+      },
+      "exits": {
+        "stop": 3,
+        "target": 1
+      },
+      "ltf_bar_count": 3370,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 8,
+      "from_time": "2019-01-01T00:00:00Z",
+      "to_time": "2019-07-01T00:00:00Z",
+      "walk_id": "eb23e16850d346cfad64ce6b90c5f724",
+      "starting_equity": 7439.9333,
+      "ending_equity": 6388.8747,
+      "trade_count": 13,
+      "wins": 2,
+      "losses": 11,
+      "mean_r": -0.5706,
+      "win_rate": 0.1538,
+      "max_drawdown_frac": 0.1727,
+      "sides": {
+        "short": 13
+      },
+      "exits": {
+        "stop": 11,
+        "target": 2
+      },
+      "ltf_bar_count": 3326,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 9,
+      "from_time": "2019-07-01T00:00:00Z",
+      "to_time": "2020-01-01T00:00:00Z",
+      "walk_id": "a968d8d377b841dbaa7ce051c5db9406",
+      "starting_equity": 6388.8747,
+      "ending_equity": 6573.4125,
+      "trade_count": 13,
+      "wins": 5,
+      "losses": 8,
+      "mean_r": 0.1298,
+      "win_rate": 0.3846,
+      "max_drawdown_frac": 0.0776,
+      "sides": {
+        "short": 8,
+        "long": 5
+      },
+      "exits": {
+        "stop": 8,
+        "target": 5
+      },
+      "ltf_bar_count": 3389,
+      "htf_bar_count": 381
+    },
+    {
+      "i": 10,
+      "from_time": "2020-01-01T00:00:00Z",
+      "to_time": "2020-07-01T00:00:00Z",
+      "walk_id": "72cd57927d904c499cb2480d28f7efc3",
+      "starting_equity": 6573.4125,
+      "ending_equity": 6539.4835,
+      "trade_count": 6,
+      "wins": 2,
+      "losses": 4,
+      "mean_r": -0.0243,
+      "win_rate": 0.3333,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "short": 1,
+        "long": 5
+      },
+      "exits": {
+        "stop": 4,
+        "target": 2
+      },
+      "ltf_bar_count": 3348,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 11,
+      "from_time": "2020-07-01T00:00:00Z",
+      "to_time": "2021-01-01T00:00:00Z",
+      "walk_id": "2c245794da8d4160bcf2b7b94138750a",
+      "starting_equity": 6539.4835,
+      "ending_equity": 6729.1825,
+      "trade_count": 13,
+      "wins": 5,
+      "losses": 8,
+      "mean_r": 0.1289,
+      "win_rate": 0.3846,
+      "max_drawdown_frac": 0.0986,
+      "sides": {
+        "long": 10,
+        "short": 3
+      },
+      "exits": {
+        "target": 5,
+        "stop": 7,
+        "window_end": 1
+      },
+      "ltf_bar_count": 3391,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 12,
+      "from_time": "2021-01-01T00:00:00Z",
+      "to_time": "2021-07-01T00:00:00Z",
+      "walk_id": "41de0075d76843aaa050931720739d21",
+      "starting_equity": 6729.1825,
+      "ending_equity": 6256.4347,
+      "trade_count": 12,
+      "wins": 3,
+      "losses": 9,
+      "mean_r": -0.2876,
+      "win_rate": 0.25,
+      "max_drawdown_frac": 0.0776,
+      "sides": {
+        "long": 10,
+        "short": 2
+      },
+      "exits": {
+        "stop": 9,
+        "target": 3
+      },
+      "ltf_bar_count": 3324,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 13,
+      "from_time": "2021-07-01T00:00:00Z",
+      "to_time": "2022-01-01T00:00:00Z",
+      "walk_id": "8de6d7e372954a148e47617aac5bf38a",
+      "starting_equity": 6256.4347,
+      "ending_equity": 7362.2743,
+      "trade_count": 12,
+      "wins": 7,
+      "losses": 5,
+      "mean_r": 0.7034,
+      "win_rate": 0.5833,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "short": 8,
+        "long": 4
+      },
+      "exits": {
+        "target": 7,
+        "stop": 5
+      },
+      "ltf_bar_count": 3413,
+      "htf_bar_count": 381
+    },
+    {
+      "i": 14,
+      "from_time": "2022-01-01T00:00:00Z",
+      "to_time": "2022-07-01T00:00:00Z",
+      "walk_id": "fffff05b7f0945a0ad6ec7487ccac22c",
+      "starting_equity": 7362.2743,
+      "ending_equity": 9218.2749,
+      "trade_count": 17,
+      "wins": 10,
+      "losses": 7,
+      "mean_r": 0.6855,
+      "win_rate": 0.5882,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "long": 14,
+        "short": 3
+      },
+      "exits": {
+        "target": 10,
+        "stop": 7
+      },
+      "ltf_bar_count": 3338,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 15,
+      "from_time": "2022-07-01T00:00:00Z",
+      "to_time": "2023-01-01T00:00:00Z",
+      "walk_id": "e5011cbbe8914050a34948da7b281e3c",
+      "starting_equity": 9218.2749,
+      "ending_equity": 8662.0098,
+      "trade_count": 6,
+      "wins": 1,
+      "losses": 5,
+      "mean_r": -0.5039,
+      "win_rate": 0.1667,
+      "max_drawdown_frac": 0.0603,
+      "sides": {
+        "long": 2,
+        "short": 4
+      },
+      "exits": {
+        "stop": 5,
+        "target": 1
+      },
+      "ltf_bar_count": 3365,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 16,
+      "from_time": "2023-01-01T00:00:00Z",
+      "to_time": "2023-07-01T00:00:00Z",
+      "walk_id": "e51cda7cb64447518762752b64113996",
+      "starting_equity": 8662.0098,
+      "ending_equity": 9133.725,
+      "trade_count": 6,
+      "wins": 3,
+      "losses": 3,
+      "mean_r": 0.4651,
+      "win_rate": 0.5,
+      "max_drawdown_frac": 0.0396,
+      "sides": {
+        "short": 5,
+        "long": 1
+      },
+      "exits": {
+        "stop": 3,
+        "target": 3
+      },
+      "ltf_bar_count": 3369,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 17,
+      "from_time": "2023-07-01T00:00:00Z",
+      "to_time": "2024-01-01T00:00:00Z",
+      "walk_id": "c8a833913e1f4ccbafa2e96312945356",
+      "starting_equity": 9133.725,
+      "ending_equity": 10701.61,
+      "trade_count": 15,
+      "wins": 8,
+      "losses": 7,
+      "mean_r": 0.5518,
+      "win_rate": 0.5333,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "long": 10,
+        "short": 5
+      },
+      "exits": {
+        "target": 8,
+        "stop": 7
+      },
+      "ltf_bar_count": 3346,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 18,
+      "from_time": "2024-01-01T00:00:00Z",
+      "to_time": "2024-07-01T00:00:00Z",
+      "walk_id": "1333fbf7e6cc45d59d783a075b9b91df",
+      "starting_equity": 10701.61,
+      "ending_equity": 10256.3877,
+      "trade_count": 5,
+      "wins": 1,
+      "losses": 4,
+      "mean_r": -0.4094,
+      "win_rate": 0.2,
+      "max_drawdown_frac": 0.0776,
+      "sides": {
+        "short": 1,
+        "long": 4
+      },
+      "exits": {
+        "stop": 4,
+        "target": 1
+      },
+      "ltf_bar_count": 3347,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 19,
+      "from_time": "2024-07-01T00:00:00Z",
+      "to_time": "2025-01-01T00:00:00Z",
+      "walk_id": "0d7a5e9cd6084f1398d831ea883a9700",
+      "starting_equity": 10256.3877,
+      "ending_equity": 10714.7522,
+      "trade_count": 12,
+      "wins": 5,
+      "losses": 7,
+      "mean_r": 0.2025,
+      "win_rate": 0.4167,
+      "max_drawdown_frac": 0.0961,
+      "sides": {
+        "long": 4,
+        "short": 8
+      },
+      "exits": {
+        "stop": 7,
+        "target": 5
+      },
+      "ltf_bar_count": 3391,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 20,
+      "from_time": "2025-01-01T00:00:00Z",
+      "to_time": "2025-07-01T00:00:00Z",
+      "walk_id": "72df097a8d114025b7dad7c90b5b2b4b",
+      "starting_equity": 10714.7522,
+      "ending_equity": 10500.4578,
+      "trade_count": 1,
+      "wins": 0,
+      "losses": 1,
+      "mean_r": -1.0,
+      "win_rate": 0.0,
+      "max_drawdown_frac": 0.02,
+      "sides": {
+        "long": 1
+      },
+      "exits": {
+        "stop": 1
+      },
+      "ltf_bar_count": 3325,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 21,
+      "from_time": "2025-07-01T00:00:00Z",
+      "to_time": "2026-01-01T00:00:00Z",
+      "walk_id": "f235f5c167484f1084cc77793528bfe5",
+      "starting_equity": 10500.4578,
+      "ending_equity": 11134.1614,
+      "trade_count": 17,
+      "wins": 7,
+      "losses": 10,
+      "mean_r": 0.1928,
+      "win_rate": 0.4118,
+      "max_drawdown_frac": 0.0991,
+      "sides": {
+        "long": 17
+      },
+      "exits": {
+        "target": 7,
+        "stop": 10
+      },
+      "ltf_bar_count": 3391,
+      "htf_bar_count": 380
+    },
+    {
+      "i": 22,
+      "from_time": "2026-01-01T00:00:00Z",
+      "to_time": "2026-07-01T00:00:00Z",
+      "walk_id": "73db7e622f13438d8586f35417c6b4eb",
+      "starting_equity": 11134.1614,
+      "ending_equity": 10660.9593,
+      "trade_count": 5,
+      "wins": 1,
+      "losses": 4,
+      "mean_r": -0.4191,
+      "win_rate": 0.2,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "long": 1,
+        "short": 4
+      },
+      "exits": {
+        "stop": 4,
+        "target": 1
+      },
+      "ltf_bar_count": 3325,
+      "htf_bar_count": 379
+    },
+    {
+      "i": 23,
+      "from_time": "2026-07-01T00:00:00Z",
+      "to_time": "2026-09-10T00:00:00Z",
+      "walk_id": "7293d78229b342b9b55713f3f4d0d8dc",
+      "starting_equity": 10660.9593,
+      "ending_equity": 10502.9608,
+      "trade_count": 3,
+      "wins": 1,
+      "losses": 2,
+      "mean_r": -0.2366,
+      "win_rate": 0.3333,
+      "max_drawdown_frac": 0.02,
+      "sides": {
+        "short": 3
+      },
+      "exits": {
+        "stop": 2,
+        "target": 1
+      },
+      "ltf_bar_count": 1474,
+      "htf_bar_count": 300
+    }
+  ]
+}
