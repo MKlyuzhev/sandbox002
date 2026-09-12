@@ -1,0 +1,163 @@
+{
+  "instrument": "EUR_JPY",
+  "granularity": "D",
+  "from_time": "2015-01-01T00:00:00Z",
+  "to_time": "2026-09-10T00:00:00Z",
+  "lookback": 250,
+  "bar_count": 3285,
+  "start_index": 250,
+  "summary": {
+    "step_count": 3035,
+    "run_count": 677,
+    "regime_counts": {
+      "range": 1456,
+      "trend": 1023,
+      "mixed": 556
+    },
+    "mean_p_hat": 0.3744,
+    "p_hat_defined": 2935,
+    "completed_forecasts": 2930,
+    "brier": 0.2054,
+    "hit_rate": 0.3843,
+    "last_p_hat": 0.2912,
+    "last_instability": 0.0
+  },
+  "occupancy": {
+    "step_count": 3035,
+    "regime_counts": {
+      "range": 1456,
+      "trend": 1023,
+      "mixed": 556
+    },
+    "direction_counts": {
+      "down": 1504,
+      "up": 1531
+    },
+    "trend_direction_counts": {
+      "down": 532,
+      "up": 491
+    },
+    "trend_share": 0.3371,
+    "range_share": 0.4797,
+    "mixed_share": 0.1832,
+    "dir_up_share": 0.5044,
+    "dir_down_share": 0.4956,
+    "dir_imbalance": 0.0089,
+    "signed_dir": 0.0089,
+    "trend_up_share": 0.48,
+    "trend_dir_imbalance": 0.0401,
+    "waning_share": 0.0491,
+    "direction_flips": 212,
+    "mean_direction_run_bars": 14.25,
+    "years": [
+      {
+        "year": "2015",
+        "n": 260,
+        "trend_share": 0.5,
+        "range_share": 0.25,
+        "mixed_share": 0.25,
+        "dir_up_share": 0.3115,
+        "dir_down_share": 0.6885
+      },
+      {
+        "year": "2016",
+        "n": 259,
+        "trend_share": 0.3243,
+        "range_share": 0.5637,
+        "mixed_share": 0.112,
+        "dir_up_share": 0.2703,
+        "dir_down_share": 0.7297
+      },
+      {
+        "year": "2017",
+        "n": 261,
+        "trend_share": 0.2414,
+        "range_share": 0.5824,
+        "mixed_share": 0.1762,
+        "dir_up_share": 0.6513,
+        "dir_down_share": 0.3487
+      },
+      {
+        "year": "2018",
+        "n": 259,
+        "trend_share": 0.2934,
+        "range_share": 0.5598,
+        "mixed_share": 0.1467,
+        "dir_up_share": 0.3205,
+        "dir_down_share": 0.6795
+      },
+      {
+        "year": "2019",
+        "n": 260,
+        "trend_share": 0.3808,
+        "range_share": 0.3615,
+        "mixed_share": 0.2577,
+        "dir_up_share": 0.2885,
+        "dir_down_share": 0.7115
+      },
+      {
+        "year": "2020",
+        "n": 259,
+        "trend_share": 0.2934,
+        "range_share": 0.5097,
+        "mixed_share": 0.1969,
+        "dir_up_share": 0.5444,
+        "dir_down_share": 0.4556
+      },
+      {
+        "year": "2021",
+        "n": 261,
+        "trend_share": 0.6169,
+        "range_share": 0.2222,
+        "mixed_share": 0.1609,
+        "dir_up_share": 0.6207,
+        "dir_down_share": 0.3793
+      },
+      {
+        "year": "2022",
+        "n": 260,
+        "trend_share": 0.4115,
+        "range_share": 0.4077,
+        "mixed_share": 0.1808,
+        "dir_up_share": 0.5615,
+        "dir_down_share": 0.4385
+      },
+      {
+        "year": "2023",
+        "n": 259,
+        "trend_share": 0.2162,
+        "range_share": 0.6371,
+        "mixed_share": 0.1467,
+        "dir_up_share": 0.6602,
+        "dir_down_share": 0.3398
+      },
+      {
+        "year": "2024",
+        "n": 259,
+        "trend_share": 0.2896,
+        "range_share": 0.4749,
+        "mixed_share": 0.2355,
+        "dir_up_share": 0.6409,
+        "dir_down_share": 0.3591
+      },
+      {
+        "year": "2025",
+        "n": 259,
+        "trend_share": 0.2703,
+        "range_share": 0.5521,
+        "mixed_share": 0.1776,
+        "dir_up_share": 0.7568,
+        "dir_down_share": 0.2432
+      },
+      {
+        "year": "2026",
+        "n": 179,
+        "trend_share": 0.1453,
+        "range_share": 0.7095,
+        "mixed_share": 0.1453,
+        "dir_up_share": 0.3911,
+        "dir_down_share": 0.6089
+      }
+    ]
+  }
+}

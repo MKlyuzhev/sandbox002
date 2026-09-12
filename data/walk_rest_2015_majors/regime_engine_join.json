@@ -1,0 +1,946 @@
+{
+  "pairs": [
+    {
+      "pair": "USD_JPY",
+      "trend": 0.3296,
+      "range": 0.4864,
+      "mixed": 0.184,
+      "up": 0.5185,
+      "down": 0.4815,
+      "imbalance": 0.0371,
+      "signed": 0.0371,
+      "trend_up": 0.4687,
+      "trend_imb": 0.0627,
+      "flips": 233,
+      "mean_dir_run": 13.03,
+      "waning": 0.0682,
+      "mtf_r": 0.0958,
+      "mtf_wr": 0.3846,
+      "mtf_end": 14012.9071,
+      "mtf_n": 221,
+      "mtf_long_share": 0.43,
+      "fader_r": -0.0542,
+      "fader_wr": 0.3311,
+      "fader_end": 8003.6713,
+      "fader_n": 148,
+      "dbb_r": -0.2631,
+      "dbb_wr": 0.2513,
+      "dbb_end": 3312.3227,
+      "po_r": -0.1159,
+      "bo_r": -0.5604,
+      "mtf_sides": {
+        "long": 95,
+        "short": 126
+      }
+    },
+    {
+      "pair": "GBP_USD",
+      "trend": 0.3011,
+      "range": 0.5211,
+      "mixed": 0.1779,
+      "up": 0.4848,
+      "down": 0.5152,
+      "imbalance": 0.0303,
+      "signed": -0.0303,
+      "trend_up": 0.4322,
+      "trend_imb": 0.1357,
+      "flips": 241,
+      "mean_dir_run": 12.55,
+      "waning": 0.0468,
+      "mtf_r": 0.0844,
+      "mtf_wr": 0.3846,
+      "mtf_end": 13101.2503,
+      "mtf_n": 208,
+      "mtf_long_share": 0.375,
+      "fader_r": 0.0034,
+      "fader_wr": 0.3412,
+      "fader_end": 9226.4323,
+      "fader_n": 255,
+      "dbb_r": -0.1679,
+      "dbb_wr": 0.3097,
+      "dbb_end": 4351.4704,
+      "po_r": -0.0417,
+      "bo_r": -0.3123,
+      "mtf_sides": {
+        "long": 78,
+        "short": 130
+      }
+    },
+    {
+      "pair": "EUR_USD",
+      "trend": 0.3329,
+      "range": 0.4786,
+      "mixed": 0.1885,
+      "up": 0.4904,
+      "down": 0.5096,
+      "imbalance": 0.0191,
+      "signed": -0.0191,
+      "trend_up": 0.5505,
+      "trend_imb": 0.101,
+      "flips": 233,
+      "mean_dir_run": 12.97,
+      "waning": 0.0649,
+      "mtf_r": -0.1181,
+      "mtf_wr": 0.3032,
+      "mtf_end": 5487.3437,
+      "mtf_n": 221,
+      "mtf_long_share": 0.561,
+      "fader_r": -0.172,
+      "fader_wr": 0.288,
+      "fader_end": 6197.9865,
+      "fader_n": 125,
+      "dbb_r": -0.2585,
+      "dbb_wr": 0.2672,
+      "dbb_end": 2795.044,
+      "po_r": 0.0848,
+      "bo_r": -0.5213,
+      "mtf_sides": {
+        "long": 124,
+        "short": 97
+      }
+    },
+    {
+      "pair": "EUR_JPY",
+      "trend": 0.3371,
+      "range": 0.4797,
+      "mixed": 0.1832,
+      "up": 0.5044,
+      "down": 0.4956,
+      "imbalance": 0.0089,
+      "signed": 0.0089,
+      "trend_up": 0.48,
+      "trend_imb": 0.0401,
+      "flips": 212,
+      "mean_dir_run": 14.25,
+      "waning": 0.0491,
+      "mtf_r": 0.0296,
+      "mtf_wr": 0.3547,
+      "mtf_end": 10502.9608,
+      "mtf_n": 234,
+      "mtf_long_share": 0.466,
+      "fader_r": -0.1342,
+      "fader_wr": 0.3047,
+      "fader_end": 4920.2948,
+      "fader_n": 233,
+      "dbb_r": -0.2704,
+      "dbb_wr": 0.281,
+      "dbb_end": 3015.1325,
+      "po_r": -0.0254,
+      "bo_r": -0.2626,
+      "mtf_sides": {
+        "long": 109,
+        "short": 125
+      }
+    },
+    {
+      "pair": "AUD_USD",
+      "trend": 0.302,
+      "range": 0.5318,
+      "mixed": 0.1662,
+      "up": 0.4514,
+      "down": 0.5486,
+      "imbalance": 0.0973,
+      "signed": -0.0973,
+      "trend_up": 0.4159,
+      "trend_imb": 0.1681,
+      "flips": 243,
+      "mean_dir_run": 12.43,
+      "waning": 0.0491,
+      "mtf_r": 0.0293,
+      "mtf_wr": 0.3575,
+      "mtf_end": 10416.6663,
+      "mtf_n": 193,
+      "mtf_long_share": 0.378,
+      "fader_r": 0.0604,
+      "fader_wr": 0.3583,
+      "fader_end": 11027.3659,
+      "fader_n": 120,
+      "dbb_r": -0.3055,
+      "dbb_wr": 0.2638,
+      "dbb_end": 2213.5237,
+      "po_r": -0.1745,
+      "bo_r": -0.3405,
+      "mtf_sides": {
+        "long": 73,
+        "short": 120
+      }
+    },
+    {
+      "pair": "USD_CHF",
+      "trend": 0.3087,
+      "range": 0.5092,
+      "mixed": 0.1821,
+      "up": 0.4283,
+      "down": 0.5717,
+      "imbalance": 0.1433,
+      "signed": -0.1433,
+      "trend_up": 0.4026,
+      "trend_imb": 0.1949,
+      "flips": 271,
+      "mean_dir_run": 11.18,
+      "waning": 0.0572,
+      "mtf_r": 0.02,
+      "mtf_wr": 0.3636,
+      "mtf_end": 10068.1237,
+      "mtf_n": 198,
+      "mtf_long_share": 0.333,
+      "fader_r": -0.1366,
+      "fader_wr": 0.2991,
+      "fader_end": 6971.0971,
+      "fader_n": 117,
+      "dbb_r": -0.3375,
+      "dbb_wr": 0.2694,
+      "dbb_end": 2507.0764,
+      "po_r": -0.7346,
+      "bo_r": -0.6006,
+      "mtf_sides": {
+        "long": 66,
+        "short": 132
+      }
+    }
+  ],
+  "cross_pair": {
+    "trend_vs_mtf_r": {
+      "r": -0.359,
+      "rho": -0.2
+    },
+    "range_vs_mtf_r": {
+      "r": 0.387,
+      "rho": 0.257
+    },
+    "imbalance_vs_mtf_r": {
+      "r": 0.096,
+      "rho": -0.086
+    },
+    "up_vs_mtf_r": {
+      "r": 0.137,
+      "rho": 0.543
+    },
+    "mean_dir_run_vs_mtf_r": {
+      "r": -0.027,
+      "rho": 0.429
+    },
+    "flips_vs_mtf_r": {
+      "r": 0.039,
+      "rho": -0.429
+    },
+    "trend_vs_mtf_wr": {
+      "r": -0.434,
+      "rho": -0.714
+    },
+    "imbalance_vs_mtf_wr": {
+      "r": 0.185,
+      "rho": 0.429
+    },
+    "range_vs_fader_r": {
+      "r": 0.807,
+      "rho": 0.829
+    },
+    "trend_vs_fader_r": {
+      "r": -0.703,
+      "rho": -0.657
+    },
+    "range_vs_dbb_r": {
+      "r": 0.008,
+      "rho": -0.257
+    },
+    "trend_vs_dbb_r": {
+      "r": -0.063,
+      "rho": -0.086
+    },
+    "imbalance_vs_fader_r": {
+      "r": 0.173,
+      "rho": 0.257
+    },
+    "up_vs_fader_r": {
+      "r": -0.127,
+      "rho": -0.086
+    },
+    "trend_vs_po_r": {
+      "r": 0.432,
+      "rho": 0.543
+    },
+    "imbalance_vs_po_r": {
+      "r": -0.911,
+      "rho": -0.943
+    }
+  },
+  "year_pooled": {
+    "n": 72,
+    "trend_vs_mtf_r": 0.265,
+    "range_vs_mtf_r": -0.213,
+    "imbalance_vs_mtf_r": -0.004,
+    "up_vs_mtf_r": 0.153,
+    "trend_vs_mtf_rho": 0.292,
+    "imbalance_vs_mtf_rho": -0.027,
+    "range_vs_fader_r": 0.036,
+    "range_vs_fader_rho": 0.076,
+    "n_fader_years": 72,
+    "high_trend_year_mean_r": 0.1106,
+    "low_trend_year_mean_r": -0.0446,
+    "n_high_trend_years": 17,
+    "n_low_trend_years": 34
+  },
+  "year_series": {
+    "USD_JPY": [
+      {
+        "year": "2015",
+        "trend_share": 0.3359,
+        "range_share": 0.4903,
+        "dir_up_share": 0.5058,
+        "mtf_n": 19,
+        "mtf_r": 0.0133,
+        "mtf_end": 9981.5612
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.4923,
+        "range_share": 0.3,
+        "dir_up_share": 0.3308,
+        "mtf_n": 28,
+        "mtf_r": 0.2083,
+        "mtf_end": 11091.339
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.2414,
+        "range_share": 0.5785,
+        "dir_up_share": 0.3716,
+        "mtf_n": 15,
+        "mtf_r": 0.1717,
+        "mtf_end": 11605.6101
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.2885,
+        "range_share": 0.5692,
+        "dir_up_share": 0.5115,
+        "mtf_n": 17,
+        "mtf_r": -0.1526,
+        "mtf_end": 10953.9449
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.2445,
+        "range_share": 0.5584,
+        "dir_up_share": 0.4416,
+        "mtf_n": 13,
+        "mtf_r": 0.3579,
+        "mtf_end": 11952.4539
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.2346,
+        "range_share": 0.6308,
+        "dir_up_share": 0.2192,
+        "mtf_n": 13,
+        "mtf_r": 0.0078,
+        "mtf_end": 11921.9987
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.3103,
+        "range_share": 0.4559,
+        "dir_up_share": 0.7241,
+        "mtf_n": 18,
+        "mtf_r": -0.0368,
+        "mtf_end": 11687.487
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.5615,
+        "range_share": 0.2423,
+        "dir_up_share": 0.6962,
+        "mtf_n": 36,
+        "mtf_r": 0.1476,
+        "mtf_end": 12819.1387
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.305,
+        "range_share": 0.4903,
+        "dir_up_share": 0.6602,
+        "mtf_n": 17,
+        "mtf_r": 0.7148,
+        "mtf_end": 16206.274
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.4962,
+        "range_share": 0.2846,
+        "dir_up_share": 0.6808,
+        "mtf_n": 25,
+        "mtf_r": 0.0673,
+        "mtf_end": 16593.7994
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.2248,
+        "range_share": 0.655,
+        "dir_up_share": 0.5039,
+        "mtf_n": 10,
+        "mtf_r": -0.1106,
+        "mtf_end": 16171.3347
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.1751,
+        "range_share": 0.6215,
+        "dir_up_share": 0.6102,
+        "mtf_n": 10,
+        "mtf_r": -0.7034,
+        "mtf_end": 14012.9071
+      }
+    ],
+    "GBP_USD": [
+      {
+        "year": "2015",
+        "trend_share": 0.2385,
+        "range_share": 0.5692,
+        "dir_up_share": 0.3962,
+        "mtf_n": 15,
+        "mtf_r": 0.1762,
+        "mtf_end": 10477.2847
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.2934,
+        "range_share": 0.4749,
+        "dir_up_share": 0.2741,
+        "mtf_n": 19,
+        "mtf_r": 0.3877,
+        "mtf_end": 12036.9424
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.2154,
+        "range_share": 0.6,
+        "dir_up_share": 0.6462,
+        "mtf_n": 10,
+        "mtf_r": -0.565,
+        "mtf_end": 10704.5727
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.3166,
+        "range_share": 0.4402,
+        "dir_up_share": 0.4363,
+        "mtf_n": 18,
+        "mtf_r": -0.339,
+        "mtf_end": 9420.9243
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.3295,
+        "range_share": 0.5,
+        "dir_up_share": 0.4129,
+        "mtf_n": 22,
+        "mtf_r": 0.0278,
+        "mtf_end": 9459.704
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.2038,
+        "range_share": 0.6769,
+        "dir_up_share": 0.65,
+        "mtf_n": 13,
+        "mtf_r": 0.8083,
+        "mtf_end": 11592.1232
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.1731,
+        "range_share": 0.6808,
+        "dir_up_share": 0.4769,
+        "mtf_n": 11,
+        "mtf_r": 0.0205,
+        "mtf_end": 11598.206
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.4556,
+        "range_share": 0.3629,
+        "dir_up_share": 0.332,
+        "mtf_n": 28,
+        "mtf_r": 0.0442,
+        "mtf_end": 11760.7598
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.2154,
+        "range_share": 0.6192,
+        "dir_up_share": 0.5885,
+        "mtf_n": 10,
+        "mtf_r": 0.3958,
+        "mtf_end": 12676.0981
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.3962,
+        "range_share": 0.4654,
+        "dir_up_share": 0.5077,
+        "mtf_n": 21,
+        "mtf_r": 0.0328,
+        "mtf_end": 12757.5936
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.4457,
+        "range_share": 0.3915,
+        "dir_up_share": 0.5698,
+        "mtf_n": 30,
+        "mtf_r": 0.0472,
+        "mtf_end": 12973.7467
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.3446,
+        "range_share": 0.4463,
+        "dir_up_share": 0.548,
+        "mtf_n": 11,
+        "mtf_r": 0.0595,
+        "mtf_end": 13101.2503
+      }
+    ],
+    "EUR_USD": [
+      {
+        "year": "2015",
+        "trend_share": 0.4615,
+        "range_share": 0.3269,
+        "dir_up_share": 0.4615,
+        "mtf_n": 31,
+        "mtf_r": 0.0304,
+        "mtf_end": 10070.3049
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.3629,
+        "range_share": 0.5019,
+        "dir_up_share": 0.5598,
+        "mtf_n": 24,
+        "mtf_r": -0.1571,
+        "mtf_end": 9261.3977
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.3154,
+        "range_share": 0.4192,
+        "dir_up_share": 0.6846,
+        "mtf_n": 18,
+        "mtf_r": -0.1933,
+        "mtf_end": 8585.9014
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.2587,
+        "range_share": 0.5251,
+        "dir_up_share": 0.3629,
+        "mtf_n": 16,
+        "mtf_r": -0.4564,
+        "mtf_end": 7384.1945
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.0923,
+        "range_share": 0.7962,
+        "dir_up_share": 0.2846,
+        "mtf_n": 4,
+        "mtf_r": -0.2586,
+        "mtf_end": 7223.1502
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.3552,
+        "range_share": 0.4517,
+        "dir_up_share": 0.6293,
+        "mtf_n": 19,
+        "mtf_r": -0.0283,
+        "mtf_end": 7096.5708
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.4385,
+        "range_share": 0.4077,
+        "dir_up_share": 0.2885,
+        "mtf_n": 27,
+        "mtf_r": 0.3063,
+        "mtf_end": 8274.0775
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.3692,
+        "range_share": 0.4962,
+        "dir_up_share": 0.3808,
+        "mtf_n": 16,
+        "mtf_r": 0.0856,
+        "mtf_end": 8450.7732
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.3115,
+        "range_share": 0.4192,
+        "dir_up_share": 0.5808,
+        "mtf_n": 17,
+        "mtf_r": -0.1301,
+        "mtf_end": 8035.3935
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.3243,
+        "range_share": 0.4402,
+        "dir_up_share": 0.5019,
+        "mtf_n": 21,
+        "mtf_r": -0.3213,
+        "mtf_end": 6974.8015
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.2394,
+        "range_share": 0.61,
+        "dir_up_share": 0.6795,
+        "mtf_n": 8,
+        "mtf_r": -0.4641,
+        "mtf_end": 6462.9279
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.5251,
+        "range_share": 0.2905,
+        "dir_up_share": 0.4637,
+        "mtf_n": 20,
+        "mtf_r": -0.3945,
+        "mtf_end": 5487.3437
+      }
+    ],
+    "EUR_JPY": [
+      {
+        "year": "2015",
+        "trend_share": 0.5,
+        "range_share": 0.25,
+        "dir_up_share": 0.3115,
+        "mtf_n": 20,
+        "mtf_r": 0.0303,
+        "mtf_end": 10043.3166
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.3243,
+        "range_share": 0.5637,
+        "dir_up_share": 0.2703,
+        "mtf_n": 24,
+        "mtf_r": -0.3838,
+        "mtf_end": 8290.5366
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.2414,
+        "range_share": 0.5824,
+        "dir_up_share": 0.6513,
+        "mtf_n": 17,
+        "mtf_r": -0.1377,
+        "mtf_end": 7863.3773
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.2934,
+        "range_share": 0.5598,
+        "dir_up_share": 0.3205,
+        "mtf_n": 17,
+        "mtf_r": -0.1452,
+        "mtf_end": 7439.9333
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.3808,
+        "range_share": 0.3615,
+        "dir_up_share": 0.2885,
+        "mtf_n": 26,
+        "mtf_r": -0.2204,
+        "mtf_end": 6573.4125
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.2934,
+        "range_share": 0.5097,
+        "dir_up_share": 0.5444,
+        "mtf_n": 19,
+        "mtf_r": 0.0805,
+        "mtf_end": 6729.1825
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.6169,
+        "range_share": 0.2222,
+        "dir_up_share": 0.6207,
+        "mtf_n": 24,
+        "mtf_r": 0.2079,
+        "mtf_end": 7362.2743
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.4115,
+        "range_share": 0.4077,
+        "dir_up_share": 0.5615,
+        "mtf_n": 23,
+        "mtf_r": 0.3752,
+        "mtf_end": 8662.0098
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.2162,
+        "range_share": 0.6371,
+        "dir_up_share": 0.6602,
+        "mtf_n": 21,
+        "mtf_r": 0.527,
+        "mtf_end": 10701.61
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.2896,
+        "range_share": 0.4749,
+        "dir_up_share": 0.6409,
+        "mtf_n": 17,
+        "mtf_r": 0.0225,
+        "mtf_end": 10714.7522
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.2703,
+        "range_share": 0.5521,
+        "dir_up_share": 0.7568,
+        "mtf_n": 18,
+        "mtf_r": 0.1265,
+        "mtf_end": 11134.1614
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.1453,
+        "range_share": 0.7095,
+        "dir_up_share": 0.3911,
+        "mtf_n": 8,
+        "mtf_r": -0.3507,
+        "mtf_end": 10502.9608
+      }
+    ],
+    "AUD_USD": [
+      {
+        "year": "2015",
+        "trend_share": 0.4385,
+        "range_share": 0.4346,
+        "dir_up_share": 0.2769,
+        "mtf_n": 27,
+        "mtf_r": -0.0363,
+        "mtf_end": 9708.6278
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.2317,
+        "range_share": 0.6409,
+        "dir_up_share": 0.5946,
+        "mtf_n": 12,
+        "mtf_r": 0.184,
+        "mtf_end": 10098.8767
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.4521,
+        "range_share": 0.3218,
+        "dir_up_share": 0.5862,
+        "mtf_n": 15,
+        "mtf_r": 0.1669,
+        "mtf_end": 10552.5503
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.2907,
+        "range_share": 0.5039,
+        "dir_up_share": 0.2907,
+        "mtf_n": 17,
+        "mtf_r": -0.1335,
+        "mtf_end": 10022.5536
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.3591,
+        "range_share": 0.444,
+        "dir_up_share": 0.2934,
+        "mtf_n": 23,
+        "mtf_r": 0.143,
+        "mtf_end": 10604.5605
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.4154,
+        "range_share": 0.3885,
+        "dir_up_share": 0.6308,
+        "mtf_n": 21,
+        "mtf_r": 0.1142,
+        "mtf_end": 11032.6145
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.3654,
+        "range_share": 0.4808,
+        "dir_up_share": 0.3769,
+        "mtf_n": 35,
+        "mtf_r": -0.2343,
+        "mtf_end": 9261.2287
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.1892,
+        "range_share": 0.668,
+        "dir_up_share": 0.4015,
+        "mtf_n": 11,
+        "mtf_r": -0.196,
+        "mtf_end": 8836.4034
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.0769,
+        "range_share": 0.8308,
+        "dir_up_share": 0.4538,
+        "mtf_n": 4,
+        "mtf_r": -0.0681,
+        "mtf_end": 8778.0663
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.3923,
+        "range_share": 0.4846,
+        "dir_up_share": 0.4,
+        "mtf_n": 16,
+        "mtf_r": 0.6416,
+        "mtf_end": 10693.8705
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.0814,
+        "range_share": 0.7636,
+        "dir_up_share": 0.5349,
+        "mtf_n": 3,
+        "mtf_r": -0.6814,
+        "mtf_end": 10261.3071
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.3408,
+        "range_share": 0.3743,
+        "dir_up_share": 0.6313,
+        "mtf_n": 9,
+        "mtf_r": 0.1016,
+        "mtf_end": 10416.6663
+      }
+    ],
+    "USD_CHF": [
+      {
+        "year": "2015",
+        "trend_share": 0.2846,
+        "range_share": 0.5,
+        "dir_up_share": 0.4731,
+        "mtf_n": 11,
+        "mtf_r": 0.2676,
+        "mtf_end": 10560.0758
+      },
+      {
+        "year": "2016",
+        "trend_share": 0.1892,
+        "range_share": 0.6255,
+        "dir_up_share": 0.4788,
+        "mtf_n": 16,
+        "mtf_r": -0.4095,
+        "mtf_end": 9226.7871
+      },
+      {
+        "year": "2017",
+        "trend_share": 0.2692,
+        "range_share": 0.5731,
+        "dir_up_share": 0.3615,
+        "mtf_n": 14,
+        "mtf_r": -0.5804,
+        "mtf_end": 7812.3536
+      },
+      {
+        "year": "2018",
+        "trend_share": 0.4154,
+        "range_share": 0.3692,
+        "dir_up_share": 0.4654,
+        "mtf_n": 17,
+        "mtf_r": 0.1677,
+        "mtf_end": 8215.9155
+      },
+      {
+        "year": "2019",
+        "trend_share": 0.2097,
+        "range_share": 0.6479,
+        "dir_up_share": 0.412,
+        "mtf_n": 14,
+        "mtf_r": -0.2303,
+        "mtf_end": 7669.2635
+      },
+      {
+        "year": "2020",
+        "trend_share": 0.3615,
+        "range_share": 0.5038,
+        "dir_up_share": 0.1808,
+        "mtf_n": 21,
+        "mtf_r": -0.0531,
+        "mtf_end": 7444.2626
+      },
+      {
+        "year": "2021",
+        "trend_share": 0.2885,
+        "range_share": 0.5346,
+        "dir_up_share": 0.5538,
+        "mtf_n": 14,
+        "mtf_r": 0.6728,
+        "mtf_end": 8924.4892
+      },
+      {
+        "year": "2022",
+        "trend_share": 0.3359,
+        "range_share": 0.5097,
+        "dir_up_share": 0.5598,
+        "mtf_n": 21,
+        "mtf_r": 0.0876,
+        "mtf_end": 9184.8181
+      },
+      {
+        "year": "2023",
+        "trend_share": 0.2462,
+        "range_share": 0.6038,
+        "dir_up_share": 0.3577,
+        "mtf_n": 15,
+        "mtf_r": 0.3408,
+        "mtf_end": 10108.4436
+      },
+      {
+        "year": "2024",
+        "trend_share": 0.4903,
+        "range_share": 0.2394,
+        "dir_up_share": 0.5328,
+        "mtf_n": 27,
+        "mtf_r": 0.1851,
+        "mtf_end": 11047.8902
+      },
+      {
+        "year": "2025",
+        "trend_share": 0.2278,
+        "range_share": 0.5444,
+        "dir_up_share": 0.2625,
+        "mtf_n": 16,
+        "mtf_r": -0.4204,
+        "mtf_end": 9616.7239
+      },
+      {
+        "year": "2026",
+        "trend_share": 0.4246,
+        "range_share": 0.4302,
+        "dir_up_share": 0.5363,
+        "mtf_n": 12,
+        "mtf_r": 0.2119,
+        "mtf_end": 10068.1237
+      }
+    ]
+  }
+}

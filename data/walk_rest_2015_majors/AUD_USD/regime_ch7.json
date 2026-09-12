@@ -1,0 +1,163 @@
+{
+  "instrument": "AUD_USD",
+  "granularity": "D",
+  "from_time": "2015-01-01T00:00:00Z",
+  "to_time": "2026-09-10T00:00:00Z",
+  "lookback": 250,
+  "bar_count": 3283,
+  "start_index": 250,
+  "summary": {
+    "step_count": 3033,
+    "run_count": 696,
+    "regime_counts": {
+      "mixed": 504,
+      "trend": 916,
+      "range": 1613
+    },
+    "mean_p_hat": 0.3465,
+    "p_hat_defined": 2941,
+    "completed_forecasts": 2936,
+    "brier": 0.1848,
+    "hit_rate": 0.3372,
+    "last_p_hat": 0.8444,
+    "last_instability": 0.65
+  },
+  "occupancy": {
+    "step_count": 3033,
+    "regime_counts": {
+      "mixed": 504,
+      "trend": 916,
+      "range": 1613
+    },
+    "direction_counts": {
+      "down": 1664,
+      "up": 1369
+    },
+    "trend_direction_counts": {
+      "down": 535,
+      "up": 381
+    },
+    "trend_share": 0.302,
+    "range_share": 0.5318,
+    "mixed_share": 0.1662,
+    "dir_up_share": 0.4514,
+    "dir_down_share": 0.5486,
+    "dir_imbalance": 0.0973,
+    "signed_dir": -0.0973,
+    "trend_up_share": 0.4159,
+    "trend_dir_imbalance": 0.1681,
+    "waning_share": 0.0491,
+    "direction_flips": 243,
+    "mean_direction_run_bars": 12.43,
+    "years": [
+      {
+        "year": "2015",
+        "n": 260,
+        "trend_share": 0.4385,
+        "range_share": 0.4346,
+        "mixed_share": 0.1269,
+        "dir_up_share": 0.2769,
+        "dir_down_share": 0.7231
+      },
+      {
+        "year": "2016",
+        "n": 259,
+        "trend_share": 0.2317,
+        "range_share": 0.6409,
+        "mixed_share": 0.1274,
+        "dir_up_share": 0.5946,
+        "dir_down_share": 0.4054
+      },
+      {
+        "year": "2017",
+        "n": 261,
+        "trend_share": 0.4521,
+        "range_share": 0.3218,
+        "mixed_share": 0.2261,
+        "dir_up_share": 0.5862,
+        "dir_down_share": 0.4138
+      },
+      {
+        "year": "2018",
+        "n": 258,
+        "trend_share": 0.2907,
+        "range_share": 0.5039,
+        "mixed_share": 0.2054,
+        "dir_up_share": 0.2907,
+        "dir_down_share": 0.7093
+      },
+      {
+        "year": "2019",
+        "n": 259,
+        "trend_share": 0.3591,
+        "range_share": 0.444,
+        "mixed_share": 0.1969,
+        "dir_up_share": 0.2934,
+        "dir_down_share": 0.7066
+      },
+      {
+        "year": "2020",
+        "n": 260,
+        "trend_share": 0.4154,
+        "range_share": 0.3885,
+        "mixed_share": 0.1962,
+        "dir_up_share": 0.6308,
+        "dir_down_share": 0.3692
+      },
+      {
+        "year": "2021",
+        "n": 260,
+        "trend_share": 0.3654,
+        "range_share": 0.4808,
+        "mixed_share": 0.1538,
+        "dir_up_share": 0.3769,
+        "dir_down_share": 0.6231
+      },
+      {
+        "year": "2022",
+        "n": 259,
+        "trend_share": 0.1892,
+        "range_share": 0.668,
+        "mixed_share": 0.1429,
+        "dir_up_share": 0.4015,
+        "dir_down_share": 0.5985
+      },
+      {
+        "year": "2023",
+        "n": 260,
+        "trend_share": 0.0769,
+        "range_share": 0.8308,
+        "mixed_share": 0.0923,
+        "dir_up_share": 0.4538,
+        "dir_down_share": 0.5462
+      },
+      {
+        "year": "2024",
+        "n": 260,
+        "trend_share": 0.3923,
+        "range_share": 0.4846,
+        "mixed_share": 0.1231,
+        "dir_up_share": 0.4,
+        "dir_down_share": 0.6
+      },
+      {
+        "year": "2025",
+        "n": 258,
+        "trend_share": 0.0814,
+        "range_share": 0.7636,
+        "mixed_share": 0.155,
+        "dir_up_share": 0.5349,
+        "dir_down_share": 0.4651
+      },
+      {
+        "year": "2026",
+        "n": 179,
+        "trend_share": 0.3408,
+        "range_share": 0.3743,
+        "mixed_share": 0.2849,
+        "dir_up_share": 0.6313,
+        "dir_down_share": 0.3687
+      }
+    ]
+  }
+}

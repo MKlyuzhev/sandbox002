@@ -1,0 +1,533 @@
+{
+  "instrument": "USD_JPY",
+  "engine": "mtf",
+  "chapter": 8,
+  "fill_mode": "rest",
+  "n_trades": 221,
+  "n_unjoined": 0,
+  "overall": {
+    "n": 221,
+    "mean_r": 0.0958,
+    "win_rate": 0.3846,
+    "sum_r": 21.1679,
+    "stops": 136,
+    "targets": 84,
+    "window_end": 1
+  },
+  "by_regime": {
+    "mixed": {
+      "n": 1,
+      "mean_r": 0.7391,
+      "win_rate": 1.0,
+      "sum_r": 0.7391,
+      "stops": 0,
+      "targets": 1,
+      "window_end": 0
+    },
+    "range": {
+      "n": 1,
+      "mean_r": -1.0,
+      "win_rate": 0.0,
+      "sum_r": -1.0,
+      "stops": 1,
+      "targets": 0,
+      "window_end": 0
+    },
+    "trend": {
+      "n": 219,
+      "mean_r": 0.0978,
+      "win_rate": 0.3836,
+      "sum_r": 21.4288,
+      "stops": 135,
+      "targets": 83,
+      "window_end": 1
+    }
+  },
+  "by_waning": {
+    "waning": {
+      "n": 1,
+      "mean_r": 0.7391,
+      "win_rate": 1.0,
+      "sum_r": 0.7391,
+      "stops": 0,
+      "targets": 1,
+      "window_end": 0
+    },
+    "not_waning": {
+      "n": 220,
+      "mean_r": 0.0929,
+      "win_rate": 0.3818,
+      "sum_r": 20.4288,
+      "stops": 136,
+      "targets": 83,
+      "window_end": 1
+    }
+  },
+  "by_alignment": {
+    "htf_aligned": {
+      "n": 220,
+      "mean_r": 0.1008,
+      "win_rate": 0.3864,
+      "sum_r": 22.1679,
+      "stops": 135,
+      "targets": 84,
+      "window_end": 1
+    },
+    "htf_contra": {
+      "n": 1,
+      "mean_r": -1.0,
+      "win_rate": 0.0,
+      "sum_r": -1.0,
+      "stops": 1,
+      "targets": 0,
+      "window_end": 0
+    }
+  },
+  "regime_x_alignment": {
+    "trend_aligned": {
+      "n": 218,
+      "mean_r": 0.1029,
+      "win_rate": 0.3853,
+      "sum_r": 22.4288,
+      "stops": 134,
+      "targets": 83,
+      "window_end": 1
+    },
+    "trend_contra": {
+      "n": 1,
+      "mean_r": -1.0,
+      "win_rate": 0.0,
+      "sum_r": -1.0,
+      "stops": 1,
+      "targets": 0,
+      "window_end": 0
+    },
+    "range_aligned": {
+      "n": 1,
+      "mean_r": -1.0,
+      "win_rate": 0.0,
+      "sum_r": -1.0,
+      "stops": 1,
+      "targets": 0,
+      "window_end": 0
+    },
+    "range_contra": {
+      "n": 0
+    },
+    "mixed_aligned": {
+      "n": 1,
+      "mean_r": 0.7391,
+      "win_rate": 1.0,
+      "sum_r": 0.7391,
+      "stops": 0,
+      "targets": 1,
+      "window_end": 0
+    },
+    "mixed_contra": {
+      "n": 0
+    }
+  },
+  "correlations": {
+    "r_vs_is_trend": 0.0154,
+    "r_vs_is_range": -0.0528,
+    "r_vs_is_mixed": 0.031,
+    "r_vs_is_trend_excluding_mixed": 0.0526,
+    "r_vs_waning": 0.031,
+    "r_vs_htf_aligned": 0.0528,
+    "n": 221,
+    "n_trend_vs_range": 220,
+    "note": "Pearson of realized R with a 0/1 dummy. Equivalent to point-biserial. R is bimodal near -1 and +2, so r is modest even when mean R differs."
+  },
+  "yearly": [
+    {
+      "year": "2015",
+      "all": {
+        "n": 19,
+        "mean_r": 0.0133,
+        "win_rate": 0.3684,
+        "sum_r": 0.2533,
+        "stops": 12,
+        "targets": 7,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 19,
+        "mean_r": 0.0133,
+        "win_rate": 0.3684,
+        "sum_r": 0.2533,
+        "stops": 12,
+        "targets": 7,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2016",
+      "all": {
+        "n": 28,
+        "mean_r": 0.2084,
+        "win_rate": 0.4286,
+        "sum_r": 5.8341,
+        "stops": 16,
+        "targets": 12,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 27,
+        "mean_r": 0.1887,
+        "win_rate": 0.4074,
+        "sum_r": 5.095,
+        "stops": 16,
+        "targets": 11,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 1,
+        "mean_r": 0.7391,
+        "win_rate": 1.0,
+        "sum_r": 0.7391,
+        "stops": 0,
+        "targets": 1,
+        "window_end": 0
+      }
+    },
+    {
+      "year": "2017",
+      "all": {
+        "n": 15,
+        "mean_r": 0.1717,
+        "win_rate": 0.4,
+        "sum_r": 2.5752,
+        "stops": 9,
+        "targets": 6,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 14,
+        "mean_r": 0.2554,
+        "win_rate": 0.4286,
+        "sum_r": 3.5752,
+        "stops": 8,
+        "targets": 6,
+        "window_end": 0
+      },
+      "range": {
+        "n": 1,
+        "mean_r": -1.0,
+        "win_rate": 0.0,
+        "sum_r": -1.0,
+        "stops": 1,
+        "targets": 0,
+        "window_end": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2018",
+      "all": {
+        "n": 17,
+        "mean_r": -0.1526,
+        "win_rate": 0.2941,
+        "sum_r": -2.5945,
+        "stops": 12,
+        "targets": 5,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 17,
+        "mean_r": -0.1526,
+        "win_rate": 0.2941,
+        "sum_r": -2.5945,
+        "stops": 12,
+        "targets": 5,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2019",
+      "all": {
+        "n": 13,
+        "mean_r": 0.358,
+        "win_rate": 0.4615,
+        "sum_r": 4.6536,
+        "stops": 7,
+        "targets": 6,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 13,
+        "mean_r": 0.358,
+        "win_rate": 0.4615,
+        "sum_r": 4.6536,
+        "stops": 7,
+        "targets": 6,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2020",
+      "all": {
+        "n": 13,
+        "mean_r": 0.0078,
+        "win_rate": 0.3846,
+        "sum_r": 0.1012,
+        "stops": 8,
+        "targets": 5,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 13,
+        "mean_r": 0.0078,
+        "win_rate": 0.3846,
+        "sum_r": 0.1012,
+        "stops": 8,
+        "targets": 5,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2021",
+      "all": {
+        "n": 18,
+        "mean_r": -0.0368,
+        "win_rate": 0.3333,
+        "sum_r": -0.6627,
+        "stops": 12,
+        "targets": 6,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 18,
+        "mean_r": -0.0368,
+        "win_rate": 0.3333,
+        "sum_r": -0.6627,
+        "stops": 12,
+        "targets": 6,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2022",
+      "all": {
+        "n": 36,
+        "mean_r": 0.1476,
+        "win_rate": 0.4167,
+        "sum_r": 5.3132,
+        "stops": 21,
+        "targets": 14,
+        "window_end": 1
+      },
+      "trend": {
+        "n": 36,
+        "mean_r": 0.1476,
+        "win_rate": 0.4167,
+        "sum_r": 5.3132,
+        "stops": 21,
+        "targets": 14,
+        "window_end": 1
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2023",
+      "all": {
+        "n": 17,
+        "mean_r": 0.7148,
+        "win_rate": 0.5882,
+        "sum_r": 12.1521,
+        "stops": 7,
+        "targets": 10,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 17,
+        "mean_r": 0.7148,
+        "win_rate": 0.5882,
+        "sum_r": 12.1521,
+        "stops": 7,
+        "targets": 10,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2024",
+      "all": {
+        "n": 25,
+        "mean_r": 0.0673,
+        "win_rate": 0.36,
+        "sum_r": 1.6822,
+        "stops": 16,
+        "targets": 9,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 25,
+        "mean_r": 0.0673,
+        "win_rate": 0.36,
+        "sum_r": 1.6822,
+        "stops": 16,
+        "targets": 9,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2025",
+      "all": {
+        "n": 10,
+        "mean_r": -0.1106,
+        "win_rate": 0.3,
+        "sum_r": -1.1056,
+        "stops": 7,
+        "targets": 3,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 10,
+        "mean_r": -0.1106,
+        "win_rate": 0.3,
+        "sum_r": -1.1056,
+        "stops": 7,
+        "targets": 3,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    },
+    {
+      "year": "2026",
+      "all": {
+        "n": 10,
+        "mean_r": -0.7034,
+        "win_rate": 0.1,
+        "sum_r": -7.0342,
+        "stops": 9,
+        "targets": 1,
+        "window_end": 0
+      },
+      "trend": {
+        "n": 10,
+        "mean_r": -0.7034,
+        "win_rate": 0.1,
+        "sum_r": -7.0342,
+        "stops": 9,
+        "targets": 1,
+        "window_end": 0
+      },
+      "range": {
+        "n": 0
+      },
+      "mixed": {
+        "n": 0
+      }
+    }
+  ],
+  "join_rule": "Last complete daily Ch.7 step with time <= trade entry_time (same causal rule as mtf_walk.htf_index_as_of).",
+  "selection": {
+    "day_counts": {
+      "trend": 1008,
+      "range": 1483,
+      "mixed": 561,
+      "n": 3052
+    },
+    "day_share": {
+      "trend": 0.33,
+      "range": 0.486,
+      "mixed": 0.184
+    },
+    "trade_counts": {
+      "trend": 219,
+      "range": 1,
+      "mixed": 1,
+      "n": 221
+    },
+    "trade_share": {
+      "trend": 0.991,
+      "range": 0.0045,
+      "mixed": 0.0045
+    },
+    "note": "policy.evaluate requires join_trend in allowed_play_classes; range/mixed days almost never fill a Ch.8 ticket."
+  },
+  "trailing_20d": {
+    "pearson_r_vs_trend_share": 0.0829,
+    "pearson_r_vs_range_share": -0.1364,
+    "spearman_r_vs_trend_share": 0.0459,
+    "tertiles": [
+      {
+        "name": "low",
+        "n": 73,
+        "mean_trend_share_20d": 0.255,
+        "mean_r": -0.0359,
+        "win_rate": 0.3425
+      },
+      {
+        "name": "mid",
+        "n": 75,
+        "mean_trend_share_20d": 0.574,
+        "mean_r": 0.0887,
+        "win_rate": 0.3733
+      },
+      {
+        "name": "high",
+        "n": 73,
+        "mean_trend_share_20d": 0.8973,
+        "mean_r": 0.2348,
+        "win_rate": 0.4384
+      }
+    ]
+  }
+}

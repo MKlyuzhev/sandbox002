@@ -24,6 +24,8 @@ Kalman decomposition of log(close) into level + slope + three harmonic cycles. E
 Causal path: `prefer="filt"`, `do_smooth=False`. The live runner can place OANDA market orders (this repo’s MCP does not).
 
 Docs: `SB_QuantAna/trend_trade/Docs/trade_trend_strategy.md`.
+Lien-clock named priors (daily direction + H1 dip, not the 2015 freeze):
+sandbox002 [KALMAN_LIEN_CLOCK.md](KALMAN_LIEN_CLOCK.md).
 
 ### `cycle_trade`
 
@@ -41,8 +43,8 @@ Docs: `SB_QuantAna/cycle_trade/Docs/cycle_trade_strategy.md`.
 |--------------|---------|-------|-----|
 | Trade with the trend; do not pick tops in a bull | Murphy Ch.4 (`murphy-digital` chunk **36**, d=0.16); Lien Ch.8 (chunks **70–71**) | Strong principle | Code uses `slope_z`, not chart peaks/troughs or HTF+RSI dip |
 | Stand aside or switch system when trendless | Murphy Ch.4 (36): trend systems fail in a range | Strong principle | Optional cycle-1 amplitude `active` gate, not ADX&lt;25 |
-| Join a strong trend; ADX / MA stack as trend proof | Lien Ch.7 (64), Ch.16 (92–93): ADX&gt;25, perfect order | Play class only | No ADX, no SMA 10&gt;20&gt;50&gt;100&gt;200, no five-bar delay |
-| Standardized trend forecast (slope / uncertainty) | Carver (`carver-systematic` **408**): EWMAC scaled by recent price stdev | Analog | Kalman `slope_z` vs EWMA crossover; `z_entry` 0.05 is tiny vs a strong-trend screen |
+| Join a strong trend; ADX / MA stack as trend proof | Lien Ch.7 (64), Ch.16 (92–93): ADX&gt;25, perfect order | Play class only | No ADX, no SMA 10&gt;20&gt;50&gt;100&gt;200, no five-bar delay. Named **Lien-clock** priors put Kalman on **daily** 10/20/50 and keep ADX in Ch.7 — still extra-corpus slope_z, not perfect order. See [KALMAN_LIEN_CLOCK.md](KALMAN_LIEN_CLOCK.md). |
+| Standardized trend forecast (slope / uncertainty) | Carver (`carver-systematic` **408**): EWMAC scaled by recent price stdev | Analog | Kalman `slope_z` vs EWMA crossover. Freeze `z_entry` 0.05 is tiny; Lien-clock daily prior restores `z_entry=1.0` |
 | Move stop to BE then trail once in profit | Lien Ch.7 risk (67–68): 1R → BE, close half, trail | Strong on modifiers | Optional pack; no scale-half. ATR/sigma sources are not Lien’s two-day low |
 | Exit when trend structure breaks | Lien Ch.16: exit when perfect order fails | Analog | `EXIT_slope_weak` is a z threshold, not an SMA cross |
 | State-space / Kalman trend+cycle split | No Kalman / Harvey / Durbin SSM in corpus | **None** | Core engine is original quant, not a book recipe |
@@ -56,7 +58,7 @@ Docs: `SB_QuantAna/cycle_trade/Docs/cycle_trade_strategy.md`.
 |--------------|---------|-------|-----|
 | Cycle = amplitude, period, phase; trade troughs and crests | Murphy Ch.14 (chunks **188–189**), Hurst cited | Strong | Phase via `atan2` on Kalman cos/sin, not visual trough-to-trough |
 | Price is the sum of active cycles (composite) | Murphy (189): Principle of Summation | Strong | Weighted sum of three SSM harmonics, not “all active cycles” |
-| Neighboring periods related by 2: `[10, 20, 40]` | Murphy (190): Principle of Harmonicity, usually ×2 | Strong | Exact harmonic grid. Trend SSM defaults `[20, 40, 80]` — same idea, slower |
+| Neighboring periods related by 2: `[10, 20, 40]` | Murphy (190): Principle of Harmonicity, usually ×2 | Strong | Exact harmonic grid for `cycle_trade`. Trend freeze `[20, 40, 80]` was the same idea on the wrong clock; Lien-clock trend residuals use **10/20/50 days** (perfect-order SMAs), not Murphy 5–10–20–40 |
 | More cycles turning together = better entry | Murphy synchronicity (190); Pring (`pring-ta` **484**) | Strong in docs | Tuner JSON sets `use_alignment_filter=false` |
 | Momentum zero-cross marks turning points | Pring (484): momentum confirms cyclic highs/lows | Strong | Pring says momentum alone is not enough for identification |
 | Ride trough → opposite turning point (half-cycle TP) | Murphy (188): extrapolate next peak/trough | Partial | Natural cyclic target; not a 2R Lien ticket |

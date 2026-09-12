@@ -1,0 +1,163 @@
+{
+  "instrument": "USD_CHF",
+  "granularity": "D",
+  "from_time": "2015-01-01T00:00:00Z",
+  "to_time": "2026-09-10T00:00:00Z",
+  "lookback": 250,
+  "bar_count": 3292,
+  "start_index": 250,
+  "summary": {
+    "step_count": 3042,
+    "run_count": 726,
+    "regime_counts": {
+      "range": 1549,
+      "trend": 939,
+      "mixed": 554
+    },
+    "mean_p_hat": 0.3741,
+    "p_hat_defined": 2947,
+    "completed_forecasts": 2942,
+    "brier": 0.1964,
+    "hit_rate": 0.3569,
+    "last_p_hat": 0.2012,
+    "last_instability": 0.0
+  },
+  "occupancy": {
+    "step_count": 3042,
+    "regime_counts": {
+      "range": 1549,
+      "trend": 939,
+      "mixed": 554
+    },
+    "direction_counts": {
+      "up": 1303,
+      "down": 1739
+    },
+    "trend_direction_counts": {
+      "up": 378,
+      "down": 561
+    },
+    "trend_share": 0.3087,
+    "range_share": 0.5092,
+    "mixed_share": 0.1821,
+    "dir_up_share": 0.4283,
+    "dir_down_share": 0.5717,
+    "dir_imbalance": 0.1433,
+    "signed_dir": -0.1433,
+    "trend_up_share": 0.4026,
+    "trend_dir_imbalance": 0.1949,
+    "waning_share": 0.0572,
+    "direction_flips": 271,
+    "mean_direction_run_bars": 11.18,
+    "years": [
+      {
+        "year": "2015",
+        "n": 260,
+        "trend_share": 0.2846,
+        "range_share": 0.5,
+        "mixed_share": 0.2154,
+        "dir_up_share": 0.4731,
+        "dir_down_share": 0.5269
+      },
+      {
+        "year": "2016",
+        "n": 259,
+        "trend_share": 0.1892,
+        "range_share": 0.6255,
+        "mixed_share": 0.1853,
+        "dir_up_share": 0.4788,
+        "dir_down_share": 0.5212
+      },
+      {
+        "year": "2017",
+        "n": 260,
+        "trend_share": 0.2692,
+        "range_share": 0.5731,
+        "mixed_share": 0.1577,
+        "dir_up_share": 0.3615,
+        "dir_down_share": 0.6385
+      },
+      {
+        "year": "2018",
+        "n": 260,
+        "trend_share": 0.4154,
+        "range_share": 0.3692,
+        "mixed_share": 0.2154,
+        "dir_up_share": 0.4654,
+        "dir_down_share": 0.5346
+      },
+      {
+        "year": "2019",
+        "n": 267,
+        "trend_share": 0.2097,
+        "range_share": 0.6479,
+        "mixed_share": 0.1423,
+        "dir_up_share": 0.412,
+        "dir_down_share": 0.588
+      },
+      {
+        "year": "2020",
+        "n": 260,
+        "trend_share": 0.3615,
+        "range_share": 0.5038,
+        "mixed_share": 0.1346,
+        "dir_up_share": 0.1808,
+        "dir_down_share": 0.8192
+      },
+      {
+        "year": "2021",
+        "n": 260,
+        "trend_share": 0.2885,
+        "range_share": 0.5346,
+        "mixed_share": 0.1769,
+        "dir_up_share": 0.5538,
+        "dir_down_share": 0.4462
+      },
+      {
+        "year": "2022",
+        "n": 259,
+        "trend_share": 0.3359,
+        "range_share": 0.5097,
+        "mixed_share": 0.1544,
+        "dir_up_share": 0.5598,
+        "dir_down_share": 0.4402
+      },
+      {
+        "year": "2023",
+        "n": 260,
+        "trend_share": 0.2462,
+        "range_share": 0.6038,
+        "mixed_share": 0.15,
+        "dir_up_share": 0.3577,
+        "dir_down_share": 0.6423
+      },
+      {
+        "year": "2024",
+        "n": 259,
+        "trend_share": 0.4903,
+        "range_share": 0.2394,
+        "mixed_share": 0.2703,
+        "dir_up_share": 0.5328,
+        "dir_down_share": 0.4672
+      },
+      {
+        "year": "2025",
+        "n": 259,
+        "trend_share": 0.2278,
+        "range_share": 0.5444,
+        "mixed_share": 0.2278,
+        "dir_up_share": 0.2625,
+        "dir_down_share": 0.7375
+      },
+      {
+        "year": "2026",
+        "n": 179,
+        "trend_share": 0.4246,
+        "range_share": 0.4302,
+        "mixed_share": 0.1453,
+        "dir_up_share": 0.5363,
+        "dir_down_share": 0.4637
+      }
+    ]
+  }
+}

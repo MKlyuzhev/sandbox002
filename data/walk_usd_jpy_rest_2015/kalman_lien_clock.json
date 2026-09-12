@@ -1,0 +1,156 @@
+{
+  "instrument": "USD_JPY",
+  "from": "2015-01-01T00:00:00Z",
+  "to": "2026-09-10T00:00:00Z",
+  "pip_size": 0.01,
+  "n_daily": 3052,
+  "n_h1": 72723,
+  "ch7_occupancy_daily_bars": {
+    "trend": 1008,
+    "range": 1483,
+    "mixed": 561,
+    "waning": 203
+  },
+  "priors": {
+    "lien_d1": {
+      "q_level": 1e-05,
+      "q_slope": 1e-06,
+      "q_accel": 1e-08,
+      "r_obs": 5e-05,
+      "do_smooth": false,
+      "cycle_periods_bars": [],
+      "q_cycles": []
+    },
+    "lien_h1_timing_q_slope": 4.166666666666666e-08,
+    "lien_sma_periods": [
+      10.0,
+      20.0,
+      50.0
+    ]
+  },
+  "kpi_note": "PnL is reported, not used to pick Q. Pass if daily holds are weeks, slope_z tracks SMA 10/20/50 better than the 2015 freeze, and H1 entries match daily sign with smaller |h1_z|.",
+  "acceptance": {
+    "daily_holds_longer_than_freeze": true,
+    "weeks_scale_mean_ge_10_llt": false,
+    "weeks_scale_mean_ge_10_cycles": true,
+    "stack_agreement_better_than_freeze_llt": true,
+    "stack_agreement_better_than_freeze_cycles": true,
+    "h1_entries_same_sign_as_daily": true,
+    "h1_abs_z_lt_daily": true,
+    "q_not_searched_on_pnl": true
+  },
+  "variants": {
+    "freeze_2015_on_daily": {
+      "note": "Historical H1 Q and z_entry=0.05 on the daily series (wrong clock).",
+      "trades": {
+        "n": 776,
+        "mean_duration": 2.584,
+        "median_duration": 2.0,
+        "mean_pnl_pips": 6.06,
+        "sum_pnl_pips": 4700.1,
+        "win_rate": 0.3673
+      },
+      "sma_stack_agreement": {
+        "n": 2026,
+        "frac": 0.5632
+      }
+    },
+    "lien_d1_llt_ungated": {
+      "trades": {
+        "n": 114,
+        "mean_duration": 8.711,
+        "median_duration": 7.0,
+        "mean_pnl_pips": 9.36,
+        "sum_pnl_pips": 1066.6,
+        "win_rate": 0.4298
+      },
+      "sma_stack_agreement": {
+        "n": 1946,
+        "frac": 0.6403
+      },
+      "mean_duration_days": 8.711
+    },
+    "lien_d1_llt_ch7": {
+      "trades": {
+        "n": 65,
+        "mean_duration": 6.677,
+        "median_duration": 5.0,
+        "mean_pnl_pips": -9.52,
+        "sum_pnl_pips": -618.7,
+        "win_rate": 0.3538
+      },
+      "sma_stack_agreement": {
+        "n": 1946,
+        "frac": 0.6403
+      }
+    },
+    "lien_d1_cycles_ch7": {
+      "trades": {
+        "n": 12,
+        "mean_duration": 11.5,
+        "median_duration": 10.5,
+        "mean_pnl_pips": 126.25,
+        "sum_pnl_pips": 1515.0,
+        "win_rate": 0.5
+      },
+      "sma_stack_agreement": {
+        "n": 1946,
+        "frac": 0.7626
+      }
+    },
+    "dual_llt_ch7": {
+      "trades_h1_bars": {
+        "n": 66,
+        "mean_duration": 146.833,
+        "median_duration": 117.5,
+        "mean_pnl_pips": 105.25,
+        "sum_pnl_pips": 6946.8,
+        "win_rate": 0.5909
+      },
+      "trades_days": {
+        "n": 66,
+        "mean_duration": 6.118,
+        "median_duration": 4.896,
+        "mean_pnl_pips": 105.25,
+        "sum_pnl_pips": 6946.8,
+        "win_rate": 0.5909
+      },
+      "pullback": {
+        "n": 66,
+        "frac_same_sign_as_daily": 1.0,
+        "frac_abs_h1_z_lt_abs_daily_z": 0.9848,
+        "mean_abs_h1_z": 0.5741,
+        "mean_abs_daily_z": 1.6101
+      },
+      "daily_sma_stack_agreement": {
+        "n": 1946,
+        "frac": 0.6403
+      }
+    },
+    "dual_h1_cycles_ch7": {
+      "trades_h1_bars": {
+        "n": 62,
+        "mean_duration": 145.839,
+        "median_duration": 117.0,
+        "mean_pnl_pips": 106.67,
+        "sum_pnl_pips": 6613.6,
+        "win_rate": 0.6129
+      },
+      "trades_days": {
+        "n": 62,
+        "mean_duration": 6.077,
+        "median_duration": 4.875,
+        "mean_pnl_pips": 106.67,
+        "sum_pnl_pips": 6613.6,
+        "win_rate": 0.6129
+      },
+      "pullback": {
+        "n": 62,
+        "frac_same_sign_as_daily": 1.0,
+        "frac_abs_h1_z_lt_abs_daily_z": 1.0,
+        "mean_abs_h1_z": 0.397,
+        "mean_abs_daily_z": 1.5637
+      }
+    }
+  }
+}
