@@ -9,10 +9,12 @@ Not a signal service and not an execution path.
 classification, `agent/levels.py` maps the snapshot to a ticket (last close,
 10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) and
 Ch. 9 (Double Bollinger Bands) are now encoded as entry engines
-(`agent/engines/mtf.py`, `agent/engines/dbb.py`); Ch. 13 (Fader), 14 (20-day
-breakout), and 16 (Perfect order) are also encoded. Chapters 10, 11, 12, and 15
-remain documented here for later iterations (news, London session,
-`breakout_watch` paper policy) and are **not** encoded as trade logic yet.
+(`agent/engines/mtf.py`, `agent/engines/dbb.py`); Ch. 11 (Waiting for the Deal),
+13 (Fader), 14 (20-day breakout), and 16 (Perfect order) are also encoded.
+Chapters 10, 12, and 15 remain documented here for later iterations (news
+filter, `breakout_watch` paper policy) and are **not** encoded as trade logic
+yet. The Ch. 11 clock is a calendar join on OHLCV timestamps
+(`app/session_clock.py`), not the Kalman holding-period prior.
 
 ```
 OANDA candles → indicators.py → regime.py → JSON
@@ -29,8 +31,12 @@ Headless loop (regime → retrieve → propose → policy → journal):
 [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
 Planner campaign (scan → peek → `run_graph` / `run_walk`):
 [AGENT_PLANNER.md](AGENT_PLANNER.md).
-Sibling `trend_trade` / `cycle_trade` vs this corpus:
+Sibling `trend_trade` / `cycle_trade` / `mean_reversion_trade` vs this corpus:
 [sandbox001 vs RAG](SANDBOX001_RAG_CORRELATION.md).
+Named Kalman clocks (extra-corpus slope/cycle/residual, Ch.7 gate):
+[KALMAN_LIEN_CLOCK.md](KALMAN_LIEN_CLOCK.md),
+[CYCLE_TRADE_RAG.md](CYCLE_TRADE_RAG.md),
+[MEAN_REV_RAG.md](MEAN_REV_RAG.md).
 
 ---
 
@@ -165,7 +171,7 @@ Unit tests (no network):
 
 ## Technical strategies (Ch. 8–16)
 
-Ch. 8, 9, 13, 14, and 16 are coded (see below); Ch. 10, 11, 12, and 15
+Ch. 8, 9, 11, 13, 14, and 16 are coded (see below); Ch. 10, 12, and 15
 entries are documented, not coded. Ch. 15 channel rails appear on the
 regime overlay as display only.
 
@@ -174,7 +180,7 @@ regime overlay as display only.
 | **8** *(coded)* | Multiple time frames | Daily bias + H1/M15 entry | Higher TF sets direction; buy RSI dips in uptrends | Trend on daily | Fading daily trend from a lower TF |
 | **9** *(coded)* | Double Bollinger Bands | Daily | 1σ+2σ: fade only after close back through 1σ; outer zone = trend; close through 1σ after opposite side = join trend | Regime already classified | Single-band fades that hug 2σ |
 | **10** | Fade double zeros | 15m | Fade round numbers 10–15 pips before the figure; stop ~20 pips beyond; 20-SMA filter | Quiet tape, tighter crosses, confluence | News, strong trend |
-| **11** | Waiting for the Deal | GBPUSD, London | Skip first London spike (stop hunt); trade reverse through power-hour (6–7 GMT) range | After US open / major release | First spike |
+| **11** *(coded)* | Waiting for the Deal | GBPUSD, M15 + London clock | Skip first London spike (stop hunt); trade reverse through power-hour range | After US open / major release (news filter not encoded) | First spike |
 | **12** | Inside-days breakout | Daily (hourly only before London/US) | ≥2 nested inside days; enter ±10 pips; **stop-and-reverse** on false break | Compression, tighter pairs (EURGBP, USDCAD, EURCHF, EURCAD, AUDCAD) | Chasing without nested insides |
 | **13** *(coded)* | Fader | Daily ADX + hourly entry | ADX(14) &lt; 20: fade a ≥15-pip probe beyond prior day H/L | Range regime | ADX trending |
 | **14** *(coded)* | 20-day breakout | Daily | 20-day extreme → 2-day pullback → rebreak within 3 days | Trend / expansion | First touch of the 20-day without shakeout |
@@ -270,6 +276,38 @@ agent.tester_backtest --engine dbb --tf D` — see
 [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 
 MCP (`oanda-research`): `entry_dbb`.
+
+### Ch. 11 Waiting for the Deal (encoded)
+
+`app/session_clock.py` joins each M15 (or finer) bar's RFC3339 UTC `time` to
+London/Berlin/NY hours with IANA zones (no hardcoded DST table). Default clock
+`frankfurt` is Berlin 08:00 → London 08:00 — summer 06:00–07:00 UTC (the book's
+"6 GMT to 7 GMT"), winter 07:00–08:00 UTC. `utc_fixed` keeps 06:00–07:00 UTC
+year-round for a book-literal check.
+
+`agent/engines/waiting_deal.py` then: (1) Ch.7 daily gate (`fade_range` or
+`breakout_watch`, never `join_trend` or `trend_waning`); (2) power-hour H/L;
+(3) ≥25-pip hunt beyond that box after London open; (4) reverse through the
+opposite rail, pending 10 pips beyond, stop 25 pips the other side of the rail.
+Tickets use `levels.build_ticket` + 2R (not the book's 50/105 pip template).
+News/FOMC is **not** identified from range fatness. Same-bar hunt+reverse is
+allowed (OHLC has no wick order). Citations: `lien-fx` chunks 80–82.
+
+Calendar correlation (hour-of-week mean range + hunt/reverse rates; not a PnL
+fit):
+
+```bash
+.venv/bin/python scripts/session_clock_stats.py --instrument GBP_USD --granularity M15
+.venv/bin/python scripts/entry_lien.py --chapter 11 --instrument GBP_USD
+.venv/bin/python -m agent.walk_lien --chapter 11 --instrument GBP_USD \
+  --ltf-granularity M15 \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.tester_backtest --chapter 11 --instrument GBP_USD --tf M15 --htf D
+.venv/bin/python -m unittest tests.test_session_clock tests.test_entry_waiting_deal \
+  tests.test_agent_waiting_deal_walk -v
+```
+
+MCP: `entry_lien(chapter=11, ...)`. Coarse LTF (`H1`/`H4`/`D`) remaps to **M15**.
 
 ### Ch. 13 Fader (encoded)
 
@@ -377,11 +415,12 @@ MCP: `entry_lien(chapter=16, ...)`.
 
 ## Out of scope / later
 
-- Encoding Ch. 10 (double zeros — news cannot be coded), 11 (London session
-  clock), 12 (inside days), and 15 (channel **entries**). Overlay rails reuse
-  the Ch. 15 trendline+parallel construction as display only; they do not
-  fire ±10-pip breakout tickets. 12/15 need a `breakout_watch` →
-  `pending_exec` policy change this pass did not make.
+- Encoding Ch. 10 (double zeros — news cannot be coded), 12 (inside days), and
+  15 (channel **entries**). Overlay rails reuse the Ch. 15 trendline+parallel
+  construction as display only; they do not fire ±10-pip breakout tickets.
+  12/15 need a `breakout_watch` → `pending_exec` policy change this pass did
+  not make. Ch. 11 is encoded (`waiting_deal`); its news preference stays
+  `unavailable`.
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)
 - Orders, a risk MCP wrapper, or live execution

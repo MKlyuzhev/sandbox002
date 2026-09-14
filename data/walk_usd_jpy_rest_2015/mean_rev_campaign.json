@@ -1,0 +1,214 @@
+{
+  "instrument": "USD_JPY",
+  "engine": "mean_rev_lien_clock_d1",
+  "note": "Causal filt Kalman. Daily Murphy [10,20,40] residual z vs recon; Chan k_entry=2 / TP |z|<=1 / T_max=10; Ch.7 fade_range gate. Not a Lien chapter.",
+  "window": "2015-01-01T00:00:00Z to 2026-09-09T21:00:00.000000000Z",
+  "last_daily_bar": "2026-09-09T21:00:00.000000000Z",
+  "fill_mode": "next_open",
+  "ch7": "fade_range (regime=range, not waning); flatten on leave-range",
+  "value_per_price_unit": 0.006666666666666667,
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "atr": {
+    "period": 14,
+    "k": 3.0
+  },
+  "decision": {
+    "cycle_periods_bars": [
+      10.0,
+      20.0,
+      40.0
+    ],
+    "stretch_mode": "sigma",
+    "k_entry": 2.0,
+    "tp_resid_close": 0.0,
+    "tp_abs_eps_sigma": 1.0,
+    "use_resid_stop": false,
+    "use_range_regime": false,
+    "use_slope_z": false,
+    "A_min": 0.0,
+    "T_max": 10,
+    "warmup_bars": 80,
+    "phase_c1_c2": true
+  },
+  "ssm": {
+    "q_level": 1e-05,
+    "q_slope": 1e-06,
+    "q_accel": 1e-08,
+    "cycle_periods_bars": [
+      10.0,
+      20.0,
+      40.0
+    ],
+    "q_cycles": [
+      2e-05,
+      8e-06,
+      3e-06
+    ],
+    "r_obs": 5e-05,
+    "do_smooth": false
+  },
+  "n_daily": 3052,
+  "occupancy": {
+    "fade_range_bars_after_warmup": 1433,
+    "bars_after_warmup": 2972,
+    "fade_range_frac": 0.4822,
+    "stretch_bars": 174,
+    "stretch_long_bars": 83,
+    "stretch_short_bars": 91,
+    "stretch_and_fade": 36,
+    "stretch_and_fade_long": 14,
+    "stretch_and_fade_short": 22,
+    "stretch_fade_and_phase": 11,
+    "stretch_fade_and_c1c2": 12,
+    "stretch_fade_phase_c1c2": 4
+  },
+  "signals": {
+    "raw_long": 6,
+    "raw_short": 3,
+    "gated_long": 3,
+    "gated_short": 1
+  },
+  "trade_count": 4,
+  "ending_equity": 10022.0555,
+  "peak_equity": 10082.1258,
+  "max_drawdown_frac": 0.006,
+  "n": 4,
+  "mean_r": 0.0279,
+  "sum_r": 0.1116,
+  "win_rate": 0.5,
+  "wins": 2,
+  "losses": 2,
+  "mean_pnl_pips": 5.1,
+  "sum_pnl_pips": 20.4,
+  "mean_duration_days": 1.25,
+  "median_duration_days": 1.0,
+  "mean_entry_abs_z": 3.622,
+  "exits": {
+    "TP_z_le_1": 4
+  },
+  "by_side": {
+    "long": {
+      "n": 3,
+      "mean_r": 0.0958,
+      "sum_r": 0.2875,
+      "win_rate": 0.6667,
+      "wins": 2,
+      "losses": 1,
+      "mean_pnl_pips": 29.37,
+      "sum_pnl_pips": 88.1,
+      "mean_duration_days": 1.0,
+      "median_duration_days": 1.0,
+      "mean_entry_abs_z": 3.794
+    },
+    "short": {
+      "n": 1,
+      "mean_r": -0.1759,
+      "sum_r": -0.1759,
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 1,
+      "mean_pnl_pips": -67.7,
+      "sum_pnl_pips": -67.7,
+      "mean_duration_days": 2.0,
+      "median_duration_days": 2.0,
+      "mean_entry_abs_z": 3.105
+    }
+  },
+  "by_regime": {
+    "range": {
+      "n": 4,
+      "mean_r": 0.0279,
+      "sum_r": 0.1116,
+      "win_rate": 0.5,
+      "wins": 2,
+      "losses": 2,
+      "mean_pnl_pips": 5.1,
+      "sum_pnl_pips": 20.4,
+      "mean_duration_days": 1.25,
+      "median_duration_days": 1.0,
+      "mean_entry_abs_z": 3.622
+    }
+  },
+  "yearly": [
+    {
+      "year": "2015",
+      "n": 1,
+      "mean_r": 0.1339,
+      "sum_r": 0.1339,
+      "win_rate": 1.0,
+      "wins": 1,
+      "losses": 0,
+      "mean_pnl_pips": 46.3,
+      "sum_pnl_pips": 46.3,
+      "mean_duration_days": 1.0,
+      "median_duration_days": 1.0,
+      "mean_entry_abs_z": 4.907
+    },
+    {
+      "year": "2016",
+      "n": 2,
+      "mean_r": 0.0501,
+      "sum_r": 0.1001,
+      "win_rate": 0.5,
+      "wins": 1,
+      "losses": 1,
+      "mean_pnl_pips": 15.4,
+      "sum_pnl_pips": 30.8,
+      "mean_duration_days": 1.5,
+      "median_duration_days": 1.5,
+      "mean_entry_abs_z": 3.001
+    },
+    {
+      "year": "2017",
+      "n": 0
+    },
+    {
+      "year": "2018",
+      "n": 0
+    },
+    {
+      "year": "2019",
+      "n": 0
+    },
+    {
+      "year": "2020",
+      "n": 0
+    },
+    {
+      "year": "2021",
+      "n": 0
+    },
+    {
+      "year": "2022",
+      "n": 0
+    },
+    {
+      "year": "2023",
+      "n": 0
+    },
+    {
+      "year": "2024",
+      "n": 0
+    },
+    {
+      "year": "2025",
+      "n": 1,
+      "mean_r": -0.1224,
+      "sum_r": -0.1224,
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 1,
+      "mean_pnl_pips": -56.7,
+      "sum_pnl_pips": -56.7,
+      "mean_duration_days": 1.0,
+      "median_duration_days": 1.0,
+      "mean_entry_abs_z": 3.579
+    },
+    {
+      "year": "2026",
+      "n": 0
+    }
+  ],
+  "sliced": true
+}

@@ -121,6 +121,12 @@ Lower `--lookback` for shorter ranges.
   ≥15 pips beyond prior day H/L then close back inside. First-fire (no
   rollover-peak). `--tf H1 --htf D`.
 
+### Ch. 11 (`--engine waiting_deal` / `--chapter 11`)
+
+- Dual-TF like Ch. 8: export **M15**, resample **D**. Frankfurt–London power-hour
+  range, ≥25-pip hunt, reverse through the opposite rail. First-fire.
+  `--tf M15 --htf D`.
+
 ### Ch. 14 / 16 (`--chapter 14` / `--chapter 16`)
 
 - Single daily timeframe like Ch. 9 (`agent.event_walk`). Ch. 14 is a 20-day
@@ -146,6 +152,9 @@ Lower `--lookback` for shorter ranges.
 
 # Ch. 8 (MTF) with first-fire timing instead of rollover-peak
 .venv/bin/python -m agent.tester_backtest --engine mtf --entry-mode first_fire --instrument GBP_USD --tf H1 --htf D
+
+# Ch. 11 (Waiting for the Deal): export on M15, resample D internally
+.venv/bin/python -m agent.tester_backtest --chapter 11 --instrument GBP_USD --tf M15 --htf D
 
 # Ch. 13 (Fader): export on H1, resample D internally
 .venv/bin/python -m agent.tester_backtest --chapter 13 --instrument EUR_USD --tf H1 --htf D

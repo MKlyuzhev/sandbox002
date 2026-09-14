@@ -1,19 +1,21 @@
-"""Chapter ids for encoded Lien engines (this iteration: 13, 14, 16 + 8/9)."""
+"""Chapter ids for encoded Lien engines (this iteration: 11, 13, 14, 16 + 8/9)."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
 
-from agent.engines import breakout20, dbb, fader, mtf, perfect_order
+from agent.engines import breakout20, dbb, fader, mtf, perfect_order, waiting_deal
 
 # MCP ``entry_lien`` implements these only.
-ENTRY_LIEN_CHAPTERS: frozenset[int] = frozenset({13, 14, 16})
-DEFERRED_CHAPTERS: frozenset[int] = frozenset({10, 11, 12, 15})
+ENTRY_LIEN_CHAPTERS: frozenset[int] = frozenset({11, 13, 14, 16})
+DEFERRED_CHAPTERS: frozenset[int] = frozenset({10, 12, 15})
+DUAL_TF_ENGINES: frozenset[str] = frozenset({"mtf", "fader", "waiting_deal"})
 
 CHAPTER_TO_ENGINE: dict[int, str] = {
     8: "mtf",
     9: "dbb",
+    11: "waiting_deal",
     13: "fader",
     14: "breakout20",
     16: "perfect_order",
@@ -31,6 +33,14 @@ EVENT_SIGNAL: dict[str, SignalFn] = {
     "breakout20": breakout20.breakout20_signal,
     "perfect_order": perfect_order.perfect_order_signal,
 }
+
+
+def default_ltf(chapter: int | None, ltf_granularity: str | None) -> str:
+    """Ch.11 remaps coarse TFs to M15; others keep the caller default."""
+    if chapter == 11:
+        return waiting_deal.resolve_ltf(ltf_granularity)
+    text = (ltf_granularity or "H1").strip()
+    return text or "H1"
 
 
 def resolve_engine(*, chapter: int | None, engine: str | None) -> str:
@@ -63,11 +73,11 @@ def entry_lien_error(chapter: int) -> str:
         return "Chapter 9 is the entry_dbb tool, not entry_lien."
     if chapter in DEFERRED_CHAPTERS:
         return (
-            f"Chapter {chapter} is not encoded yet (deferred: news, session clock, "
-            "or breakout_watch paper policy). This iteration covers chapters 13, "
-            "14, and 16 only."
+            f"Chapter {chapter} is not encoded yet (deferred: news filter or "
+            "breakout_watch paper policy). entry_lien implements 11 (waiting "
+            "for the deal), 13 (fader), 14 (20-day breakout), and 16 (perfect order)."
         )
     return (
-        f"Unsupported chapter {chapter}. entry_lien implements 13 (fader), "
-        "14 (20-day breakout), and 16 (perfect order)."
+        f"Unsupported chapter {chapter}. entry_lien implements 11 (waiting for "
+        "the deal), 13 (fader), 14 (20-day breakout), and 16 (perfect order)."
     )

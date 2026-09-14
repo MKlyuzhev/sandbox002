@@ -6,6 +6,8 @@ Named SSM priors in sandbox001
 Q/R is the documented D1 Set B block, scaled by `dt` — not the 2015 H1 PnL freeze.
 
 Related: [SANDBOX001_RAG_CORRELATION.md](SANDBOX001_RAG_CORRELATION.md),
+[CYCLE_TRADE_RAG.md](CYCLE_TRADE_RAG.md),
+[MEAN_REV_RAG.md](MEAN_REV_RAG.md),
 [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). Pin Lien engines with
 `python -m agent.fidelity --pin`.
 
@@ -45,7 +47,8 @@ Ch.7 join_trend (not waning)
 Exits belong to the daily state.
 ```
 
-Session clocks (Ch.11 / 15) are not this Kalman.
+Session clocks (Ch.11) are encoded in [`app/session_clock.py`](../app/session_clock.py)
+(calendar join on OHLCV timestamps). They are **not** this Kalman.
 
 ## Acceptance walk
 

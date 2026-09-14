@@ -9,7 +9,13 @@ from typing import Any, Literal
 from agent.event_walk import walk_event
 from agent.fader_walk import walk_fader
 from agent.journal import DEFAULT_DB_PATH, Journal
-from agent.lien_chapters import CHAPTER_TO_ENGINE, EVENT_ENGINES, entry_lien_error
+from agent.lien_chapters import (
+    CHAPTER_TO_ENGINE,
+    EVENT_ENGINES,
+    default_ltf,
+    entry_lien_error,
+)
+from agent.waiting_deal_walk import walk_waiting_deal
 from agent.mtf_walk import walk_mtf
 from agent.paper_walk import walk_paper
 from agent.schema import FillMode, Goal, WalkResult
@@ -94,6 +100,8 @@ async def execute_walk(
         raise WalkJobError(f"unknown walk kind {kind!r}; use ch7, mtf, or lien")
     if not from_time or not to_time:
         raise WalkJobError("from_time and to_time are required")
+    if kind_key == "lien" and chapter == 11:
+        ltf_granularity = default_ltf(chapter, ltf_granularity)
     fetch = fetch_fn or fetch_walk_bars
     with_ba = fill_mode == "rest"
     store = None if no_journal else (journal if journal is not None else Journal(DEFAULT_DB_PATH))
@@ -179,13 +187,13 @@ async def execute_walk(
         return result, meta
 
     if chapter is None:
-        raise WalkJobError("lien walks require chapter (9, 13, 14, or 16)")
+        raise WalkJobError("lien walks require chapter (9, 11, 13, 14, or 16)")
     engine = CHAPTER_TO_ENGINE.get(chapter)
     if engine is None:
         raise WalkJobError(entry_lien_error(chapter))
     meta["chapter"] = chapter
     meta["engine"] = engine
-    if engine == "fader":
+    if engine in ("fader", "waiting_deal"):
         htf_bars, ltf_bars = await asyncio.gather(
             fetch(
                 instrument, granularity, from_time, to_time, lookback, with_ba=False
@@ -200,7 +208,8 @@ async def execute_walk(
             ),
         )
         start_index = regime_walk.first_index_on_or_after(ltf_bars, from_time)
-        result = walk_fader(
+        walker = walk_waiting_deal if engine == "waiting_deal" else walk_fader
+        result = walker(
             htf_bars,
             ltf_bars,
             goal,

@@ -1,8 +1,9 @@
 """CLI: python -m agent.walk_lien --chapter 16 --instrument GBP_USD --from ... --to ...
 
-Causal paper walk for encoded Lien chapters 9 / 13 / 14 / 16. Single-TF event
+Causal paper walk for encoded Lien chapters 9 / 11 / 13 / 14 / 16. Single-TF event
 engines (9, 14, 16) step the exported granularity; Ch.13 Fader steps H1 against
-a daily ADX gate. Research only; no broker orders.
+a daily ADX gate; Ch.11 Waiting for the Deal steps M15 against a daily Ch.7
+gate. Research only; no broker orders.
 """
 
 from __future__ import annotations
@@ -83,7 +84,7 @@ async def _async_main(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Causal Lien paper walk for chapters 9, 13, 14, or 16. "
+            "Causal Lien paper walk for chapters 9, 11, 13, 14, or 16. "
             "Research only; no broker orders."
         )
     )
@@ -91,7 +92,7 @@ def main() -> int:
         "--chapter",
         type=int,
         required=True,
-        help="9 (dbb), 13 (fader), 14 (breakout20), or 16 (perfect_order).",
+        help="9 (dbb), 11 (waiting_deal), 13 (fader), 14 (breakout20), or 16 (perfect_order).",
     )
     parser.add_argument("--instrument", required=True)
     parser.add_argument("--from", dest="from_time", required=True, metavar="RFC3339")
@@ -100,7 +101,7 @@ def main() -> int:
     parser.add_argument(
         "--ltf-granularity",
         default="H1",
-        help="Lower TF for Ch.13 (default H1).",
+        help="Lower TF for Ch.11 (remaps H1→M15) and Ch.13 (default H1).",
     )
     parser.add_argument(
         "--lookback",

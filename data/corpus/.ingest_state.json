@@ -76,6 +76,11 @@
       "chunks_added": 811,
       "figures_added": 330,
       "file": "pring-ta.pdf"
+    },
+    "gerchik": {
+      "chunks_added": 334,
+      "figures_added": 184,
+      "file": "gerchik.pdf"
     }
   },
   "smoke_tests": {

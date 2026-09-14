@@ -88,6 +88,7 @@ async def _default_fetch_analyses(
         analysis = regime_mod.analyze_bars(bars)
         analysis.setdefault("instrument", goal.instrument)
         analysis.setdefault("granularity", gran)
+        analysis["ohlc"] = bars
         out[gran] = analysis
     return out
 

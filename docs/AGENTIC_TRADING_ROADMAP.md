@@ -87,12 +87,13 @@ firing signal wins; specialized engines outrank Ch. 7 geometry fallback.
 |--------|---------|--------------|------------|
 | `mtf` | 8 | `join_trend` | `agent.run`, `agent.walk_mtf`, `agent.tester_backtest --engine mtf` |
 | `dbb` | 9 | `join_trend`, `fade_range` | `agent.run`, `agent.walk_lien --chapter 9`, `agent.tester_backtest --engine dbb` |
+| `waiting_deal` | 11 | `fade_range`, `breakout_watch` | `agent.run`, `agent.walk_lien --chapter 11`, `entry_lien` |
 | `fader` | 13 | `fade_range` | `agent.run`, `agent.walk_lien --chapter 13`, `entry_lien` |
 | `breakout20` | 14 | `join_trend` | `agent.run`, `agent.walk_lien --chapter 14`, `entry_lien` |
 | `perfect_order` | 16 | `join_trend` | `agent.run`, `agent.walk_lien --chapter 16`, `entry_lien` |
 | `ch7_geometry` | 7 | `join_trend`, `fade_range` | Fallback; `agent.walk` (causal Ch. 7 paper walk) |
 
-Ch. 10, 11, 12, and 15 remain documentation-only in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
+Ch. 10, 12, and 15 remain documentation-only in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 
 **Sibling workflows** (same journal schema, different time semantics):
 
@@ -101,7 +102,7 @@ Ch. 10, 11, 12, and 15 remain documentation-only in [LIEN_FX_STRATEGIES.md](LIEN
 | `agent.run` | Snapshot at last bar; optional RAG + LLM |
 | `agent.walk` | Causal Ch. 7 back-test over `--from`/`--to` |
 | `agent.walk_mtf` | Causal Ch. 8 rollover-peak walk (HTF + LTF) |
-| `agent.walk_lien` | Causal Ch. 9 / 13 / 14 / 16 walks |
+| `agent.walk_lien` | Causal Ch. 9 / 11 / 13 / 14 / 16 walks |
 | `agent.tester_backtest` | MT4 Strategy Tester replay for encoded engines |
 | `agent.executor` | Drain `pending_exec` rows → `filled_sim` (stub) |
 
@@ -119,7 +120,7 @@ How to run this loop in Cursor (tools, campaign recipe, peek vs act):
 summary.
 
 The useful LLM is a **searcher and experimenter in front of the graph**, not a
-decision node inside it. Encoding remaining Lien chapters (10, 11, 12, 15)
+decision node inside it. Encoding remaining Lien chapters (10, 12, 15)
 expands the toolbox; it does not replace this loop. A human typing flags and a
 ReAct agent emitting the same `Goal` produce the **same ticket** if both go
 through `agent.run`. They are not the same **planner**: ReAct does the work
@@ -224,7 +225,7 @@ stats without re-computing them.
 | Parameter grid | Manual flag loops in Cursor | No `sweep` tool; easy to overfit |
 | Read walk / journal stats | Walk JSON, `GET /api/journal/walks/{id}` | Planner must be given the artifact; no `analyze_walk` summarizer |
 | Sentence → `Goal` | Type RFC3339 flags | No parser; dashboard has no free-text |
-| `entry_dbb` / `entry_lien` as MCP | **Done** — Ch. 9 `entry_dbb`; Ch. 13/14/16 `entry_lien` | Ch. 10/11/12/15 still unencoded |
+| `entry_dbb` / `entry_lien` as MCP | **Done** — Ch. 9 `entry_dbb`; Ch. 11/13/14/16 `entry_lien` | Ch. 10/12/15 still unencoded |
 | `agent.run` / walks as MCP | **Done** — `run_graph`, `run_walk` (not tester) | Tester stays CLI |
 
 **Practical order**
@@ -238,7 +239,7 @@ stats without re-computing them.
    `engine_candidates` are **done**. Tester MCP is still CLI. Do not loosen policy.
 3. Natural language → `JobSpec` + preview (dashboard/CLI). Confirmed walk or
    basket of classify calls — not a free shell and not an unbounded sweep.
-4. Encode remaining chapters (10, 11, 12, 15) when news/session/`breakout_watch`
+4. Encode remaining chapters (10, 12, 15) when news/`breakout_watch`
    policy is honest.
 
 HTTP `/agent/run` and a dashboard chat box are later wrappers around the same
@@ -298,7 +299,7 @@ Murphy is theory; trading needs live or historical market state.
 | `run_graph` / `run_walk` | Journaled snapshot + causal walks | **Done** — MCP wraps `agent.graph` / `agent/walk_jobs.py` |
 | `entry_mtf` | Ch. 8 two-timeframe signal | **Done** — MCP + `agent/engines/mtf.py` |
 | `entry_dbb` | Ch. 9 double Bollinger signal | **Done** — MCP + `agent/engines/dbb.py` |
-| `entry_lien` | Ch. 13/14/16 (fader, 20-day, perfect order) | **Done** — MCP + `scripts/entry_lien.py` |
+| `entry_lien` | Ch. 11/13/14/16 (waiting for the deal, fader, 20-day, perfect order) | **Done** — MCP + `scripts/entry_lien.py` |
 | `get_account_summary` | NAV / balance for sizing | **Done** — OANDA MCP; `agent.run --use-account` |
 | `mt4_draw_regime` / `mt4_draw_ticket` | Chart overlay (display only) | **Done** — OANDA MCP; `agent.run --mt4` |
 | `get_quote(symbol)` | Last price, spread | Partial — last close from candles, not a dedicated quote tool |
@@ -414,7 +415,7 @@ Serialize GPU work: do not embed + vision + chat concurrently.
 
 ### Phase B — Analysis / signal — **done** (orchestrator)
 
-- **Add:** OANDA candles + Ch. 7 regime + entry engines (Ch. 8/9/13/14/16 + Ch. 7 fallback)
+- **Add:** OANDA candles + Ch. 7 regime + entry engines (Ch. 8/9/11/13/14/16 + Ch. 7 fallback)
 - **Output:** `wait` / `log_setup` / `pending_exec` + regime snapshot + risk verdict
 - **Still no** broker orders
 
@@ -423,8 +424,8 @@ Bollinger / MA stack in code. MCP tools `classify_regime`, `indicator_snapshot`,
 `mt4_draw_regime`, `mt4_draw_ticket`, `entry_mtf`, `entry_dbb`, and `entry_lien`
 on `oanda-research`. See [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). Causal
 paper walks: `agent.walk` (Ch. 7), `agent.walk_mtf` (Ch. 8), `agent.walk_lien`
-(Ch. 9/13/14/16). MT4 Strategy Tester bridge: `agent.tester_backtest`. Ch. 10,
-11, 12, and 15 remain documentation-only.
+(Ch. 9/11/13/14/16). MT4 Strategy Tester bridge: `agent.tester_backtest`. Ch. 10,
+12, and 15 remain documentation-only.
 
 ### Phase B2 — Planner ReAct — **prototype** (intended LLM agent)
 
@@ -523,7 +524,7 @@ Success is:
 | `agent/` package — bounded graph | `python -m agent.run` |
 | Decision journal + stub paper executor | `data/journal/runs.sqlite`, `python -m agent.executor` |
 | Ch. 7 regime + risk policy gate | `app/regime.py`, `agent/policy.py` |
-| Entry engines Ch. 8/9/13/14/16 + Ch. 7 fallback | `agent/engines/` |
+| Entry engines Ch. 8/9/11/13/14/16 + Ch. 7 fallback | `agent/engines/` |
 | Causal paper walks + MT4 tester bridge | `agent.walk`, `agent.walk_mtf`, `agent.walk_lien`, `agent.tester_backtest` |
 | Ops dashboard first slice | `python -m dashboard` (port 8001) — [DASHBOARD.md](DASHBOARD.md) |
 
@@ -532,7 +533,7 @@ Success is:
 **Planner loop (§1c) — remaining**
 
 1. Natural language → `JobSpec` + preview; optional dashboard chat (no free-text argv)
-2. Remaining Lien chapters 10, 11, 12, 15 (news / session / `breakout_watch` policy)
+2. Remaining Lien chapters 10, 12, 15 (news / `breakout_watch` policy)
 3. MT4 tester as MCP (still CLI: `agent.tester_backtest`)
 4. `analyze_walk` summarizer; dashboard whitelist for `walk_lien` / `walk_mtf`
 
@@ -583,8 +584,8 @@ clients (interchangeable; own no indicator / policy / order logic)
   numbers are computed here. Not an MCP tool — `agent/policy.py` imports it
   in-process.
 - **`agent/`** — bounded analysis graph (`python -m agent.run`), entry engines
-  (Ch. 8 MTF, Ch. 9 DBB, Ch. 13 Fader, Ch. 14 20-day, Ch. 16 perfect order,
-  Ch. 7 geometry fallback), causal walks
+  (Ch. 8 MTF, Ch. 9 DBB, Ch. 11 Waiting for the Deal, Ch. 13 Fader, Ch. 14
+  20-day, Ch. 16 perfect order, Ch. 7 geometry fallback), causal walks
   (`agent.walk`, `agent.walk_mtf`, `agent.walk_lien`; MCP `run_walk`),
   MT4 tester bridge (`agent.tester_backtest`),
   SQLite journal, and stub executor (`python -m agent.executor`) that records

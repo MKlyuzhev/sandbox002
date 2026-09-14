@@ -14,7 +14,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from agent.engines import breakout20, dbb, fader, mtf, perfect_order, registry
+from agent.engines import (
+    breakout20,
+    dbb,
+    fader,
+    mtf,
+    perfect_order,
+    registry,
+    waiting_deal,
+)
 from agent.lien_chapters import CHAPTER_TO_ENGINE, DEFERRED_CHAPTERS
 from agent.retrieve import get_source_chunk, search_knowledge
 
@@ -24,6 +32,7 @@ _ENGINE_MODULES = {
     "fader": fader,
     "breakout20": breakout20,
     "perfect_order": perfect_order,
+    "waiting_deal": waiting_deal,
 }
 
 DEFAULT_SOURCE = "lien-fx"
@@ -126,8 +135,17 @@ CLAIMS: tuple[Claim, ...] = (
     Claim(
         claim_id="ch11_london_deal",
         chapter=11,
-        title="Waiting for the Deal / London stop-hunt (unencoded)",
-        encoded=False,
+        title="Waiting for the Deal: power-hour range, ≥25-pip hunt, reverse through opposite rail",
+        encoded=True,
+        engine="waiting_deal",
+        mcp_tool="entry_lien",
+        play_classes=("fade_range", "breakout_watch"),
+        chunk_indices=(80, 81, 82),
+        gates=(
+            "Frankfurt–London power hour range, then ≥25-pip hunt",
+            "enter 10 pips through the opposite rail after the reverse",
+        ),
+        must_contain=("waiting for the",),
         search_query="Kathy Lien waiting for the deal London session stop hunt",
     ),
     Claim(

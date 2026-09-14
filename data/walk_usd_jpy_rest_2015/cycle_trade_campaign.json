@@ -1,0 +1,278 @@
+{
+  "instrument": "USD_JPY",
+  "engine": "cycle_trade_lien_clock_d1",
+  "note": "Causal filt Kalman. Daily Murphy [10,20,40] composite-cycle turns; alignment min 2 of 3; Ch.7 fade_range gate. Not a Lien chapter.",
+  "window": "2015-01-01T00:00:00Z to 2026-09-09T21:00:00.000000000Z",
+  "last_daily_bar": "2026-09-09T21:00:00.000000000Z",
+  "fill_mode": "next_open",
+  "ch7": "fade_range (regime=range, not waning); flatten on leave-range",
+  "value_per_price_unit": 0.006666666666666667,
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "atr": {
+    "period": 14,
+    "k": 3.0
+  },
+  "decision": {
+    "cycle_periods_bars": [
+      10.0,
+      20.0,
+      40.0
+    ],
+    "use_alignment_filter": true,
+    "alignment_min_cycles": 2,
+    "use_phase_confirm": true,
+    "use_regime_filter": false,
+    "tp_half_cycle": true,
+    "T_max": 30,
+    "warmup_bars": 80
+  },
+  "ssm": {
+    "q_level": 1e-05,
+    "q_slope": 1e-06,
+    "q_accel": 1e-08,
+    "cycle_periods_bars": [
+      10.0,
+      20.0,
+      40.0
+    ],
+    "q_cycles": [
+      2e-05,
+      8e-06,
+      3e-06
+    ],
+    "r_obs": 5e-05,
+    "do_smooth": false
+  },
+  "n_daily": 3052,
+  "occupancy": {
+    "fade_range_bars_after_warmup": 1433,
+    "bars_after_warmup": 2972,
+    "fade_range_frac": 0.4822
+  },
+  "signals": {
+    "raw_long": 129,
+    "raw_short": 194,
+    "gated_long": 65,
+    "gated_short": 92
+  },
+  "trade_count": 157,
+  "ending_equity": 9439.2784,
+  "max_drawdown_frac": 0.1446,
+  "n": 157,
+  "mean_r": -0.0166,
+  "sum_r": -2.6082,
+  "win_rate": 0.4841,
+  "wins": 76,
+  "losses": 81,
+  "mean_pnl_pips": -7.41,
+  "sum_pnl_pips": -1163.92,
+  "mean_duration_days": 3.529,
+  "median_duration_days": 3.0,
+  "exits": {
+    "TP_half_cycle": 84,
+    "STOP_atr": 6,
+    "FLIP_to_long": 18,
+    "FLIP_to_short": 14,
+    "gate": 35
+  },
+  "by_side": {
+    "long": {
+      "n": 65,
+      "mean_r": 0.0318,
+      "sum_r": 2.0646,
+      "win_rate": 0.6154,
+      "wins": 40,
+      "losses": 25,
+      "mean_pnl_pips": 10.78,
+      "sum_pnl_pips": 700.87,
+      "mean_duration_days": 3.569,
+      "median_duration_days": 3.0
+    },
+    "short": {
+      "n": 92,
+      "mean_r": -0.0508,
+      "sum_r": -4.6728,
+      "win_rate": 0.3913,
+      "wins": 36,
+      "losses": 56,
+      "mean_pnl_pips": -20.27,
+      "sum_pnl_pips": -1864.79,
+      "mean_duration_days": 3.5,
+      "median_duration_days": 3.0
+    }
+  },
+  "by_regime": {
+    "range": {
+      "n": 157,
+      "mean_r": -0.0166,
+      "sum_r": -2.6082,
+      "win_rate": 0.4841,
+      "wins": 76,
+      "losses": 81,
+      "mean_pnl_pips": -7.41,
+      "sum_pnl_pips": -1163.92,
+      "mean_duration_days": 3.529,
+      "median_duration_days": 3.0
+    }
+  },
+  "yearly": [
+    {
+      "year": "2015",
+      "n": 7,
+      "mean_r": -0.2439,
+      "sum_r": -1.7074,
+      "win_rate": 0.4286,
+      "wins": 3,
+      "losses": 4,
+      "mean_pnl_pips": -55.64,
+      "sum_pnl_pips": -389.5,
+      "mean_duration_days": 3.143,
+      "median_duration_days": 4.0
+    },
+    {
+      "year": "2016",
+      "n": 9,
+      "mean_r": 0.0438,
+      "sum_r": 0.394,
+      "win_rate": 0.7778,
+      "wins": 7,
+      "losses": 2,
+      "mean_pnl_pips": 7.93,
+      "sum_pnl_pips": 71.34,
+      "mean_duration_days": 4.333,
+      "median_duration_days": 5.0
+    },
+    {
+      "year": "2017",
+      "n": 15,
+      "mean_r": -0.0974,
+      "sum_r": -1.4604,
+      "win_rate": 0.4,
+      "wins": 6,
+      "losses": 9,
+      "mean_pnl_pips": -31.19,
+      "sum_pnl_pips": -467.8,
+      "mean_duration_days": 3.4,
+      "median_duration_days": 3.0
+    },
+    {
+      "year": "2018",
+      "n": 22,
+      "mean_r": 0.0317,
+      "sum_r": 0.6983,
+      "win_rate": 0.5,
+      "wins": 11,
+      "losses": 11,
+      "mean_pnl_pips": 5.82,
+      "sum_pnl_pips": 128.1,
+      "mean_duration_days": 3.091,
+      "median_duration_days": 3.0
+    },
+    {
+      "year": "2019",
+      "n": 15,
+      "mean_r": -0.0053,
+      "sum_r": -0.08,
+      "win_rate": 0.5333,
+      "wins": 8,
+      "losses": 7,
+      "mean_pnl_pips": -0.73,
+      "sum_pnl_pips": -10.9,
+      "mean_duration_days": 3.867,
+      "median_duration_days": 4.0
+    },
+    {
+      "year": "2020",
+      "n": 17,
+      "mean_r": 0.2689,
+      "sum_r": 4.5711,
+      "win_rate": 0.7059,
+      "wins": 12,
+      "losses": 5,
+      "mean_pnl_pips": 52.99,
+      "sum_pnl_pips": 900.8,
+      "mean_duration_days": 3.412,
+      "median_duration_days": 3.0
+    },
+    {
+      "year": "2021",
+      "n": 11,
+      "mean_r": 0.0612,
+      "sum_r": 0.6731,
+      "win_rate": 0.4545,
+      "wins": 5,
+      "losses": 6,
+      "mean_pnl_pips": 10.63,
+      "sum_pnl_pips": 116.9,
+      "mean_duration_days": 3.455,
+      "median_duration_days": 3.0
+    },
+    {
+      "year": "2022",
+      "n": 6,
+      "mean_r": -0.0566,
+      "sum_r": -0.3398,
+      "win_rate": 0.5,
+      "wins": 3,
+      "losses": 3,
+      "mean_pnl_pips": -7.83,
+      "sum_pnl_pips": -47.0,
+      "mean_duration_days": 3.0,
+      "median_duration_days": 2.0
+    },
+    {
+      "year": "2023",
+      "n": 14,
+      "mean_r": -0.2537,
+      "sum_r": -3.5518,
+      "win_rate": 0.2143,
+      "wins": 3,
+      "losses": 11,
+      "mean_pnl_pips": -80.19,
+      "sum_pnl_pips": -1122.64,
+      "mean_duration_days": 3.357,
+      "median_duration_days": 3.0
+    },
+    {
+      "year": "2024",
+      "n": 8,
+      "mean_r": -0.2958,
+      "sum_r": -2.3663,
+      "win_rate": 0.25,
+      "wins": 2,
+      "losses": 6,
+      "mean_pnl_pips": -92.53,
+      "sum_pnl_pips": -740.23,
+      "mean_duration_days": 2.25,
+      "median_duration_days": 2.0
+    },
+    {
+      "year": "2025",
+      "n": 21,
+      "mean_r": -0.0224,
+      "sum_r": -0.4703,
+      "win_rate": 0.4762,
+      "wins": 10,
+      "losses": 11,
+      "mean_pnl_pips": 0.26,
+      "sum_pnl_pips": 5.37,
+      "mean_duration_days": 3.667,
+      "median_duration_days": 4.0
+    },
+    {
+      "year": "2026",
+      "n": 12,
+      "mean_r": 0.0859,
+      "sum_r": 1.0313,
+      "win_rate": 0.5,
+      "wins": 6,
+      "losses": 6,
+      "mean_pnl_pips": 32.64,
+      "sum_pnl_pips": 391.64,
+      "mean_duration_days": 5.0,
+      "median_duration_days": 5.0
+    }
+  ],
+  "sliced": true
+}

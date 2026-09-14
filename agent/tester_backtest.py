@@ -10,6 +10,7 @@ Entry engines via ``--engine`` or ``--chapter``:
 * ``dbb`` (Ch.9): single-TF Double Bollinger on exported bars.
 * ``perfect_order`` (Ch.16) / ``breakout20`` (Ch.14): single-TF event walks.
 * ``fader`` (Ch.13): resample HTF like MTF; first-fire failed-break fades.
+* ``waiting_deal`` (Ch.11): resample HTF like MTF; first-fire hunt-then-reverse.
 """
 
 from __future__ import annotations
@@ -25,9 +26,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 from agent.event_walk import event_decisions  # noqa: E402
 from agent.fader_walk import fader_decisions  # noqa: E402
-from agent.lien_chapters import EVENT_ENGINES, resolve_engine  # noqa: E402
+from agent.lien_chapters import DUAL_TF_ENGINES, EVENT_ENGINES, resolve_engine  # noqa: E402
 from agent.mtf_walk import mtf_decisions  # noqa: E402
 from agent.schema import Goal  # noqa: E402
+from agent.waiting_deal_walk import waiting_deal_decisions  # noqa: E402
 from app import mt4_tester, regime_walk  # noqa: E402
 
 
@@ -51,6 +53,20 @@ def _run_mtf(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, di
 def _run_fader(args: argparse.Namespace, bars: list, goal: Goal) -> tuple[list, dict]:
     htf_bars = mt4_tester.resample_bars(bars, args.htf)
     decisions = fader_decisions(
+        htf_bars,
+        bars,
+        goal,
+        lookback=args.lookback,
+        start_index=args.start_index,
+    )
+    return decisions, {"htf": args.htf, "htf_bar_count": len(htf_bars)}
+
+
+def _run_waiting_deal(
+    args: argparse.Namespace, bars: list, goal: Goal
+) -> tuple[list, dict]:
+    htf_bars = mt4_tester.resample_bars(bars, args.htf)
+    decisions = waiting_deal_decisions(
         htf_bars,
         bars,
         goal,
@@ -97,7 +113,7 @@ def _run(args: argparse.Namespace) -> int:
         print(f"Feed error: {exc}", file=sys.stderr)
         return 2
 
-    dual_tf = engine in ("mtf", "fader")
+    dual_tf = engine in DUAL_TF_ENGINES
     goal = Goal(
         instrument=args.instrument,
         granularity=args.htf if dual_tf else args.tf,
@@ -114,6 +130,8 @@ def _run(args: argparse.Namespace) -> int:
             decisions, extra = _run_mtf(args, bars, goal)
         elif engine == "fader":
             decisions, extra = _run_fader(args, bars, goal)
+        elif engine == "waiting_deal":
+            decisions, extra = _run_waiting_deal(args, bars, goal)
         elif engine in EVENT_ENGINES:
             decisions, extra = _run_event(engine, args, bars, goal)
         else:
@@ -148,6 +166,7 @@ def main() -> int:
         description=(
             "Compute the MT4 Strategy Tester decision feed from exported bars. "
             "engine=mtf resamples an HTF (Ch.8); engine=fader resamples HTF (Ch.13); "
+            "engine=waiting_deal resamples HTF (Ch.11, export M15); "
             "dbb/breakout20/perfect_order run on the exported TF. Writes decisions.csv. "
             "No orders."
         )
@@ -155,7 +174,7 @@ def main() -> int:
     parser.add_argument("--instrument", required=True)
     parser.add_argument(
         "--engine",
-        choices=("mtf", "dbb", "fader", "breakout20", "perfect_order"),
+        choices=("mtf", "dbb", "fader", "waiting_deal", "breakout20", "perfect_order"),
         default=None,
         help="Entry engine (default mtf if --chapter is omitted).",
     )
@@ -163,17 +182,17 @@ def main() -> int:
         "--chapter",
         type=int,
         default=None,
-        help="Lien chapter alias: 8=mtf, 9=dbb, 13=fader, 14=breakout20, 16=perfect_order.",
+        help="Lien chapter alias: 8=mtf, 9=dbb, 11=waiting_deal, 13=fader, 14=breakout20, 16=perfect_order.",
     )
     parser.add_argument(
         "--tf",
         default="H1",
-        help="Timeframe the tester ran (default H1; use D for dbb/14/16).",
+        help="Timeframe the tester ran (default H1; M15 for Ch.11; D for dbb/14/16).",
     )
     parser.add_argument(
         "--htf",
         default="D",
-        help="Higher TF to resample (mtf and fader only; default D).",
+        help="Higher TF to resample (mtf, fader, waiting_deal; default D).",
     )
     parser.add_argument(
         "--entry-mode",

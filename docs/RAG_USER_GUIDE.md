@@ -301,7 +301,7 @@ for s in data["sources"]:
 
 ## 6. Corpus ingest (trading knowledge base)
 
-For the curated 15-book trading corpus (Murphy, Harris, Lien, etc.), see the
+For the curated 16-book trading corpus (Murphy, Harris, Lien, Gerchik, etc.), see the
 [Corpus Runbook](CORPUS_RUNBOOK.md).
 
 Quick batch ingest from manifest:

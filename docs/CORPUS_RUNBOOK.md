@@ -9,7 +9,7 @@ sibling-repo pin [sandbox001 vs RAG](SANDBOX001_RAG_CORRELATION.md)
 
 ---
 
-## 1. Corpus overview (15 sources)
+## 1. Corpus overview (16 sources)
 
 | source_id | Title | Role for agents |
 |-----------|-------|-----------------|
@@ -28,6 +28,7 @@ sibling-repo pin [sandbox001 vs RAG](SANDBOX001_RAG_CORRELATION.md)
 | `pring-ta` | Technical Analysis Explained | Broad TA survey complementing Murphy |
 | `reminiscences` | Reminiscences of a Stock Operator | Market psychology, tape-reading principles |
 | `bis-triennial-fx` | BIS Triennial FX Survey | Empirical FX market structure and turnover |
+| `gerchik` | Kurs aktivnogo treydera (Gerchik) | Price levels, risk/money management, discretionary setups |
 
 ---
 
@@ -52,6 +53,7 @@ Save each file as `{source_id}.{pdf|epub}` per the manifest `file` field.
 | `chan-quant` | `chan-quant.pdf` |
 | `harris-microstructure` | `harris-microstructure.epub` |
 | `pring-ta` | `pring-ta.pdf` |
+| `gerchik` | `gerchik.pdf` |
 
 ### Free / public domain
 
@@ -124,7 +126,7 @@ Large PDFs with figures can take 30–90+ minutes each on a 6 GB GPU.
 3. `edwards-magee`, `nison-candlesticks`, `pring-ta`
 4. `carver-systematic`, `aronson-ebta`, `chan-quant`
 5. `harris-microstructure`, `schwager-wizards`, `taleb-fooled`
-6. `reminiscences`, `bis-triennial-fx`
+6. `reminiscences`, `bis-triennial-fx`, `gerchik`
 
 ### Metadata
 
@@ -163,6 +165,7 @@ curl -s -X POST http://localhost:8000/query \
 | What is overfitting in backtesting? | `chan-quant` |
 | What can we learn from Livermore about tape reading? | `reminiscences` |
 | What is global FX turnover and market structure? | `bis-triennial-fx` |
+| How does Gerchik identify price levels? | `gerchik` |
 
 Record pass/fail in `data/corpus/.ingest_state.json` notes or a local log. If a query
 misses, try higher `top_k` (8–10) or confirm the source was ingested.

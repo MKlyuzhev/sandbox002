@@ -154,3 +154,14 @@ documents:
     file: bis-triennial-fx.pdf
     enabled: true
     notes: "Download latest PDF from bis.org/statistics"
+
+  - source_id: gerchik
+    title: "Kurs aktivnogo treydera (Course of the Active Trader)"
+    author: "Alexander Gerchik"
+    asset_class: general
+    topics: [level, risk, psychology]
+    evidence_level: heuristic
+    acquisition: owned
+    file: gerchik.pdf
+    enabled: true
+    notes: "Russian original, Alpina 2019 (ISBN 978-5-9614-2374-7). Price-level system, risk/money management, discretionary setups."

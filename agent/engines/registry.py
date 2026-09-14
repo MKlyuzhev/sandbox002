@@ -16,12 +16,14 @@ from agent.engines.dbb import DbbEngine
 from agent.engines.fader import FaderEngine
 from agent.engines.mtf import MtfEngine
 from agent.engines.perfect_order import PerfectOrderEngine
+from agent.engines.waiting_deal import WaitingDealEngine
 from agent.schema import Goal
 
 # Priority order (specialized first, generic Ch. 7 fallback last).
 REGISTRY: list[Engine] = [
     MtfEngine(),
     DbbEngine(),
+    WaitingDealEngine(),
     FaderEngine(),
     Breakout20Engine(),
     PerfectOrderEngine(),

@@ -439,7 +439,7 @@ async def run_walk(
     """Causal paper walk (ch7 / mtf / lien). Not the MT4 Strategy Tester.
 
     Requires ``from_time`` and ``to_time`` (RFC3339). Lien ``chapter`` is
-    9, 13, 14, or 16. Unencoded chapters return an error. Response is
+    9, 11, 13, 14, or 16. Unencoded chapters return an error. Response is
     ``walk_id``, ``equity``, ``trade_count``, and a truncated trade list.
     Can be expensive (OANDA history). Research only; no broker orders.
     """
@@ -616,19 +616,21 @@ async def entry_lien(
     buffer_pips: int = 10,
     probe_pips: int = 15,
 ) -> dict:
-    """Lien Ch.13 / 14 / 16 entry signal (deterministic).
+    """Lien Ch.11 / 13 / 14 / 16 entry signal (deterministic).
 
-    Chapter 13 (fader): daily ADX<20 + H1 probe ≥15 pips beyond prior day H/L,
-    fade. Chapter 14 (20-day breakout): rebreak after a ≥2-day pullback, not
-    first touch. Chapter 16 (perfect order): SMA stack intact, ADX rising,
-    pulse when stack age is exactly 5. Other chapters return an error (10/11/12/15
-    are not encoded yet; 8 is entry_mtf; 9 is entry_dbb).
+    Chapter 11 (waiting for the deal): daily Ch.7 gate + M15 power-hour range,
+    ≥25-pip London hunt, reverse through the opposite rail. Chapter 13 (fader):
+    daily ADX<20 + H1 probe ≥15 pips beyond prior day H/L, fade. Chapter 14
+    (20-day breakout): rebreak after a ≥2-day pullback, not first touch.
+    Chapter 16 (perfect order): SMA stack intact, ADX rising, pulse when stack
+    age is exactly 5. Other chapters return an error (10/12/15 are not encoded
+    yet; 8 is entry_mtf; 9 is entry_dbb).
 
     Always after the Ch.7 filter. Research only; no orders.
     """
     from app import indicators
     from agent.lien_chapters import ENTRY_LIEN_CHAPTERS, entry_lien_error
-    from agent.engines import breakout20, fader, perfect_order
+    from agent.engines import breakout20, fader, perfect_order, waiting_deal
 
     if chapter not in ENTRY_LIEN_CHAPTERS:
         return {
@@ -646,6 +648,29 @@ async def entry_lien(
             "instrument": instrument,
             "granularity": granularity,
         }
+
+    if chapter == 11:
+        ltf = waiting_deal.resolve_ltf(ltf_granularity)
+        try:
+            payload = await oanda_client.get_candles(
+                instrument, granularity=ltf, count=ltf_count, price="M"
+            )
+        except oanda_client.OandaError as exc:
+            return {
+                "error": str(exc),
+                "chapter": chapter,
+                "instrument": instrument,
+                "ltf_granularity": ltf,
+            }
+        ltf_bars = oanda_client.candles_to_bars(payload, prefer="mid")
+        return waiting_deal.waiting_deal_signal(
+            analysis,
+            ltf_bars,
+            instrument,
+            buffer_pips=buffer_pips,
+            htf_granularity=granularity,
+            ltf_granularity=ltf,
+        )
 
     if chapter == 13:
         try:

@@ -1,0 +1,234 @@
+[
+  {
+    "i": 0,
+    "from_time": "2015-01-01T00:00:00Z",
+    "to_time": "2015-07-01T00:00:00Z",
+    "starting_equity": 10000.0,
+    "ending_equity": 10000.0,
+    "n": 0
+  },
+  {
+    "i": 1,
+    "from_time": "2015-07-01T00:00:00Z",
+    "to_time": "2016-01-01T00:00:00Z",
+    "starting_equity": 10000.0,
+    "ending_equity": 10026.7871,
+    "n": 1,
+    "mean_r": 0.1339,
+    "sum_r": 0.1339,
+    "win_rate": 1.0,
+    "wins": 1,
+    "losses": 0,
+    "mean_pnl_pips": 46.3,
+    "sum_pnl_pips": 46.3,
+    "mean_duration_days": 1.0,
+    "median_duration_days": 1.0,
+    "mean_entry_abs_z": 4.907
+  },
+  {
+    "i": 2,
+    "from_time": "2016-01-01T00:00:00Z",
+    "to_time": "2016-07-01T00:00:00Z",
+    "starting_equity": 10026.7871,
+    "ending_equity": 10082.1258,
+    "n": 1,
+    "mean_r": 0.276,
+    "sum_r": 0.276,
+    "win_rate": 1.0,
+    "wins": 1,
+    "losses": 0,
+    "mean_pnl_pips": 98.5,
+    "sum_pnl_pips": 98.5,
+    "mean_duration_days": 1.0,
+    "median_duration_days": 1.0,
+    "mean_entry_abs_z": 2.897
+  },
+  {
+    "i": 3,
+    "from_time": "2016-07-01T00:00:00Z",
+    "to_time": "2017-01-01T00:00:00Z",
+    "starting_equity": 10082.1258,
+    "ending_equity": 10046.6515,
+    "n": 1,
+    "mean_r": -0.1759,
+    "sum_r": -0.1759,
+    "win_rate": 0.0,
+    "wins": 0,
+    "losses": 1,
+    "mean_pnl_pips": -67.7,
+    "sum_pnl_pips": -67.7,
+    "mean_duration_days": 2.0,
+    "median_duration_days": 2.0,
+    "mean_entry_abs_z": 3.105
+  },
+  {
+    "i": 4,
+    "from_time": "2017-01-01T00:00:00Z",
+    "to_time": "2017-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 5,
+    "from_time": "2017-07-01T00:00:00Z",
+    "to_time": "2018-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 6,
+    "from_time": "2018-01-01T00:00:00Z",
+    "to_time": "2018-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 7,
+    "from_time": "2018-07-01T00:00:00Z",
+    "to_time": "2019-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 8,
+    "from_time": "2019-01-01T00:00:00Z",
+    "to_time": "2019-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 9,
+    "from_time": "2019-07-01T00:00:00Z",
+    "to_time": "2020-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 10,
+    "from_time": "2020-01-01T00:00:00Z",
+    "to_time": "2020-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 11,
+    "from_time": "2020-07-01T00:00:00Z",
+    "to_time": "2021-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 12,
+    "from_time": "2021-01-01T00:00:00Z",
+    "to_time": "2021-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 13,
+    "from_time": "2021-07-01T00:00:00Z",
+    "to_time": "2022-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 14,
+    "from_time": "2022-01-01T00:00:00Z",
+    "to_time": "2022-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 15,
+    "from_time": "2022-07-01T00:00:00Z",
+    "to_time": "2023-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 16,
+    "from_time": "2023-01-01T00:00:00Z",
+    "to_time": "2023-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 17,
+    "from_time": "2023-07-01T00:00:00Z",
+    "to_time": "2024-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 18,
+    "from_time": "2024-01-01T00:00:00Z",
+    "to_time": "2024-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 19,
+    "from_time": "2024-07-01T00:00:00Z",
+    "to_time": "2025-01-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10046.6515,
+    "n": 0
+  },
+  {
+    "i": 20,
+    "from_time": "2025-01-01T00:00:00Z",
+    "to_time": "2025-07-01T00:00:00Z",
+    "starting_equity": 10046.6515,
+    "ending_equity": 10022.0555,
+    "n": 1,
+    "mean_r": -0.1224,
+    "sum_r": -0.1224,
+    "win_rate": 0.0,
+    "wins": 0,
+    "losses": 1,
+    "mean_pnl_pips": -56.7,
+    "sum_pnl_pips": -56.7,
+    "mean_duration_days": 1.0,
+    "median_duration_days": 1.0,
+    "mean_entry_abs_z": 3.579
+  },
+  {
+    "i": 21,
+    "from_time": "2025-07-01T00:00:00Z",
+    "to_time": "2026-01-01T00:00:00Z",
+    "starting_equity": 10022.0555,
+    "ending_equity": 10022.0555,
+    "n": 0
+  },
+  {
+    "i": 22,
+    "from_time": "2026-01-01T00:00:00Z",
+    "to_time": "2026-07-01T00:00:00Z",
+    "starting_equity": 10022.0555,
+    "ending_equity": 10022.0555,
+    "n": 0
+  },
+  {
+    "i": 23,
+    "from_time": "2026-07-01T00:00:00Z",
+    "to_time": "2026-09-12T18:32:30Z",
+    "starting_equity": 10022.0555,
+    "ending_equity": 10022.0555,
+    "n": 0
+  }
+]

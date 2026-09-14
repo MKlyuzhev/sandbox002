@@ -114,11 +114,11 @@ and a regime label. Rails are display only — Ch. 15 is not an entry engine.
 |------|---------|-----------|
 | `entry_mtf` | 8 | `join_trend` (HTF direction + LTF RSI dip/rally) |
 | `entry_dbb` | 9 | `join_trend` / `fade_range` (1σ band) |
-| `entry_lien(chapter)` | 13 / 14 / 16 | Fader / 20-day breakout / perfect order |
+| `entry_lien(chapter)` | 11 / 13 / 14 / 16 | Waiting for the Deal / Fader / 20-day / perfect order |
 
 These do **not** run `agent/policy.py` and do **not** write the journal. A
-planner that only peeks is not bound by the graph. Unencoded chapters (10, 11,
-12, 15) return the existing `entry_lien_error` message — retrieve and explain,
+planner that only peeks is not bound by the graph. Unencoded chapters (10, 12,
+15) return the existing `entry_lien_error` message — retrieve and explain,
 or skip. Do not emit a fake ticket. Ch. 8 is `entry_mtf`, not `entry_lien`;
 Ch. 9 is `entry_dbb`.
 
@@ -129,7 +129,7 @@ Paper/signal hlines only: `mt4_draw_ticket` (prefix `sbox.ticket.`; no orders).
 | Tool | What it is | Default |
 |------|------------|---------|
 | `run_graph` | Same path as `python -m agent.run`. Regime → engines → **policy** → journal. Returns `RunRecord` including `engine_candidates`. | `mode=signal`, `no_llm=true`, `mt4=false`, `use_account=false`. `paper` still only queues sqlite `pending_exec`. |
-| `run_walk` | Causal paper walk. Same libraries as the walk CLIs (`agent/walk_jobs.py`). | `kind` = `ch7` \| `mtf` \| `lien`. `from_time`+`to_time` required (RFC3339). `lien` needs `chapter` 9, 13, 14, or 16. Fill `close` default. Response truncates trades (first/last 10 if more than 20). |
+| `run_walk` | Causal paper walk. Same libraries as the walk CLIs (`agent/walk_jobs.py`). | `kind` = `ch7` \| `mtf` \| `lien`. `from_time`+`to_time` required (RFC3339). `lien` needs `chapter` 9, 11, 13, 14, or 16. Fill `close` default. Response truncates trades (first/last 10 if more than 20). |
 
 Policy **cannot** be skipped on `run_graph`. Passing `signal` → `log_setup`;
 passing `paper` → `pending_exec` (except `breakout_watch`, which stays
@@ -261,7 +261,7 @@ That is **not** `POST /v3/accounts/.../orders` on the practice host.
   `app/indicators.py`. Engines overwrite play, side, and levels.
 - **No `pending_exec` except via the graph** (`run_graph` / `agent.run` / walks).
 - **Do not aggress on `trend_waning`.** Scan drops these by default; the graph waits.
-- **Unencoded chapters:** retrieve and explain, or skip. No fake ticket, no fake back-test. Ch. 10/11/12/15 are documentation-only (news, session clock, `breakout_watch` paper policy).
+- **Unencoded chapters:** retrieve and explain, or skip. No fake ticket, no fake back-test. Ch. 10/12/15 are documentation-only (news filter, `breakout_watch` paper policy). Ch. 11 is `entry_lien(chapter=11)`.
 - **Peek ≠ act.** `entry_*` / `classify_regime` do not journal. Journaled snapshot or measured equity requires `run_graph` / `run_walk` (or the matching CLI).
 - **Book defaults first.** Sweep one axis; cap the grid. Do not silently rewrite `agent/engines/*.py` from a lucky window. Do not sweep Lien’s 65/50/195-pip templates back into tickets (2R + buffer).
 - **Cite `lien-fx`.** Always `source="lien-fx"` on Lien searches. Evidence is heuristic.
@@ -310,8 +310,9 @@ secret edge. There is **no** `sweep()` helper — the planner loops.
 | Natural language → `JobSpec` | Type flags / MCP args; dashboard has no free-text |
 | `analyze_walk` summarizer | Read `equity` + truncated trades; dashboard `GET /api/journal/walks/{id}` |
 | Dashboard whitelist for `walk_lien` / `walk_mtf` | MCP `run_walk` or CLI |
-| Lien 10 / 11 / 12 / 15 as engines | Doc tables after the regime filter only |
-| `place_order`, daily loss halt, session clock | Out of scope |
+| Lien 10 / 12 / 15 as engines | Doc tables after the regime filter only |
+| `place_order`, daily loss halt | Out of scope |
+| Session clock (Ch.11) | Encoded: `app/session_clock.py` + `entry_lien(11)` |
 | Risk reversals / implied vol | `unavailable` |
 
 ---
@@ -325,6 +326,9 @@ secret edge. There is **no** `sweep()` helper — the planner loops.
 | [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md) | Chapter tables (encoded vs documentation-only) |
 | [DASHBOARD.md](DASHBOARD.md) | Ops console; no planner chat box |
 | [CORPUS_RUNBOOK.md](CORPUS_RUNBOOK.md) | Ingest `lien-fx` |
-| [SANDBOX001_RAG_CORRELATION.md](SANDBOX001_RAG_CORRELATION.md) | Sibling `trend_trade` / `cycle_trade` vs this corpus |
+| [SANDBOX001_RAG_CORRELATION.md](SANDBOX001_RAG_CORRELATION.md) | Sibling `trend_trade` / `cycle_trade` / `mean_reversion_trade` vs this corpus |
+| [KALMAN_LIEN_CLOCK.md](KALMAN_LIEN_CLOCK.md) | Daily Kalman trend prior + H1 dip (not a Lien chapter) |
+| [CYCLE_TRADE_RAG.md](CYCLE_TRADE_RAG.md) | Daily Kalman cycle prior, Murphy 10/20/40, Ch.7 `fade_range` |
+| [MEAN_REV_RAG.md](MEAN_REV_RAG.md) | Daily Kalman residual prior, Chan ±2σ / 10-day hold, Ch.7 `fade_range` |
 | [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md) | Tester bridge (CLI) |
 | README “Research MCP” | Server setup and tool list |
