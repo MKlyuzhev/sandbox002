@@ -1,0 +1,505 @@
+{
+  "engine": "double_zeros",
+  "chapter": 10,
+  "fill_mode": "rest",
+  "window": "2015-01-01T00:00:00Z to 2026-09-15T01:43:59Z",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "note": "User wrote GBP_SHF; walked GBP_CHF. Four independent $10k books. Do not average. Frozen vppu, not live conversion. Research only.",
+  "pairs": [
+    {
+      "instrument": "GBP_USD",
+      "vppu": 1.0,
+      "vppu_note": "USD quote",
+      "n": 1504,
+      "n_fire": 1504,
+      "n_skip_gap": 0,
+      "n_skip_size": 0,
+      "wins": 479,
+      "losses": 1025,
+      "win_rate": 0.3185,
+      "mean_r": -0.0738,
+      "sum_r": -110.9968,
+      "ending_equity": 623.5173,
+      "peak_equity": 12594.3782,
+      "max_drawdown_frac": 0.9505,
+      "exits": {
+        "stop": 1025,
+        "target": 479
+      },
+      "by_side": {
+        "long": {
+          "n": 762,
+          "mean_r": -0.0699,
+          "win_rate": 0.3202,
+          "sum_r": -53.2392
+        },
+        "short": {
+          "n": 742,
+          "mean_r": -0.0778,
+          "win_rate": 0.3167,
+          "sum_r": -57.7576
+        }
+      },
+      "mean_hold_hours": 18.79,
+      "median_hold_hours": 9.25,
+      "years": [
+        {
+          "year": "2015",
+          "n": 147,
+          "mean_r": -0.1286,
+          "win_rate": 0.2993,
+          "ending_equity": 6502.12
+        },
+        {
+          "year": "2016",
+          "n": 155,
+          "mean_r": -0.1219,
+          "win_rate": 0.3032,
+          "ending_equity": 4214.57
+        },
+        {
+          "year": "2017",
+          "n": 153,
+          "mean_r": -0.094,
+          "win_rate": 0.3137,
+          "ending_equity": 2991.15
+        },
+        {
+          "year": "2018",
+          "n": 108,
+          "mean_r": 0.2956,
+          "win_rate": 0.4444,
+          "ending_equity": 5405.99
+        },
+        {
+          "year": "2019",
+          "n": 110,
+          "mean_r": -0.0531,
+          "win_rate": 0.3273,
+          "ending_equity": 4617.14
+        },
+        {
+          "year": "2020",
+          "n": 214,
+          "mean_r": -0.1515,
+          "win_rate": 0.2897,
+          "ending_equity": 2237.5
+        },
+        {
+          "year": "2021",
+          "n": 153,
+          "mean_r": -0.0128,
+          "win_rate": 0.3333,
+          "ending_equity": 2027.57
+        },
+        {
+          "year": "2022",
+          "n": 113,
+          "mean_r": -0.3385,
+          "win_rate": 0.2301,
+          "ending_equity": 910.58
+        },
+        {
+          "year": "2023",
+          "n": 152,
+          "mean_r": 0.0711,
+          "win_rate": 0.3684,
+          "ending_equity": 1065.09
+        },
+        {
+          "year": "2024",
+          "n": 68,
+          "mean_r": 0.038,
+          "win_rate": 0.3529,
+          "ending_equity": 1092.24
+        },
+        {
+          "year": "2025",
+          "n": 77,
+          "mean_r": -0.1178,
+          "win_rate": 0.3117,
+          "ending_equity": 883.76
+        },
+        {
+          "year": "2026",
+          "n": 54,
+          "mean_r": -0.307,
+          "win_rate": 0.2407,
+          "ending_equity": 623.52
+        }
+      ]
+    },
+    {
+      "instrument": "EUR_GBP",
+      "vppu": 1.3,
+      "vppu_note": "GBP quote; frozen GBPUSD=1.30",
+      "n": 579,
+      "n_fire": 579,
+      "n_skip_gap": 0,
+      "n_skip_size": 0,
+      "wins": 196,
+      "losses": 383,
+      "win_rate": 0.3385,
+      "mean_r": -0.0211,
+      "sum_r": -12.1971,
+      "ending_equity": 6309.0936,
+      "peak_equity": 11469.5047,
+      "max_drawdown_frac": 0.5392,
+      "exits": {
+        "stop": 383,
+        "target": 195,
+        "window_end": 1
+      },
+      "by_side": {
+        "long": {
+          "n": 299,
+          "mean_r": -0.0115,
+          "win_rate": 0.3411,
+          "sum_r": -3.4398
+        },
+        "short": {
+          "n": 280,
+          "mean_r": -0.0313,
+          "win_rate": 0.3357,
+          "sum_r": -8.7573
+        }
+      },
+      "mean_hold_hours": 71.89,
+      "median_hold_hours": 37.5,
+      "years": [
+        {
+          "year": "2015",
+          "n": 43,
+          "mean_r": -0.116,
+          "win_rate": 0.3023,
+          "ending_equity": 8911.49
+        },
+        {
+          "year": "2016",
+          "n": 30,
+          "mean_r": -0.1493,
+          "win_rate": 0.3,
+          "ending_equity": 8064.37
+        },
+        {
+          "year": "2017",
+          "n": 69,
+          "mean_r": 0.1048,
+          "win_rate": 0.3768,
+          "ending_equity": 9064.76
+        },
+        {
+          "year": "2018",
+          "n": 76,
+          "mean_r": -0.0532,
+          "win_rate": 0.3289,
+          "ending_equity": 8131.24
+        },
+        {
+          "year": "2019",
+          "n": 49,
+          "mean_r": -0.1124,
+          "win_rate": 0.3061,
+          "ending_equity": 7157.36
+        },
+        {
+          "year": "2020",
+          "n": 83,
+          "mean_r": -0.0356,
+          "win_rate": 0.3373,
+          "ending_equity": 6545.65
+        },
+        {
+          "year": "2021",
+          "n": 44,
+          "mean_r": -0.134,
+          "win_rate": 0.2955,
+          "ending_equity": 5726.26
+        },
+        {
+          "year": "2022",
+          "n": 68,
+          "mean_r": 0.3591,
+          "win_rate": 0.4706,
+          "ending_equity": 9056.72
+        },
+        {
+          "year": "2023",
+          "n": 53,
+          "mean_r": -0.1699,
+          "win_rate": 0.283,
+          "ending_equity": 7424.41
+        },
+        {
+          "year": "2024",
+          "n": 22,
+          "mean_r": -0.0956,
+          "win_rate": 0.3182,
+          "ending_equity": 7058.35
+        },
+        {
+          "year": "2025",
+          "n": 27,
+          "mean_r": -0.2392,
+          "win_rate": 0.2593,
+          "ending_equity": 6146.65
+        },
+        {
+          "year": "2026",
+          "n": 15,
+          "mean_r": 0.1059,
+          "win_rate": 0.4,
+          "ending_equity": 6309.09
+        }
+      ]
+    },
+    {
+      "instrument": "GBP_CHF",
+      "vppu": 1.1111111111111112,
+      "vppu_note": "CHF quote; frozen USDCHF=0.90",
+      "n": 1325,
+      "n_fire": 1325,
+      "n_skip_gap": 0,
+      "n_skip_size": 0,
+      "wins": 436,
+      "losses": 889,
+      "win_rate": 0.3291,
+      "mean_r": -0.0729,
+      "sum_r": -96.6479,
+      "ending_equity": 898.9713,
+      "peak_equity": 10230.2957,
+      "max_drawdown_frac": 0.9273,
+      "exits": {
+        "stop": 889,
+        "target": 435,
+        "window_end": 1
+      },
+      "by_side": {
+        "long": {
+          "n": 681,
+          "mean_r": -0.0551,
+          "win_rate": 0.3348,
+          "sum_r": -37.5381
+        },
+        "short": {
+          "n": 644,
+          "mean_r": -0.0918,
+          "win_rate": 0.323,
+          "sum_r": -59.1098
+        }
+      },
+      "mean_hold_hours": 23.25,
+      "median_hold_hours": 10.5,
+      "years": [
+        {
+          "year": "2015",
+          "n": 234,
+          "mean_r": -0.0947,
+          "win_rate": 0.3248,
+          "ending_equity": 5924.26
+        },
+        {
+          "year": "2016",
+          "n": 52,
+          "mean_r": -0.2868,
+          "win_rate": 0.25,
+          "ending_equity": 4324.0
+        },
+        {
+          "year": "2017",
+          "n": 146,
+          "mean_r": -0.1079,
+          "win_rate": 0.3151,
+          "ending_equity": 2999.58
+        },
+        {
+          "year": "2018",
+          "n": 82,
+          "mean_r": -0.0573,
+          "win_rate": 0.3415,
+          "ending_equity": 2653.14
+        },
+        {
+          "year": "2019",
+          "n": 75,
+          "mean_r": -0.0104,
+          "win_rate": 0.3467,
+          "ending_equity": 2538.93
+        },
+        {
+          "year": "2020",
+          "n": 196,
+          "mean_r": -0.0109,
+          "win_rate": 0.3469,
+          "ending_equity": 2264.06
+        },
+        {
+          "year": "2021",
+          "n": 80,
+          "mean_r": 0.0897,
+          "win_rate": 0.375,
+          "ending_equity": 2532.66
+        },
+        {
+          "year": "2022",
+          "n": 168,
+          "mean_r": -0.1106,
+          "win_rate": 0.3214,
+          "ending_equity": 1639.53
+        },
+        {
+          "year": "2023",
+          "n": 109,
+          "mean_r": -0.049,
+          "win_rate": 0.3303,
+          "ending_equity": 1414.62
+        },
+        {
+          "year": "2024",
+          "n": 62,
+          "mean_r": -0.03,
+          "win_rate": 0.3387,
+          "ending_equity": 1332.26
+        },
+        {
+          "year": "2025",
+          "n": 91,
+          "mean_r": -0.237,
+          "win_rate": 0.2747,
+          "ending_equity": 839.9
+        },
+        {
+          "year": "2026",
+          "n": 30,
+          "mean_r": 0.1321,
+          "win_rate": 0.4333,
+          "ending_equity": 898.97
+        }
+      ]
+    },
+    {
+      "instrument": "GBP_JPY",
+      "vppu": 0.006666666666666667,
+      "vppu_note": "JPY quote; frozen USDJPY=150",
+      "n": 2124,
+      "n_fire": 2124,
+      "n_skip_gap": 0,
+      "n_skip_size": 0,
+      "wins": 646,
+      "losses": 1478,
+      "win_rate": 0.3041,
+      "mean_r": -0.139,
+      "sum_r": -295.2113,
+      "ending_equity": 12.9946,
+      "peak_equity": 10402.2273,
+      "max_drawdown_frac": 0.9988,
+      "exits": {
+        "stop": 1478,
+        "target": 646
+      },
+      "by_side": {
+        "long": {
+          "n": 1064,
+          "mean_r": -0.1359,
+          "win_rate": 0.3045,
+          "sum_r": -144.6459
+        },
+        "short": {
+          "n": 1060,
+          "mean_r": -0.142,
+          "win_rate": 0.3038,
+          "sum_r": -150.5654
+        }
+      },
+      "mean_hold_hours": 10.71,
+      "median_hold_hours": 4.5,
+      "years": [
+        {
+          "year": "2015",
+          "n": 102,
+          "mean_r": 0.0003,
+          "win_rate": 0.3529,
+          "ending_equity": 9642.02
+        },
+        {
+          "year": "2016",
+          "n": 132,
+          "mean_r": -0.1118,
+          "win_rate": 0.3106,
+          "ending_equity": 6852.16
+        },
+        {
+          "year": "2017",
+          "n": 152,
+          "mean_r": 0.0337,
+          "win_rate": 0.3684,
+          "ending_equity": 7180.62
+        },
+        {
+          "year": "2018",
+          "n": 213,
+          "mean_r": -0.1152,
+          "win_rate": 0.3099,
+          "ending_equity": 4076.42
+        },
+        {
+          "year": "2019",
+          "n": 115,
+          "mean_r": -0.2038,
+          "win_rate": 0.2783,
+          "ending_equity": 2453.37
+        },
+        {
+          "year": "2020",
+          "n": 213,
+          "mean_r": -0.0426,
+          "win_rate": 0.3333,
+          "ending_equity": 1893.3
+        },
+        {
+          "year": "2021",
+          "n": 97,
+          "mean_r": -0.1954,
+          "win_rate": 0.2784,
+          "ending_equity": 1253.81
+        },
+        {
+          "year": "2022",
+          "n": 295,
+          "mean_r": -0.1481,
+          "win_rate": 0.3017,
+          "ending_equity": 471.4
+        },
+        {
+          "year": "2023",
+          "n": 193,
+          "mean_r": -0.0579,
+          "win_rate": 0.3316,
+          "ending_equity": 351.09
+        },
+        {
+          "year": "2024",
+          "n": 167,
+          "mean_r": -0.2449,
+          "win_rate": 0.2635,
+          "ending_equity": 146.63
+        },
+        {
+          "year": "2025",
+          "n": 324,
+          "mean_r": -0.2183,
+          "win_rate": 0.284,
+          "ending_equity": 31.82
+        },
+        {
+          "year": "2026",
+          "n": 121,
+          "mean_r": -0.3563,
+          "win_rate": 0.2314,
+          "ending_equity": 12.99
+        }
+      ]
+    }
+  ]
+}

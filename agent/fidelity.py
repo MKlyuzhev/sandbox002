@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from agent.engines import (
     breakout20,
     dbb,
+    double_zeros,
     fader,
     mtf,
     perfect_order,
@@ -33,6 +34,7 @@ _ENGINE_MODULES = {
     "breakout20": breakout20,
     "perfect_order": perfect_order,
     "waiting_deal": waiting_deal,
+    "double_zeros": double_zeros,
 }
 
 DEFAULT_SOURCE = "lien-fx"
@@ -128,8 +130,17 @@ CLAIMS: tuple[Claim, ...] = (
     Claim(
         claim_id="ch10_double_zeros",
         chapter=10,
-        title="Fade double zeros (unencoded)",
-        encoded=False,
+        title="Fade double zeros: M15 20-SMA, 10–15 pips off the figure, stop 20 beyond",
+        encoded=True,
+        engine="double_zeros",
+        mcp_tool="entry_lien",
+        play_classes=("fade_range",),
+        chunk_indices=(77, 78, 79),
+        gates=(
+            "LTF 20-SMA: long only below, short only above",
+            "Enter 10–15 pips before the double-zero; stop 20 pips beyond it",
+        ),
+        must_contain=("double zeros",),
         search_query="Kathy Lien fade double zeros round numbers figure",
     ),
     Claim(

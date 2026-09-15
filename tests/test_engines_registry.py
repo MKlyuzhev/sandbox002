@@ -63,12 +63,12 @@ class TestSelect(unittest.TestCase):
         self.assertLess(chapters.index(8), chapters.index(7))
 
     def test_range_excludes_mtf(self) -> None:
-        # MTF (Ch.8) never fires in a range; Ch.9 (dbb fade), Ch.11 (deal),
-        # Ch.13 (fader) and the Ch.7 fallback do, specialized before generic.
+        # MTF (Ch.8) never fires in a range; Ch.9 (dbb fade), Ch.10 (zeros),
+        # Ch.11 (deal), Ch.13 (fader) and the Ch.7 fallback do.
         analysis = _analysis("range", ["fade_range"])
         chapters = [e.chapter for e in registry.select(analysis, Goal())]
         self.assertNotIn(8, chapters)
-        self.assertEqual(chapters, [9, 11, 13, 7])
+        self.assertEqual(chapters, [9, 10, 11, 13, 7])
 
     def test_mixed_selects_waiting_deal(self) -> None:
         analysis = _analysis("mixed", ["breakout_watch"])

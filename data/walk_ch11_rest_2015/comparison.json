@@ -1,0 +1,248 @@
+{
+  "engine": "waiting_deal",
+  "chapter": 11,
+  "fill_mode": "rest",
+  "window": "2015-01-01T00:00:00Z to 2026-09-15T02:02:09Z",
+  "pairs": [
+    "GBP_USD",
+    "EUR_GBP",
+    "GBP_CHF",
+    "GBP_JPY"
+  ],
+  "hunt_pips": 25,
+  "value_per_price_unit": 1.0,
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "clock": "frankfurt",
+  "note": "Same Ch.11 geometry and 25-pip hunt on every pair. Rest fill. vppu=1.0 so dollar equity is 2%\u00d7R compounding, not a USD-account JPY conversion. GBP_SHF in the request is GBP_CHF. Research only.",
+  "rows": [
+    {
+      "instrument": "GBP_USD",
+      "n": 388,
+      "n_eval": 268784,
+      "n_gate_ok": 168688,
+      "n_fire": 397,
+      "n_skip_fill": 9,
+      "ending_equity": 6194.4162,
+      "mean_r": -0.0417,
+      "sum_r": -16.1921,
+      "win_rate": 0.3531,
+      "max_drawdown_frac": 0.5315,
+      "wins": 137,
+      "losses": 251,
+      "exits": {
+        "target": 138,
+        "stop": 250
+      },
+      "by_side": {
+        "long": {
+          "n": 204,
+          "mean_r": 0.0211,
+          "win_rate": 0.3676,
+          "sum_r": 4.3061
+        },
+        "short": {
+          "n": 184,
+          "mean_r": -0.1114,
+          "win_rate": 0.337,
+          "sum_r": -20.4982
+        }
+      },
+      "by_play_class": {
+        "fade_range": {
+          "n": 312,
+          "mean_r": -0.0964,
+          "win_rate": 0.3397,
+          "sum_r": -30.0821
+        },
+        "breakout_watch": {
+          "n": 76,
+          "mean_r": 0.1828,
+          "win_rate": 0.4079,
+          "sum_r": 13.89
+        }
+      },
+      "clock_days": 3032,
+      "hunts": 2710,
+      "reverses": 633,
+      "hunt_rate": 0.894,
+      "reverse_rate": 0.209,
+      "reverse_given_hunt": 0.234,
+      "mean_hold_hours": 21.16,
+      "median_hold_hours": 9.25,
+      "pip_size": 0.0001,
+      "last_m15": "2026-09-15T01:45:00.000000000Z"
+    },
+    {
+      "instrument": "EUR_GBP",
+      "n": 70,
+      "n_eval": 281122,
+      "n_gate_ok": 184357,
+      "n_fire": 73,
+      "n_skip_fill": 3,
+      "ending_equity": 8124.4534,
+      "mean_r": -0.1321,
+      "sum_r": -9.2468,
+      "win_rate": 0.3286,
+      "max_drawdown_frac": 0.3539,
+      "wins": 23,
+      "losses": 47,
+      "exits": {
+        "stop": 47,
+        "target": 23
+      },
+      "by_side": {
+        "long": {
+          "n": 26,
+          "mean_r": -0.0759,
+          "win_rate": 0.3462,
+          "sum_r": -1.973
+        },
+        "short": {
+          "n": 44,
+          "mean_r": -0.1653,
+          "win_rate": 0.3182,
+          "sum_r": -7.2738
+        }
+      },
+      "by_play_class": {
+        "fade_range": {
+          "n": 44,
+          "mean_r": 0.0617,
+          "win_rate": 0.3864,
+          "sum_r": 2.715
+        },
+        "breakout_watch": {
+          "n": 26,
+          "mean_r": -0.4601,
+          "win_rate": 0.2308,
+          "sum_r": -11.9618
+        }
+      },
+      "clock_days": 3032,
+      "hunts": 1688,
+      "reverses": 152,
+      "hunt_rate": 0.557,
+      "reverse_rate": 0.05,
+      "reverse_given_hunt": 0.09,
+      "mean_hold_hours": 48.95,
+      "median_hold_hours": 24.5,
+      "pip_size": 0.0001,
+      "last_m15": "2026-09-15T01:45:00.000000000Z"
+    },
+    {
+      "instrument": "GBP_CHF",
+      "n": 321,
+      "n_eval": 271420,
+      "n_gate_ok": 167048,
+      "n_fire": 326,
+      "n_skip_fill": 5,
+      "ending_equity": 3476.0083,
+      "mean_r": -0.1444,
+      "sum_r": -46.3593,
+      "win_rate": 0.3209,
+      "max_drawdown_frac": 0.693,
+      "wins": 103,
+      "losses": 218,
+      "exits": {
+        "stop": 217,
+        "target": 104
+      },
+      "by_side": {
+        "long": {
+          "n": 171,
+          "mean_r": -0.1887,
+          "win_rate": 0.2865,
+          "sum_r": -32.2649
+        },
+        "short": {
+          "n": 150,
+          "mean_r": -0.094,
+          "win_rate": 0.36,
+          "sum_r": -14.0944
+        }
+      },
+      "by_play_class": {
+        "fade_range": {
+          "n": 248,
+          "mean_r": -0.1238,
+          "win_rate": 0.3266,
+          "sum_r": -30.7049
+        },
+        "breakout_watch": {
+          "n": 73,
+          "mean_r": -0.2144,
+          "win_rate": 0.3014,
+          "sum_r": -15.6544
+        }
+      },
+      "clock_days": 3032,
+      "hunts": 2502,
+      "reverses": 519,
+      "hunt_rate": 0.825,
+      "reverse_rate": 0.171,
+      "reverse_given_hunt": 0.207,
+      "mean_hold_hours": 23.04,
+      "median_hold_hours": 9.0,
+      "pip_size": 0.0001,
+      "last_m15": "2026-09-15T01:45:00.000000000Z"
+    },
+    {
+      "instrument": "GBP_JPY",
+      "n": 485,
+      "n_eval": 276802,
+      "n_gate_ok": 163814,
+      "n_fire": 509,
+      "n_skip_fill": 24,
+      "ending_equity": 2889.793,
+      "mean_r": -0.1097,
+      "sum_r": -53.2151,
+      "win_rate": 0.3258,
+      "max_drawdown_frac": 0.735,
+      "wins": 158,
+      "losses": 327,
+      "exits": {
+        "target": 167,
+        "stop": 318
+      },
+      "by_side": {
+        "long": {
+          "n": 247,
+          "mean_r": -0.1046,
+          "win_rate": 0.3279,
+          "sum_r": -25.8471
+        },
+        "short": {
+          "n": 238,
+          "mean_r": -0.115,
+          "win_rate": 0.3235,
+          "sum_r": -27.368
+        }
+      },
+      "by_play_class": {
+        "fade_range": {
+          "n": 376,
+          "mean_r": -0.1143,
+          "win_rate": 0.3245,
+          "sum_r": -42.9802
+        },
+        "breakout_watch": {
+          "n": 109,
+          "mean_r": -0.0939,
+          "win_rate": 0.3303,
+          "sum_r": -10.2349
+        }
+      },
+      "clock_days": 3032,
+      "hunts": 2833,
+      "reverses": 834,
+      "hunt_rate": 0.934,
+      "reverse_rate": 0.275,
+      "reverse_given_hunt": 0.294,
+      "mean_hold_hours": 11.08,
+      "median_hold_hours": 2.75,
+      "pip_size": 0.01,
+      "last_m15": "2026-09-15T02:00:00.000000000Z"
+    }
+  ]
+}

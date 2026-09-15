@@ -54,7 +54,8 @@ async def run(args: argparse.Namespace) -> int:
         "hour_of_week": hour_rows,
         "note": (
             "Calendar correlation on OHLCV timestamps. Not a PnL retune. "
-            "News/FOMC is not identified from range fatness."
+            "News/FOMC is not identified from range fatness. "
+            "Scheduled FOMC skip-day is documented hygiene, not this script."
         ),
     }
     print(json.dumps(out, indent=2, default=str))

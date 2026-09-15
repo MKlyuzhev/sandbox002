@@ -1,0 +1,280 @@
+{
+  "instrument": "GBP_CHF",
+  "engine": "double_zeros",
+  "chapter": 10,
+  "fill_mode": "rest",
+  "vppu_note": "CHF quote; frozen USDCHF=0.90",
+  "note": "Causal Ch.10 rest-fill paper walk. Daily Ch.7 fade_range gate; M15 20-SMA and 10\u201315 pip band off a 100-pip figure; stop 20 pips beyond. Next-bar taking-side open, making-side exit, 2R tickets, 2% equity. News/NFP/FOMC not filtered. Not orders.",
+  "citations": [
+    {
+      "source": "lien-fx",
+      "chunk_index": 77
+    },
+    {
+      "source": "lien-fx",
+      "chunk_index": 78
+    },
+    {
+      "source": "lien-fx",
+      "chunk_index": 79
+    }
+  ],
+  "window": "2015-01-01T00:00:00Z to 2026-09-15T01:43:59Z",
+  "last_m15": "2026-09-15T01:30:00.000000000Z",
+  "last_daily": "2026-09-13T21:00:00.000000000Z",
+  "value_per_price_unit": 1.1111111111111112,
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "lookback": 250,
+  "equity": {
+    "walk_id": "64b079972dbf49d7b1a31d8e599d2e6e",
+    "starting_equity": 10000.0,
+    "ending_equity": 898.9713,
+    "risk_fraction": 0.02,
+    "trade_count": 1325,
+    "wins": 436,
+    "losses": 889,
+    "scratches": 0,
+    "win_rate": 0.3291,
+    "sum_r": -96.6479,
+    "mean_r": -0.0729,
+    "max_drawdown": 9486.576,
+    "max_drawdown_frac": 0.9273
+  },
+  "trade_count": 1325,
+  "peak_equity": 10230.2957,
+  "exits": {
+    "stop": 889,
+    "target": 435,
+    "window_end": 1
+  },
+  "by_side": {
+    "long": {
+      "n": 681,
+      "mean_r": -0.0551,
+      "win_rate": 0.3348,
+      "sum_r": -37.5381
+    },
+    "short": {
+      "n": 644,
+      "mean_r": -0.0918,
+      "win_rate": 0.323,
+      "sum_r": -59.1098
+    }
+  },
+  "by_play_class": {
+    "fade_range": 1325
+  },
+  "mean_hold_hours": 23.25,
+  "median_hold_hours": 10.5,
+  "years": [
+    {
+      "year": "2015",
+      "n": 234,
+      "wins": 76,
+      "win_rate": 0.3248,
+      "mean_r": -0.0947,
+      "sum_r": -22.1621,
+      "starting_equity": 10000.0,
+      "ending_equity": 5924.26,
+      "long": 122,
+      "short": 112,
+      "exits": {
+        "stop": 158,
+        "target": 76
+      }
+    },
+    {
+      "year": "2016",
+      "n": 52,
+      "wins": 13,
+      "win_rate": 0.25,
+      "mean_r": -0.2868,
+      "sum_r": -14.9129,
+      "starting_equity": 5924.26,
+      "ending_equity": 4324.0,
+      "long": 28,
+      "short": 24,
+      "exits": {
+        "stop": 39,
+        "target": 13
+      }
+    },
+    {
+      "year": "2017",
+      "n": 146,
+      "wins": 46,
+      "win_rate": 0.3151,
+      "mean_r": -0.1079,
+      "sum_r": -15.7494,
+      "starting_equity": 4324.0,
+      "ending_equity": 2999.58,
+      "long": 76,
+      "short": 70,
+      "exits": {
+        "stop": 100,
+        "target": 46
+      }
+    },
+    {
+      "year": "2018",
+      "n": 82,
+      "wins": 28,
+      "win_rate": 0.3415,
+      "mean_r": -0.0573,
+      "sum_r": -4.6978,
+      "starting_equity": 2999.58,
+      "ending_equity": 2653.14,
+      "long": 46,
+      "short": 36,
+      "exits": {
+        "stop": 54,
+        "target": 28
+      }
+    },
+    {
+      "year": "2019",
+      "n": 75,
+      "wins": 26,
+      "win_rate": 0.3467,
+      "mean_r": -0.0104,
+      "sum_r": -0.7777,
+      "starting_equity": 2653.14,
+      "ending_equity": 2538.93,
+      "long": 37,
+      "short": 38,
+      "exits": {
+        "target": 26,
+        "stop": 49
+      }
+    },
+    {
+      "year": "2020",
+      "n": 196,
+      "wins": 68,
+      "win_rate": 0.3469,
+      "mean_r": -0.0109,
+      "sum_r": -2.1304,
+      "starting_equity": 2538.93,
+      "ending_equity": 2264.06,
+      "long": 96,
+      "short": 100,
+      "exits": {
+        "target": 68,
+        "stop": 128
+      }
+    },
+    {
+      "year": "2021",
+      "n": 80,
+      "wins": 30,
+      "win_rate": 0.375,
+      "mean_r": 0.0897,
+      "sum_r": 7.1785,
+      "starting_equity": 2264.06,
+      "ending_equity": 2532.66,
+      "long": 36,
+      "short": 44,
+      "exits": {
+        "stop": 50,
+        "target": 30
+      }
+    },
+    {
+      "year": "2022",
+      "n": 168,
+      "wins": 54,
+      "win_rate": 0.3214,
+      "mean_r": -0.1106,
+      "sum_r": -18.5885,
+      "starting_equity": 2532.66,
+      "ending_equity": 1639.53,
+      "long": 87,
+      "short": 81,
+      "exits": {
+        "stop": 114,
+        "target": 54
+      }
+    },
+    {
+      "year": "2023",
+      "n": 109,
+      "wins": 36,
+      "win_rate": 0.3303,
+      "mean_r": -0.049,
+      "sum_r": -5.341,
+      "starting_equity": 1639.53,
+      "ending_equity": 1414.62,
+      "long": 53,
+      "short": 56,
+      "exits": {
+        "stop": 73,
+        "target": 36
+      }
+    },
+    {
+      "year": "2024",
+      "n": 62,
+      "wins": 21,
+      "win_rate": 0.3387,
+      "mean_r": -0.03,
+      "sum_r": -1.8577,
+      "starting_equity": 1414.62,
+      "ending_equity": 1332.26,
+      "long": 33,
+      "short": 29,
+      "exits": {
+        "stop": 41,
+        "target": 21
+      }
+    },
+    {
+      "year": "2025",
+      "n": 91,
+      "wins": 25,
+      "win_rate": 0.2747,
+      "mean_r": -0.237,
+      "sum_r": -21.5715,
+      "starting_equity": 1332.26,
+      "ending_equity": 839.9,
+      "long": 53,
+      "short": 38,
+      "exits": {
+        "stop": 66,
+        "target": 25
+      }
+    },
+    {
+      "year": "2026",
+      "n": 30,
+      "wins": 13,
+      "win_rate": 0.4333,
+      "mean_r": 0.1321,
+      "sum_r": 3.9626,
+      "starting_equity": 839.9,
+      "ending_equity": 898.97,
+      "long": 14,
+      "short": 16,
+      "exits": {
+        "target": 12,
+        "stop": 17,
+        "window_end": 1
+      }
+    }
+  ],
+  "walk_id": "64b079972dbf49d7b1a31d8e599d2e6e",
+  "start_index": 0,
+  "ltf_bar_count": 290927,
+  "htf_bar_count": 3301,
+  "n_eval": 203034,
+  "n_fade_range": 67729,
+  "n_fire": 1325,
+  "n_filled": 1325,
+  "n_triple_zero": 142,
+  "n_policy_block": 0,
+  "n_skip_gap": 0,
+  "n_skip_size": 0,
+  "play_counts": {
+    "fade_range": 1325
+  }
+}

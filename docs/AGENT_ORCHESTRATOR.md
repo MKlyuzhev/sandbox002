@@ -125,7 +125,7 @@ Failures always become `wait`. `breakout_watch` never becomes `pending_exec`.
 |------|---------|---------|
 | `--instrument` | `EUR_USD` | OANDA name (`GBP_USD`, not `GBPUSD`) |
 | `--granularity` | `D` | Lien journal default (higher timeframe). `H1` / `H4` allowed |
-| `--ltf-granularity` | `H1` | Lower timeframe for multi-TF engines (Ch. 8 MTF, Ch. 13 Fader; Ch. 11 remaps H1→M15) |
+| `--ltf-granularity` | `H1` | Lower timeframe for multi-TF engines (Ch. 8 MTF, Ch. 13 Fader; Ch. 10/11 remap H1→M15) |
 | `--engines` | unset | Comma-separated chapter allow-list (e.g. `8,7`). Default: all matching |
 | `--count` | `250` | Candle count (covers 200-SMA). Ignored if both `--from` and `--to` are set |
 | `--from` / `--to` | unset | RFC3339 window (OANDA: not from+to+count together). Snapshot at the **last** bar. |
@@ -200,6 +200,7 @@ The chosen engine overwrites the proposal's `play_class`, `side`, and
 |--------|---------|-----------|------------|------------|
 | `mtf` (`agent/engines/mtf.py`) | 8 | `join_trend` | `--granularity` + `--ltf-granularity` | `0.5*htf_regime_conf + 0.5*rsi_extremity` |
 | `dbb` (`agent/engines/dbb.py`) | 9 | `join_trend`, `fade_range` | `--granularity` | `0.5*regime_conf + 0.5*band_extremity` |
+| `double_zeros` (`agent/engines/double_zeros.py`) | 10 | `fade_range` | `--granularity` + M15 (H1 remaps) | `0.5*regime_conf + 0.5*band_center` |
 | `waiting_deal` (`agent/engines/waiting_deal.py`) | 11 | `fade_range`, `breakout_watch` | `--granularity` + M15 (H1 remaps) | `0.5*regime_conf + 0.5*hunt_excess` |
 | `fader` (`agent/engines/fader.py`) | 13 | `fade_range` | `--granularity` + `--ltf-granularity` | `0.5*regime_conf + 0.5*probe_excess` |
 | `breakout20` (`agent/engines/breakout20.py`) | 14 | `join_trend` | `--granularity` | `0.5*regime_conf + 0.5*clearance` |
@@ -210,12 +211,12 @@ The chosen engine overwrites the proposal's `play_class`, `side`, and
   `allowed_play_classes`, filtered by `--engines` when set. Ch. 7 is the generic
   fallback, so a firing specialized engine (Ch. 8+) outranks it by confidence;
   ties break by registry priority.
-- Multi-TF fetch: Ch. 8 (`mtf`), Ch. 11 (`waiting_deal`), and Ch. 13 (`fader`)
-  need the lower timeframe too. Ch. 11 remaps coarse LTF to M15. In live mode
-  the graph fetches + classifies it (and attaches `ohlc` for the clock); with
-  injected bars (tests) extra TFs are only fetched when a `fetch_analyses_fn`
-  is provided, so injected-bars runs stay offline (those engines simply do not
-  fire).
+- Multi-TF fetch: Ch. 8 (`mtf`), Ch. 10 (`double_zeros`), Ch. 11 (`waiting_deal`),
+  and Ch. 13 (`fader`) need the lower timeframe too. Ch. 10/11 remap coarse LTF
+  to M15. In live mode the graph fetches + classifies it (and attaches `ohlc`
+  for LTF geometry); with injected bars (tests) extra TFs are only fetched when
+  a `fetch_analyses_fn` is provided, so injected-bars runs stay offline (those
+  engines simply do not fire).
 - If no engine matches the regime, the graph falls back to Ch. 7 geometry
   (`side: none` for `breakout_watch` when Ch. 11 has no M15 bars).
 - The chosen engine is recorded on `proposal.engine` / `proposal.chapter` and in
@@ -406,16 +407,21 @@ Research only; no broker orders.
 
 Ch. 9 / 14 / 16 are **one-shot events** on the primary TF (`agent.event_walk`).
 Ch. 13 Fader steps the **lower TF** against a daily ADX gate (`agent.fader_walk`),
-first-fire like MTF `--entry-mode first_fire`. Ch. 11 Waiting for the Deal steps
-**M15** against a daily Ch.7 gate (`agent.waiting_deal_walk`); `H1` remaps to
-M15. Same warmup + `[--from, --to]` fetch as §9b. `--fill close|rest` matches
-§9b; Ch.11/13 rest uses LTF bid/ask only.
+first-fire like MTF `--entry-mode first_fire`. Ch. 10 double zeros and Ch. 11
+Waiting for the Deal step **M15** against a daily Ch.7 gate
+(`agent.double_zeros_walk` / `agent.waiting_deal_walk`); `H1` remaps to M15.
+Same warmup + `[--from, --to]` fetch as §9b. `--fill close|rest` matches
+§9b; Ch.10/11/13 rest uses LTF bid/ask only. FOMC skip-day is not applied in the
+walk; it is perspective hygiene in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md).
 
 ```bash
 .venv/bin/python -m agent.walk_lien --chapter 16 --instrument USD_JPY \
   --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
 .venv/bin/python -m agent.walk_lien --chapter 13 --instrument EUR_USD \
   --granularity D --ltf-granularity H1 \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.walk_lien --chapter 10 --instrument USD_CAD \
+  --granularity D --ltf-granularity M15 \
   --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
 .venv/bin/python -m agent.walk_lien --chapter 11 --instrument GBP_USD \
   --granularity D --ltf-granularity M15 \
@@ -430,7 +436,7 @@ M15. Same warmup + `[--from, --to]` fetch as §9b. `--fill close|rest` matches
 
 Runs encoded engines **inside the MT4 Strategy Tester** so MT4's native report
 (equity curve, profit factor, drawdown) is the output. Two passes, file-based.
-`--engine mtf|dbb|fader|waiting_deal|breakout20|perfect_order` or `--chapter 8|9|11|13|14|16`.
+`--engine mtf|dbb|fader|waiting_deal|double_zeros|breakout20|perfect_order` or `--chapter 8|9|10|11|13|14|16`.
 Full workflow: [MT4_TESTER_BACKTEST.md](MT4_TESTER_BACKTEST.md).
 
 1. **Export pass** — `SandboxTesterBridge.mq4` with `InpMode=export` writes every
@@ -496,9 +502,9 @@ drawing; init does not replay leftover `cmd.json`).
 ## 11. What this is not
 
 - Not live or practice **order** placement (OANDA MCP stays read-only).
-- Encoded entry engines: Ch. 8 (`mtf`), 9 (`dbb`), 11 (`waiting_deal`), 13
-  (`fader`), 14 (`breakout20`), 16 (`perfect_order`), plus Ch. 7 geometry
-  fallback. Ch. 10, 12, and 15 remain documented only in
+- Encoded entry engines: Ch. 8 (`mtf`), 9 (`dbb`), 10 (`double_zeros`), 11
+  (`waiting_deal`), 13 (`fader`), 14 (`breakout20`), 16 (`perfect_order`), plus
+  Ch. 7 geometry fallback. Ch. 12 and 15 remain documented only in
   [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). When no specialized engine
   fires, tickets fall back to Ch. 7 geometry (`agent/levels.py`).
 - Not HTTP `/agent/run` (still a later wrapper around this same graph).
@@ -520,8 +526,10 @@ No network. From repo root:
   tests.test_lien_geometry tests.test_lien_chapters \
   tests.test_engines_registry tests.test_engines_ch7 tests.test_entry_mtf \
   tests.test_entry_dbb tests.test_entry_fader tests.test_entry_waiting_deal \
-  tests.test_entry_breakout20 tests.test_entry_perfect_order \
+  tests.test_entry_double_zeros tests.test_entry_breakout20 \
+  tests.test_entry_perfect_order \
   tests.test_session_clock tests.test_agent_waiting_deal_walk \
+  tests.test_agent_double_zeros_walk \
   tests.test_agent_fidelity \
   tests.test_agent_retrieve tests.test_agent_scan tests.test_agent_walk_jobs \
   tests.test_oanda_mcp_planner -v

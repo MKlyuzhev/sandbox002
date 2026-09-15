@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 from agent.event_walk import walk_event
+from agent.double_zeros_walk import walk_double_zeros
 from agent.fader_walk import walk_fader
 from agent.journal import DEFAULT_DB_PATH, Journal
 from agent.lien_chapters import (
@@ -18,11 +19,12 @@ from agent.lien_chapters import (
 from agent.waiting_deal_walk import walk_waiting_deal
 from agent.mtf_walk import walk_mtf
 from agent.paper_walk import walk_paper
+from agent.regime_change_walk import walk_regime_change
 from agent.schema import FillMode, Goal, WalkResult
 from app import indicators, oanda_client, regime_walk
 from app.walk_fetch import fetch_walk_bars
 
-WalkKind = Literal["ch7", "mtf", "lien"]
+WalkKind = Literal["ch7", "mtf", "lien", "regime_change"]
 TRADE_HEAD = 10
 TRADE_TAIL = 10
 MAX_INLINE_TRADES = TRADE_HEAD + TRADE_TAIL
@@ -96,11 +98,13 @@ async def execute_walk(
     ``meta`` may include bar lists for CLI overlays; MCP must not dump them.
     """
     kind_key = kind.strip().lower()
-    if kind_key not in ("ch7", "mtf", "lien"):
-        raise WalkJobError(f"unknown walk kind {kind!r}; use ch7, mtf, or lien")
+    if kind_key not in ("ch7", "mtf", "lien", "regime_change"):
+        raise WalkJobError(
+            f"unknown walk kind {kind!r}; use ch7, mtf, lien, or regime_change"
+        )
     if not from_time or not to_time:
         raise WalkJobError("from_time and to_time are required")
-    if kind_key == "lien" and chapter == 11:
+    if kind_key == "lien" and chapter in (10, 11):
         ltf_granularity = default_ltf(chapter, ltf_granularity)
     fetch = fetch_fn or fetch_walk_bars
     with_ba = fill_mode == "rest"
@@ -147,6 +151,26 @@ async def execute_walk(
         )
         return result, meta
 
+    if kind_key == "regime_change":
+        bars = await fetch(
+            instrument, granularity, from_time, to_time, lookback, with_ba=with_ba
+        )
+        start_index = regime_walk.first_index_on_or_after(bars, from_time)
+        result, detection = walk_regime_change(
+            bars, goal, lookback=lookback, start_index=start_index, journal=store
+        )
+        meta.update(
+            {
+                "bars": bars,
+                "bar_count": len(bars),
+                "start_index": start_index,
+                "engine": "regime_change",
+                "chapter": None,
+                "detection": detection,
+            }
+        )
+        return result, meta
+
     if kind_key == "mtf":
         htf_bars, ltf_bars = await asyncio.gather(
             fetch(
@@ -187,13 +211,13 @@ async def execute_walk(
         return result, meta
 
     if chapter is None:
-        raise WalkJobError("lien walks require chapter (9, 11, 13, 14, or 16)")
+        raise WalkJobError("lien walks require chapter (9, 10, 11, 13, 14, or 16)")
     engine = CHAPTER_TO_ENGINE.get(chapter)
     if engine is None:
         raise WalkJobError(entry_lien_error(chapter))
     meta["chapter"] = chapter
     meta["engine"] = engine
-    if engine in ("fader", "waiting_deal"):
+    if engine in ("fader", "waiting_deal", "double_zeros"):
         htf_bars, ltf_bars = await asyncio.gather(
             fetch(
                 instrument, granularity, from_time, to_time, lookback, with_ba=False
@@ -208,7 +232,12 @@ async def execute_walk(
             ),
         )
         start_index = regime_walk.first_index_on_or_after(ltf_bars, from_time)
-        walker = walk_waiting_deal if engine == "waiting_deal" else walk_fader
+        if engine == "waiting_deal":
+            walker = walk_waiting_deal
+        elif engine == "double_zeros":
+            walker = walk_double_zeros
+        else:
+            walker = walk_fader
         result = walker(
             htf_bars,
             ltf_bars,

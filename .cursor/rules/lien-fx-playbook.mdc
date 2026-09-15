@@ -29,7 +29,7 @@ Prefer ≥ 1:2 R, ≤ ~2% equity (`app/risk.py`). Scale half at 1R, stop to brea
 
 ## Entry engines
 
-Ch. 8 (Multiple Time Frames) is coded as the `entry_mtf` tool (oanda-research): higher-TF direction gate + lower-TF RSI-dip/rally trigger, run after the regime filter. Ch. 9 is `entry_dbb`. Ch. 11/13/14/16 are `entry_lien(chapter)`. Chapters 10, 12, and 15 are not tools yet (news filter, `breakout_watch` paper policy); use the doc tables only after the regime filter. Ch. 11 uses the calendar clock on OHLCV timestamps (`app/session_clock.py`); news/FOMC is still `unavailable`.
+Ch. 8 (Multiple Time Frames) is coded as the `entry_mtf` tool (oanda-research): higher-TF direction gate + lower-TF RSI-dip/rally trigger, run after the regime filter. Ch. 9 is `entry_dbb`. Ch. 10/11/13/14/16 are `entry_lien(chapter)`. Chapters 12 and 15 are not tools yet (`breakout_watch` paper policy); use the doc tables only after the regime filter. Ch. 10 fades double-zero figures on M15 (20-SMA + 10–15 pip band); news/NFP is not encoded. Ch. 11 uses the calendar clock on OHLCV timestamps (`app/session_clock.py`). News/FOMC is not inferred from range fatness and is not an engine filter. Perspective hygiene: optional skip of **new** Ch.11 (and, for quiet-tape Ch.10, new) tickets on a scheduled FOMC **statement** London date (14:15 New York; frozen list `data/walk_gbp_usd_ch11_2015/fomc_calendar.json`). That is “never own the binary,” not a fitted edge — see [docs/LIEN_FX_STRATEGIES.md](docs/LIEN_FX_STRATEGIES.md) Ch.11. Do not flatten at 14:15 or restrict the engine to the next London date.
 
 ## Not available yet
 

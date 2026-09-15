@@ -1,0 +1,344 @@
+{
+  "instrument": "GBP_USD",
+  "engine": "waiting_deal",
+  "chapter": 11,
+  "note": "Counterfactual FOMC policies on the existing close-fill Ch.11 book. Does not recode waiting_deal. Scheduled statements only for A/B/C; unscheduled 2020 listed separately. Flatten = last M15 close strictly before the statement; stop/target still win if they trade first. Research only; no orders.",
+  "calendar_source": "Frozen FOMC statement timestamps for Ch.11 policy research. Scheduled prints use Lien's 14:15 New York clock. Unscheduled 2020 prints use the Fed release clock. Not minutes, speeches, IOER/repo implementation notes, or the 2020-08-27 longer-run-goals update. Sources: federalreserve.gov monetaryYYYYMMDDa.htm and fomchistoricalYYYY.htm (retrieved 2026-09-14).",
+  "n_scheduled_in_window": 92,
+  "n_unscheduled": 3,
+  "baseline": {
+    "n": 395,
+    "starting_equity": 10000.0,
+    "ending_equity": 15490.9697,
+    "peak_equity": 17426.4891,
+    "max_drawdown": 6576.5011,
+    "max_drawdown_frac": 0.3774,
+    "wins": 141,
+    "win_rate": 0.357,
+    "sum_r": 30.0306,
+    "mean_r": 0.076
+  },
+  "policy_a_skip_entry_day": {
+    "n": 380,
+    "starting_equity": 10000.0,
+    "ending_equity": 15548.7674,
+    "peak_equity": 16609.3061,
+    "max_drawdown": 5373.2255,
+    "max_drawdown_frac": 0.3266,
+    "wins": 136,
+    "win_rate": 0.3579,
+    "sum_r": 29.9162,
+    "mean_r": 0.0787,
+    "dropped": 15,
+    "entry_subset": {
+      "n": 15,
+      "wins": 5,
+      "win_rate": 0.3333,
+      "mean_r": 0.0076,
+      "sum_r": 0.1144,
+      "long": 10,
+      "short": 5,
+      "exits": {
+        "stop": 10,
+        "target": 5
+      },
+      "play_class": {
+        "fade_range": 13,
+        "breakout_watch": 2
+      }
+    },
+    "kept_subset": {
+      "n": 380,
+      "wins": 136,
+      "win_rate": 0.3579,
+      "mean_r": 0.0787,
+      "sum_r": 29.9162,
+      "long": 196,
+      "short": 184,
+      "exits": {
+        "target": 136,
+        "stop": 244
+      },
+      "play_class": {
+        "fade_range": 305,
+        "breakout_watch": 75
+      }
+    }
+  },
+  "policy_b_flatten": {
+    "n": 395,
+    "starting_equity": 10000.0,
+    "ending_equity": 16311.5621,
+    "peak_equity": 17799.5322,
+    "max_drawdown": 6717.2821,
+    "max_drawdown_frac": 0.3774,
+    "wins": 142,
+    "win_rate": 0.3595,
+    "sum_r": 32.5735,
+    "mean_r": 0.0825,
+    "replaced_with_flatten": 4,
+    "hit_stop_or_target_before_flatten": 0,
+    "open_across_statement": {
+      "n": 9,
+      "wins": 4,
+      "win_rate": 0.4444,
+      "mean_r": 0.3397,
+      "sum_r": 3.0572,
+      "long": 3,
+      "short": 6,
+      "exits": {
+        "stop": 5,
+        "target": 4
+      },
+      "play_class": {
+        "fade_range": 8,
+        "breakout_watch": 1
+      }
+    },
+    "flatten_mark": {
+      "n": 4,
+      "wins": 2,
+      "win_rate": 0.5,
+      "mean_r": 0.3857,
+      "sum_r": 1.5429,
+      "long": 0,
+      "short": 4,
+      "exits": {
+        "fomc_flatten": 4
+      },
+      "play_class": {
+        "fade_range": 4
+      }
+    },
+    "mean_delta_r": 0.6357,
+    "sum_delta_r": 2.5429
+  },
+  "policy_a_plus_b": {
+    "n": 380,
+    "starting_equity": 10000.0,
+    "ending_equity": 16182.7529,
+    "peak_equity": 17286.5341,
+    "max_drawdown": 5424.6691,
+    "max_drawdown_frac": 0.3266,
+    "wins": 137,
+    "win_rate": 0.3605,
+    "sum_r": 31.8848,
+    "mean_r": 0.0839,
+    "dropped": 15,
+    "replaced_with_flatten": 3
+  },
+  "policy_c_next_london_date": {
+    "entry_subset": {
+      "n": 13,
+      "wins": 5,
+      "win_rate": 0.3846,
+      "mean_r": 0.1538,
+      "sum_r": 2.0,
+      "long": 1,
+      "short": 12,
+      "exits": {
+        "stop": 8,
+        "target": 5
+      },
+      "play_class": {
+        "fade_range": 11,
+        "breakout_watch": 2
+      }
+    },
+    "rest_excluding_fomc_and_next": {
+      "n": 367,
+      "wins": 131,
+      "win_rate": 0.3569,
+      "mean_r": 0.0761,
+      "sum_r": 27.9162,
+      "long": 195,
+      "short": 172,
+      "exits": {
+        "target": 131,
+        "stop": 236
+      },
+      "play_class": {
+        "fade_range": 294,
+        "breakout_watch": 73
+      }
+    },
+    "note": "C is not 'only trade these days'. It is the Thursday-after (next weekday) book vs the rest, after skipping the statement London date."
+  },
+  "microstructure": {
+    "fomc_london_dates": {
+      "days": 92,
+      "hunts": 88,
+      "reverses": 29,
+      "hunt_rate": 0.957,
+      "reverse_rate": 0.315,
+      "reverse_rate_given_hunt": 0.33
+    },
+    "next_london_dates": {
+      "days": 92,
+      "hunts": 87,
+      "reverses": 24,
+      "hunt_rate": 0.946,
+      "reverse_rate": 0.261,
+      "reverse_rate_given_hunt": 0.276
+    },
+    "all_days_campaign": {
+      "days_with_power_hour": 3031,
+      "hunt_rate": 0.894,
+      "reverse_rate": 0.209,
+      "reverse_rate_given_hunt": 0.234
+    }
+  },
+  "unscheduled_2020": [
+    {
+      "fed_id": "20200303",
+      "ny_date": "2020-03-03",
+      "ny_time": "10:00",
+      "london_date": "2020-03-03",
+      "n_touching_trades": 0,
+      "mean_r": null
+    },
+    {
+      "fed_id": "20200315",
+      "ny_date": "2020-03-15",
+      "ny_time": "17:00",
+      "london_date": "2020-03-15",
+      "n_touching_trades": 0,
+      "mean_r": null
+    },
+    {
+      "fed_id": "20200323",
+      "ny_date": "2020-03-23",
+      "ny_time": "08:00",
+      "london_date": "2020-03-23",
+      "n_touching_trades": 0,
+      "mean_r": null
+    }
+  ],
+  "flatten_audit_n": 4,
+  "a_entries_by_year": {
+    "2015": {
+      "n": 2,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -2.0,
+      "long": 1,
+      "short": 1,
+      "exits": {
+        "stop": 2
+      },
+      "play_class": {
+        "fade_range": 1,
+        "breakout_watch": 1
+      }
+    },
+    "2016": {
+      "n": 5,
+      "wins": 3,
+      "win_rate": 0.6,
+      "mean_r": 0.8172,
+      "sum_r": 4.0858,
+      "long": 2,
+      "short": 3,
+      "exits": {
+        "target": 3,
+        "stop": 2
+      },
+      "play_class": {
+        "fade_range": 4,
+        "breakout_watch": 1
+      }
+    },
+    "2017": {
+      "n": 1,
+      "wins": 1,
+      "win_rate": 1.0,
+      "mean_r": 2.0,
+      "sum_r": 2.0,
+      "long": 1,
+      "short": 0,
+      "exits": {
+        "target": 1
+      },
+      "play_class": {
+        "fade_range": 1
+      }
+    },
+    "2019": {
+      "n": 1,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -1.0,
+      "long": 1,
+      "short": 0,
+      "exits": {
+        "stop": 1
+      },
+      "play_class": {
+        "fade_range": 1
+      }
+    },
+    "2021": {
+      "n": 2,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -2.0,
+      "long": 2,
+      "short": 0,
+      "exits": {
+        "stop": 2
+      },
+      "play_class": {
+        "fade_range": 2
+      }
+    },
+    "2022": {
+      "n": 1,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -1.0,
+      "long": 1,
+      "short": 0,
+      "exits": {
+        "stop": 1
+      },
+      "play_class": {
+        "fade_range": 1
+      }
+    },
+    "2023": {
+      "n": 2,
+      "wins": 1,
+      "win_rate": 0.5,
+      "mean_r": 0.5143,
+      "sum_r": 1.0286,
+      "long": 2,
+      "short": 0,
+      "exits": {
+        "stop": 1,
+        "target": 1
+      },
+      "play_class": {
+        "fade_range": 2
+      }
+    },
+    "2025": {
+      "n": 1,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -1.0,
+      "long": 0,
+      "short": 1,
+      "exits": {
+        "stop": 1
+      },
+      "play_class": {
+        "fade_range": 1
+      }
+    }
+  }
+}

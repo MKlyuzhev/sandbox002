@@ -1,0 +1,246 @@
+{
+  "flatten_delta": [
+    {
+      "entry_time": "2016-04-27T14:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "orig_exit": "stop",
+      "orig_r": -1.0,
+      "flatten_r": -0.4257,
+      "delta_r": 0.5743,
+      "fed_id": "20160427"
+    },
+    {
+      "entry_time": "2018-07-31T14:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "orig_exit": "target",
+      "orig_r": 2.0,
+      "flatten_r": -0.1943,
+      "delta_r": -2.1943,
+      "fed_id": "20180801"
+    },
+    {
+      "entry_time": "2019-01-29T19:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "orig_exit": "stop",
+      "orig_r": -1.0,
+      "flatten_r": 1.6486,
+      "delta_r": 2.6486,
+      "fed_id": "20190130"
+    },
+    {
+      "entry_time": "2023-10-31T14:00:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "orig_exit": "stop",
+      "orig_r": -1.0,
+      "flatten_r": 0.5143,
+      "delta_r": 1.5143,
+      "fed_id": "20231101"
+    }
+  ],
+  "a_entries": [
+    {
+      "entry_time": "2015-10-28T18:00:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20151028"
+    },
+    {
+      "entry_time": "2015-12-16T19:30:00.000000000Z",
+      "side": "long",
+      "play_class": "breakout_watch",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20151216"
+    },
+    {
+      "entry_time": "2016-03-16T18:00:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": 2.0286,
+      "exit_status": "target",
+      "fed_id": "20160316"
+    },
+    {
+      "entry_time": "2016-04-27T14:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20160427"
+    },
+    {
+      "entry_time": "2016-07-27T18:00:00.000000000Z",
+      "side": "long",
+      "play_class": "breakout_watch",
+      "r_realized": 2.0286,
+      "exit_status": "target",
+      "fed_id": "20160727"
+    },
+    {
+      "entry_time": "2016-09-21T14:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20160921"
+    },
+    {
+      "entry_time": "2016-12-14T19:00:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "r_realized": 2.0286,
+      "exit_status": "target",
+      "fed_id": "20161214"
+    },
+    {
+      "entry_time": "2017-03-15T18:00:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": 2.0,
+      "exit_status": "target",
+      "fed_id": "20170315"
+    },
+    {
+      "entry_time": "2019-09-18T19:30:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20190918"
+    },
+    {
+      "entry_time": "2021-03-17T18:30:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20210317"
+    },
+    {
+      "entry_time": "2021-09-22T15:45:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20210922"
+    },
+    {
+      "entry_time": "2022-11-02T18:00:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20221102"
+    },
+    {
+      "entry_time": "2023-02-01T19:30:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20230201"
+    },
+    {
+      "entry_time": "2023-11-01T23:00:00.000000000Z",
+      "side": "long",
+      "play_class": "fade_range",
+      "r_realized": 2.0286,
+      "exit_status": "target",
+      "fed_id": "20231101"
+    },
+    {
+      "entry_time": "2025-09-17T18:45:00.000000000Z",
+      "side": "short",
+      "play_class": "fade_range",
+      "r_realized": -1.0,
+      "exit_status": "stop",
+      "fed_id": "20250917"
+    }
+  ],
+  "c_entries": [
+    {
+      "entry_time": "2015-07-30T15:45:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20150729"
+    },
+    {
+      "entry_time": "2015-09-18T18:15:00.000000000Z",
+      "side": "short",
+      "r_realized": 2.0,
+      "fed_id": "20150917"
+    },
+    {
+      "entry_time": "2015-12-17T10:45:00.000000000Z",
+      "side": "short",
+      "r_realized": 2.0,
+      "fed_id": "20151216"
+    },
+    {
+      "entry_time": "2016-06-16T11:00:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20160615"
+    },
+    {
+      "entry_time": "2017-02-02T10:45:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20170201"
+    },
+    {
+      "entry_time": "2017-12-14T14:00:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20171213"
+    },
+    {
+      "entry_time": "2018-03-22T12:30:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20180321"
+    },
+    {
+      "entry_time": "2018-12-20T22:00:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20181219"
+    },
+    {
+      "entry_time": "2020-06-11T11:45:00.000000000Z",
+      "side": "short",
+      "r_realized": 2.0,
+      "fed_id": "20200610"
+    },
+    {
+      "entry_time": "2020-12-17T20:45:00.000000000Z",
+      "side": "short",
+      "r_realized": -1.0,
+      "fed_id": "20201216"
+    },
+    {
+      "entry_time": "2023-07-27T12:30:00.000000000Z",
+      "side": "short",
+      "r_realized": 2.0,
+      "fed_id": "20230726"
+    },
+    {
+      "entry_time": "2025-05-08T11:15:00.000000000Z",
+      "side": "long",
+      "r_realized": -1.0,
+      "fed_id": "20250507"
+    },
+    {
+      "entry_time": "2025-09-18T13:30:00.000000000Z",
+      "side": "short",
+      "r_realized": 2.0,
+      "fed_id": "20250917"
+    }
+  ]
+}

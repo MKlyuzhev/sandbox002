@@ -121,11 +121,17 @@ Lower `--lookback` for shorter ranges.
   ≥15 pips beyond prior day H/L then close back inside. First-fire (no
   rollover-peak). `--tf H1 --htf D`.
 
+### Ch. 10 (`--engine double_zeros` / `--chapter 10`)
+
+- Dual-TF like Ch. 11: export **M15**, resample **D**. 20-SMA + 10–15 pip
+  figure band, stop 20 pips beyond the double zero. First-fire.
+  `--tf M15 --htf D`. News/NFP is not applied here.
+
 ### Ch. 11 (`--engine waiting_deal` / `--chapter 11`)
 
 - Dual-TF like Ch. 8: export **M15**, resample **D**. Frankfurt–London power-hour
   range, ≥25-pip hunt, reverse through the opposite rail. First-fire.
-  `--tf M15 --htf D`.
+  `--tf M15 --htf D`. FOMC skip-day is documented hygiene, not applied here.
 
 ### Ch. 14 / 16 (`--chapter 14` / `--chapter 16`)
 
@@ -152,6 +158,9 @@ Lower `--lookback` for shorter ranges.
 
 # Ch. 8 (MTF) with first-fire timing instead of rollover-peak
 .venv/bin/python -m agent.tester_backtest --engine mtf --entry-mode first_fire --instrument GBP_USD --tf H1 --htf D
+
+# Ch. 10 (double zeros): export on M15, resample D internally
+.venv/bin/python -m agent.tester_backtest --chapter 10 --instrument USD_CAD --tf M15 --htf D
 
 # Ch. 11 (Waiting for the Deal): export on M15, resample D internally
 .venv/bin/python -m agent.tester_backtest --chapter 11 --instrument GBP_USD --tf M15 --htf D

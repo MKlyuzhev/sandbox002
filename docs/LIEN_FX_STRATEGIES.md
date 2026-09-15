@@ -9,12 +9,14 @@ Not a signal service and not an execution path.
 classification, `agent/levels.py` maps the snapshot to a ticket (last close,
 10-bar high/low, 10-pip buffer, 2R target). Ch. 8 (Multiple Time Frames) and
 Ch. 9 (Double Bollinger Bands) are now encoded as entry engines
-(`agent/engines/mtf.py`, `agent/engines/dbb.py`); Ch. 11 (Waiting for the Deal),
-13 (Fader), 14 (20-day breakout), and 16 (Perfect order) are also encoded.
-Chapters 10, 12, and 15 remain documented here for later iterations (news
-filter, `breakout_watch` paper policy) and are **not** encoded as trade logic
-yet. The Ch. 11 clock is a calendar join on OHLCV timestamps
-(`app/session_clock.py`), not the Kalman holding-period prior.
+(`agent/engines/mtf.py`, `agent/engines/dbb.py`); Ch. 10 (double zeros),
+Ch. 11 (Waiting for the Deal), 13 (Fader), 14 (20-day breakout), and 16
+(Perfect order) are also encoded. Chapters 12 and 15 remain documented here
+for later iterations (`breakout_watch` paper policy) and are **not** encoded
+as trade logic yet. The Ch. 11 clock is a calendar join on OHLCV timestamps
+(`app/session_clock.py`), not the Kalman holding-period prior. FOMC is a
+**perspective hygiene** overlay on that clock (skip new tickets on the
+statement London date), not an encoded filter.
 
 ```
 OANDA candles → indicators.py → regime.py → JSON
@@ -171,16 +173,25 @@ Unit tests (no network):
 
 ## Technical strategies (Ch. 8–16)
 
-Ch. 8, 9, 11, 13, 14, and 16 are coded (see below); Ch. 10, 12, and 15
+Ch. 8, 9, 10, 11, 13, 14, and 16 are coded (see below); Ch. 12 and 15
 entries are documented, not coded. Ch. 15 channel rails appear on the
 regime overlay as display only.
+
+> **Ch. 15 channels now also feed detection (not entries).** The structural
+> regime-change framework ([docs/REGIME_CHANGE_FRAMEWORK.md](REGIME_CHANGE_FRAMEWORK.md))
+> reuses the trendline + parallel channel geometry — plus S/R levels, role
+> reversal, the fan principle, swing flips, and OHLCV confirmations — as
+> **early-warning evidence** for a regime change, pinned to the whole corpus
+> (Murphy, Edwards & Magee, Pring, Nison, Lien). It emits a staged verdict and
+> optional Stage-3 paper tickets; it does not add Ch. 15 ±10-pip breakout
+> entries.
 
 | Ch | Strategy | Timeframe | Idea | Use when | Avoid when |
 |----|----------|-----------|------|----------|------------|
 | **8** *(coded)* | Multiple time frames | Daily bias + H1/M15 entry | Higher TF sets direction; buy RSI dips in uptrends | Trend on daily | Fading daily trend from a lower TF |
 | **9** *(coded)* | Double Bollinger Bands | Daily | 1σ+2σ: fade only after close back through 1σ; outer zone = trend; close through 1σ after opposite side = join trend | Regime already classified | Single-band fades that hug 2σ |
-| **10** | Fade double zeros | 15m | Fade round numbers 10–15 pips before the figure; stop ~20 pips beyond; 20-SMA filter | Quiet tape, tighter crosses, confluence | News, strong trend |
-| **11** *(coded)* | Waiting for the Deal | GBPUSD, M15 + London clock | Skip first London spike (stop hunt); trade reverse through power-hour range | After US open / major release (news filter not encoded) | First spike |
+| **10** *(coded)* | Fade double zeros | GBPUSD/USDJPY/USDCAD, M15 + D gate | Fade round numbers 10–15 pips before the figure; stop 20 pips beyond; 20-SMA filter | Quiet tape, `fade_range`, tighter crosses | News, strong trend, `join_trend` |
+| **11** *(coded)* | Waiting for the Deal | GBPUSD, M15 + London clock | Skip first London spike (stop hunt); trade reverse through power-hour range | After US open / major release. Hygiene: optional skip of **new** tickets on a scheduled FOMC statement London date (not encoded) | First spike; FOMC flatten / “only next day” |
 | **12** | Inside-days breakout | Daily (hourly only before London/US) | ≥2 nested inside days; enter ±10 pips; **stop-and-reverse** on false break | Compression, tighter pairs (EURGBP, USDCAD, EURCHF, EURCAD, AUDCAD) | Chasing without nested insides |
 | **13** *(coded)* | Fader | Daily ADX + hourly entry | ADX(14) &lt; 20: fade a ≥15-pip probe beyond prior day H/L | Range regime | ADX trending |
 | **14** *(coded)* | 20-day breakout | Daily | 20-day extreme → 2-day pullback → rebreak within 3 days | Trend / expansion | First touch of the 20-day without shakeout |
@@ -277,6 +288,31 @@ agent.tester_backtest --engine dbb --tf D` — see
 
 MCP (`oanda-research`): `entry_dbb`.
 
+### Ch. 10 Fading the Double Zeros (encoded)
+
+`agent/engines/double_zeros.py` is dual-TF like Ch.11: daily Ch.7 **`fade_range`**
+gate (never `join_trend` or `trend_waning`), then M15 (or finer) OHLC. Double
+zeros are 100-pip figures (`1.1100` / `118.00`). Long only when the last close
+is **below** the 20-period SMA and sits 10–15 pips **above** the figure; stop
+20 pips below the figure. Short is the mirror (above SMA, 10–15 pips below the
+figure, stop 20 pips above). Tickets use `levels.build_ticket` + 2R (not the
+book's 35-pip half then trail). News/NFP/FOMC is **not** identified from range
+fatness and is **not** a coded filter — the book wants quieter tape without
+major reports; optional FOMC skip-day hygiene is the same overlay as Ch.11,
+not this function. Citations: `lien-fx` chunks 77–79.
+
+```bash
+.venv/bin/python scripts/entry_lien.py --chapter 10 --instrument USD_CAD
+.venv/bin/python -m agent.walk_lien --chapter 10 --instrument USD_CAD \
+  --ltf-granularity M15 \
+  --from 2024-01-01T00:00:00Z --to 2024-06-01T00:00:00Z
+.venv/bin/python -m agent.tester_backtest --chapter 10 --instrument USD_CAD --tf M15 --htf D
+.venv/bin/python -m unittest tests.test_entry_double_zeros \
+  tests.test_agent_double_zeros_walk -v
+```
+
+MCP: `entry_lien(chapter=10, ...)`. Coarse LTF (`H1`/`H4`/`D`) remap to **M15**.
+
 ### Ch. 11 Waiting for the Deal (encoded)
 
 `app/session_clock.py` joins each M15 (or finer) bar's RFC3339 UTC `time` to
@@ -290,8 +326,25 @@ year-round for a book-literal check.
 (3) ≥25-pip hunt beyond that box after London open; (4) reverse through the
 opposite rail, pending 10 pips beyond, stop 25 pips the other side of the rail.
 Tickets use `levels.build_ticket` + 2R (not the book's 50/105 pip template).
-News/FOMC is **not** identified from range fatness. Same-bar hunt+reverse is
-allowed (OHLC has no wick order). Citations: `lien-fx` chunks 80–82.
+News/FOMC is **not** identified from range fatness and is **not** a
+`waiting_deal` filter. Same-bar hunt+reverse is allowed (OHLC has no wick
+order). Citations: `lien-fx` chunks 80–82.
+
+**FOMC perspective hygiene (policy A, not encoded).** On a scheduled FOMC
+**statement** (14:15 New York, IANA `America/New_York`; frozen list
+[`data/walk_gbp_usd_ch11_2015/fomc_calendar.json`](../data/walk_gbp_usd_ch11_2015/fomc_calendar.json)),
+do not arm a **new** Ch.11 ticket that London date. Geometry still computes;
+the overlay is “never own the binary,” not a claim that those mornings are
+bad tape. Counterfactual on the GBP_USD 2015–Sep 2026 close-fill book
+(395 tickets, 92 statements): 15 statement-day entries, mean R +0.008,
+win rate 33%; dropping them left mean R +0.079 vs +0.076 and did not explain
+the 37.7% drawdown. Hunt/reverse rates were **higher** that morning (reverse
+31.5% vs 20.9% all days), which matches chunk 80 (London matters because the
+print is after the close). Do **not** flatten open trades at 14:15 (policy B:
+n=4, including one killed +2R) or restrict the engine to the next London
+date (policy C: n=13). Unscheduled March 2020 prints, minutes, and speeches
+are out of this overlay. NFP/CPI at 08:30 New York is a different clock.
+Campaign: [`fomc_policy_campaign.json`](../data/walk_gbp_usd_ch11_2015/fomc_policy_campaign.json).
 
 Calendar correlation (hour-of-week mean range + hunt/reverse rates; not a PnL
 fit):
@@ -415,12 +468,13 @@ MCP: `entry_lien(chapter=16, ...)`.
 
 ## Out of scope / later
 
-- Encoding Ch. 10 (double zeros — news cannot be coded), 12 (inside days), and
-  15 (channel **entries**). Overlay rails reuse the Ch. 15 trendline+parallel
-  construction as display only; they do not fire ±10-pip breakout tickets.
-  12/15 need a `breakout_watch` → `pending_exec` policy change this pass did
-  not make. Ch. 11 is encoded (`waiting_deal`); its news preference stays
-  `unavailable`.
+- Encoding Ch. 12 (inside days) and 15 (channel **entries**). Overlay rails reuse
+  the Ch. 15 trendline+parallel construction as display only; they do not fire
+  ±10-pip breakout tickets. 12/15 need a `breakout_watch` → `pending_exec`
+  policy change this pass did not make. Ch. 10 is encoded (`double_zeros`);
+  news/NFP is still not a tape filter. Ch. 11 is encoded (`waiting_deal`).
+  FOMC skip-day is documented perspective hygiene, not an engine filter.
+  Flatten-at-print and post-FOMC-only stay out.
 - Options (risk reversals, implied vol)
 - Native MT4 indicator panes for ADX/RSI/MACD (oscillators stay in JSON)
 - Orders, a risk MCP wrapper, or live execution

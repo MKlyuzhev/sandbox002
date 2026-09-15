@@ -7,7 +7,9 @@ Daily Ch.7 gate, then M15 (or finer) OHLC + calendar clock:
 3. Reverse through the opposite rail; pending 10 pips beyond the rail.
 
 Book pip templates (50 / 105) are not used — tickets use ``levels.build_ticket``
-+ 2R. News/FOMC preference is not encoded. Research only; no orders.
++ 2R. News/FOMC is not encoded. Optional skip of new tickets on a scheduled
+FOMC statement London date is documented hygiene (LIEN_FX_STRATEGIES Ch.11),
+not this function. Research only; no orders.
 Evidence: source ``lien-fx``, chunks 80–82.
 """
 

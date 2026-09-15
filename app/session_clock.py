@@ -3,7 +3,8 @@
 OANDA candle ``time`` is RFC3339 UTC (bar open). Session hours use IANA zones
 (``Europe/London``, ``Europe/Berlin``, ``America/New_York``, ``Asia/Tokyo``) so
 DST is not a hardcoded table. Research only; no orders. News/FOMC is not a
-calendar field — do not invent event days from range fatness.
+calendar field — do not invent event days from range fatness. Scheduled FOMC
+skip-day (new tickets only) is documented perspective hygiene, not a tag here.
 """
 
 from __future__ import annotations

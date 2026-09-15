@@ -48,7 +48,9 @@ Exits belong to the daily state.
 ```
 
 Session clocks (Ch.11) are encoded in [`app/session_clock.py`](../app/session_clock.py)
-(calendar join on OHLCV timestamps). They are **not** this Kalman.
+(calendar join on OHLCV timestamps). They are **not** this Kalman. FOMC
+skip-day is perspective hygiene in [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md),
+not a `waiting_deal` filter.
 
 ## Acceptance walk
 

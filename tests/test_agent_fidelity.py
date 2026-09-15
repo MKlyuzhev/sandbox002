@@ -25,6 +25,7 @@ class TestCatalog(unittest.TestCase):
         encoded = {c.chapter: c.engine for c in CLAIMS if c.encoded}
         self.assertEqual(encoded[8], "mtf")
         self.assertEqual(encoded[9], "dbb")
+        self.assertEqual(encoded[10], "double_zeros")
         self.assertEqual(encoded[11], "waiting_deal")
         self.assertEqual(encoded[13], "fader")
         self.assertEqual(encoded[14], "breakout20")

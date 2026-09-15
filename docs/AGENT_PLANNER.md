@@ -114,10 +114,10 @@ and a regime label. Rails are display only — Ch. 15 is not an entry engine.
 |------|---------|-----------|
 | `entry_mtf` | 8 | `join_trend` (HTF direction + LTF RSI dip/rally) |
 | `entry_dbb` | 9 | `join_trend` / `fade_range` (1σ band) |
-| `entry_lien(chapter)` | 11 / 13 / 14 / 16 | Waiting for the Deal / Fader / 20-day / perfect order |
+| `entry_lien(chapter)` | 10 / 11 / 13 / 14 / 16 | Double zeros / Waiting for the Deal / Fader / 20-day / perfect order |
 
 These do **not** run `agent/policy.py` and do **not** write the journal. A
-planner that only peeks is not bound by the graph. Unencoded chapters (10, 12,
+planner that only peeks is not bound by the graph. Unencoded chapters (12,
 15) return the existing `entry_lien_error` message — retrieve and explain,
 or skip. Do not emit a fake ticket. Ch. 8 is `entry_mtf`, not `entry_lien`;
 Ch. 9 is `entry_dbb`.
@@ -261,7 +261,7 @@ That is **not** `POST /v3/accounts/.../orders` on the practice host.
   `app/indicators.py`. Engines overwrite play, side, and levels.
 - **No `pending_exec` except via the graph** (`run_graph` / `agent.run` / walks).
 - **Do not aggress on `trend_waning`.** Scan drops these by default; the graph waits.
-- **Unencoded chapters:** retrieve and explain, or skip. No fake ticket, no fake back-test. Ch. 10/12/15 are documentation-only (news filter, `breakout_watch` paper policy). Ch. 11 is `entry_lien(chapter=11)`.
+- **Unencoded chapters:** retrieve and explain, or skip. No fake ticket, no fake back-test. Ch. 12/15 are documentation-only (`breakout_watch` paper policy). Ch. 10 is `entry_lien(chapter=10)`. Ch. 11 is `entry_lien(chapter=11)`. FOMC skip-day is perspective hygiene (optional; not in `waiting_deal` / `double_zeros`): no **new** ticket on a scheduled statement London date. Do not invent a flatten or a next-day-only engine.
 - **Peek ≠ act.** `entry_*` / `classify_regime` do not journal. Journaled snapshot or measured equity requires `run_graph` / `run_walk` (or the matching CLI).
 - **Book defaults first.** Sweep one axis; cap the grid. Do not silently rewrite `agent/engines/*.py` from a lucky window. Do not sweep Lien’s 65/50/195-pip templates back into tickets (2R + buffer).
 - **Cite `lien-fx`.** Always `source="lien-fx"` on Lien searches. Evidence is heuristic.
@@ -310,9 +310,10 @@ secret edge. There is **no** `sweep()` helper — the planner loops.
 | Natural language → `JobSpec` | Type flags / MCP args; dashboard has no free-text |
 | `analyze_walk` summarizer | Read `equity` + truncated trades; dashboard `GET /api/journal/walks/{id}` |
 | Dashboard whitelist for `walk_lien` / `walk_mtf` | MCP `run_walk` or CLI |
-| Lien 10 / 12 / 15 as engines | Doc tables after the regime filter only |
+| Lien 12 / 15 as engines | Doc tables after the regime filter only |
 | `place_order`, daily loss halt | Out of scope |
 | Session clock (Ch.11) | Encoded: `app/session_clock.py` + `entry_lien(11)` |
+| FOMC skip-day (Ch.11 policy A) | Hygiene overlay, not encoded. Frozen calendar `data/walk_gbp_usd_ch11_2015/fomc_calendar.json`. See LIEN_FX_STRATEGIES Ch.11 |
 | Risk reversals / implied vol | `unavailable` |
 
 ---

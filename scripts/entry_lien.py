@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Lien Ch.11 / 13 / 14 / 16 entry signal from OANDA candles (no MCP).
+"""Lien Ch.10 / 11 / 13 / 14 / 16 entry signal from OANDA candles (no MCP).
 
-Chapter 11 Waiting for the Deal (D + M15), 13 Fader (D + H1), 14 20-day
-breakout (D), 16 perfect order (D). Prints a signal JSON. Research only; no
-orders. See docs/LIEN_FX_STRATEGIES.md.
+Chapter 10 double zeros (D + M15), 11 Waiting for the Deal (D + M15), 13 Fader
+(D + H1), 14 20-day breakout (D), 16 perfect order (D). Prints a signal JSON.
+Research only; no orders. See docs/LIEN_FX_STRATEGIES.md.
 
 Examples:
+    .venv/bin/python scripts/entry_lien.py --chapter 10 --instrument USD_CAD
     .venv/bin/python scripts/entry_lien.py --chapter 11 --instrument GBP_USD
     .venv/bin/python scripts/entry_lien.py --chapter 16 --instrument USD_JPY
     .venv/bin/python scripts/entry_lien.py --chapter 14 --instrument GBP_USD
@@ -23,7 +24,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from agent.engines import breakout20, fader, perfect_order, waiting_deal  # noqa: E402
+from agent.engines import (  # noqa: E402
+    breakout20,
+    double_zeros,
+    fader,
+    perfect_order,
+    waiting_deal,
+)
 from agent.lien_chapters import ENTRY_LIEN_CHAPTERS, entry_lien_error  # noqa: E402
 from app import indicators, oanda_client, regime  # noqa: E402
 
@@ -61,17 +68,30 @@ async def run(args: argparse.Namespace) -> int:
         bars, analysis = await _analyze(
             args.instrument, args.granularity, args.count
         )
-        if args.chapter == 11:
-            ltf = waiting_deal.resolve_ltf(args.ltf_granularity)
-            ltf_bars = await _fetch_bars(args.instrument, ltf, args.ltf_count)
-            result = waiting_deal.waiting_deal_signal(
-                analysis,
-                ltf_bars,
-                args.instrument,
-                buffer_pips=args.buffer_pips,
-                htf_granularity=args.granularity,
-                ltf_granularity=ltf,
+        if args.chapter in (10, 11):
+            ltf = (
+                double_zeros.resolve_ltf(args.ltf_granularity)
+                if args.chapter == 10
+                else waiting_deal.resolve_ltf(args.ltf_granularity)
             )
+            ltf_bars = await _fetch_bars(args.instrument, ltf, args.ltf_count)
+            if args.chapter == 10:
+                result = double_zeros.double_zeros_signal(
+                    analysis,
+                    ltf_bars,
+                    args.instrument,
+                    htf_granularity=args.granularity,
+                    ltf_granularity=ltf,
+                )
+            else:
+                result = waiting_deal.waiting_deal_signal(
+                    analysis,
+                    ltf_bars,
+                    args.instrument,
+                    buffer_pips=args.buffer_pips,
+                    htf_granularity=args.granularity,
+                    ltf_granularity=ltf,
+                )
         elif args.chapter == 13:
             _ltf_bars, ltf_analysis = await _analyze(
                 args.instrument, args.ltf_granularity, args.ltf_count
@@ -115,22 +135,22 @@ async def run(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Lien Ch.11/13/14/16 entry signal (waiting for the deal, fader, "
-            "20-day breakout, perfect order)."
+            "Lien Ch.10/11/13/14/16 entry signal (double zeros, waiting for "
+            "the deal, fader, 20-day breakout, perfect order)."
         )
     )
     parser.add_argument(
         "--chapter",
         type=int,
         required=True,
-        help="11 (waiting for the deal), 13 (fader), 14 (20-day), or 16 (perfect order).",
+        help="10 (double zeros), 11 (waiting for the deal), 13 (fader), 14 (20-day), or 16 (perfect order).",
     )
     parser.add_argument("--instrument", default="EUR_USD")
     parser.add_argument("--granularity", default="D", help="Primary/HTF (default D).")
     parser.add_argument(
         "--ltf-granularity",
         default="H1",
-        help="Lower TF (Ch.11 remaps H1→M15; Ch.13 default H1).",
+        help="Lower TF (Ch.10/11 remap H1→M15; Ch.13 default H1).",
     )
     parser.add_argument("--count", type=int, default=250)
     parser.add_argument("--ltf-count", type=int, default=250)

@@ -13,6 +13,7 @@ from agent.engines.base import Engine, EngineContext, EngineResult
 from agent.engines.breakout20 import Breakout20Engine
 from agent.engines.ch7 import Ch7Engine
 from agent.engines.dbb import DbbEngine
+from agent.engines.double_zeros import DoubleZerosEngine
 from agent.engines.fader import FaderEngine
 from agent.engines.mtf import MtfEngine
 from agent.engines.perfect_order import PerfectOrderEngine
@@ -23,6 +24,7 @@ from agent.schema import Goal
 REGISTRY: list[Engine] = [
     MtfEngine(),
     DbbEngine(),
+    DoubleZerosEngine(),
     WaitingDealEngine(),
     FaderEngine(),
     Breakout20Engine(),

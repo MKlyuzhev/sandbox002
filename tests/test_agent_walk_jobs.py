@@ -52,11 +52,11 @@ class TestExecuteWalkValidation(unittest.TestCase):
                     "EUR_USD",
                     "2024-01-01T00:00:00Z",
                     "2024-02-01T00:00:00Z",
-                    chapter=10,
+                    chapter=12,
                     no_journal=True,
                 )
             )
-        self.assertEqual(str(ctx.exception), entry_lien_error(10))
+        self.assertEqual(str(ctx.exception), entry_lien_error(12))
 
     def test_lien_requires_chapter(self) -> None:
         with self.assertRaises(WalkJobError):

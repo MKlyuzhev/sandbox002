@@ -312,6 +312,41 @@ async def classify_regime(
     return analysis
 
 
+@mcp.tool()
+async def detect_regime_change(
+    instrument: str,
+    granularity: str = "D",
+    count: int = 250,
+    from_time: str = "",
+    to_time: str = "",
+) -> dict:
+    """Structural regime-change detector (early warning -> confirmation).
+
+    Layers price structure on top of the Ch.7 baseline: horizontal S/R levels,
+    trendline breaks (close + time/price filters), support/resistance role
+    reversal, trend-channel far-rail failure and basic-rail break, the fan
+    principle, and swing-structure flips, confirmed by OHLCV candlestick
+    reversals and tick-volume expansion. Evidence is whole-corpus and pinned
+    (Murphy, Edwards & Magee, Pring, Nison, Lien).
+
+    Returns a staged block: ``state`` (stable | early_warning | confirming |
+    confirmed), ``direction_from`` / ``direction_to``, a capped weighted
+    ``score`` (risk-of-change, not a probability), the cited ``evidence`` list,
+    a measured-move projection, and the full ``structure`` / ``candles``
+    detail. FX volume is tick volume (``volume_kind``). Research only; no
+    orders. On too few bars, returns an ``error`` field.
+    """
+    from app import indicators, regime_change
+
+    try:
+        bars, analysis = await _analyze_regime(
+            instrument, granularity, count, from_time, to_time
+        )
+    except indicators.IndicatorError as exc:
+        return {"error": str(exc), "instrument": instrument, "granularity": granularity}
+    return regime_change.detect(bars, analysis, instrument=instrument)
+
+
 def _parse_engines(engines: str) -> list[int] | None:
     text = (engines or "").strip()
     if not text:
@@ -616,21 +651,23 @@ async def entry_lien(
     buffer_pips: int = 10,
     probe_pips: int = 15,
 ) -> dict:
-    """Lien Ch.11 / 13 / 14 / 16 entry signal (deterministic).
+    """Lien Ch.10 / 11 / 13 / 14 / 16 entry signal (deterministic).
 
-    Chapter 11 (waiting for the deal): daily Ch.7 gate + M15 power-hour range,
-    ≥25-pip London hunt, reverse through the opposite rail. Chapter 13 (fader):
-    daily ADX<20 + H1 probe ≥15 pips beyond prior day H/L, fade. Chapter 14
-    (20-day breakout): rebreak after a ≥2-day pullback, not first touch.
-    Chapter 16 (perfect order): SMA stack intact, ADX rising, pulse when stack
-    age is exactly 5. Other chapters return an error (10/12/15 are not encoded
-    yet; 8 is entry_mtf; 9 is entry_dbb).
+    Chapter 10 (double zeros): daily Ch.7 fade_range gate + M15 20-SMA, enter
+    10–15 pips before the figure, stop 20 pips beyond. Chapter 11 (waiting
+    for the deal): daily Ch.7 gate + M15 power-hour range, ≥25-pip London hunt,
+    reverse through the opposite rail. Chapter 13 (fader): daily ADX<20 + H1
+    probe ≥15 pips beyond prior day H/L, fade. Chapter 14 (20-day breakout):
+    rebreak after a ≥2-day pullback, not first touch. Chapter 16 (perfect
+    order): SMA stack intact, ADX rising, pulse when stack age is exactly 5.
+    Other chapters return an error (12/15 are not encoded yet; 8 is entry_mtf;
+    9 is entry_dbb).
 
     Always after the Ch.7 filter. Research only; no orders.
     """
     from app import indicators
     from agent.lien_chapters import ENTRY_LIEN_CHAPTERS, entry_lien_error
-    from agent.engines import breakout20, fader, perfect_order, waiting_deal
+    from agent.engines import breakout20, double_zeros, fader, perfect_order, waiting_deal
 
     if chapter not in ENTRY_LIEN_CHAPTERS:
         return {
@@ -649,8 +686,12 @@ async def entry_lien(
             "granularity": granularity,
         }
 
-    if chapter == 11:
-        ltf = waiting_deal.resolve_ltf(ltf_granularity)
+    if chapter in (10, 11):
+        ltf = (
+            double_zeros.resolve_ltf(ltf_granularity)
+            if chapter == 10
+            else waiting_deal.resolve_ltf(ltf_granularity)
+        )
         try:
             payload = await oanda_client.get_candles(
                 instrument, granularity=ltf, count=ltf_count, price="M"
@@ -663,6 +704,14 @@ async def entry_lien(
                 "ltf_granularity": ltf,
             }
         ltf_bars = oanda_client.candles_to_bars(payload, prefer="mid")
+        if chapter == 10:
+            return double_zeros.double_zeros_signal(
+                analysis,
+                ltf_bars,
+                instrument,
+                htf_granularity=granularity,
+                ltf_granularity=ltf,
+            )
         return waiting_deal.waiting_deal_signal(
             analysis,
             ltf_bars,
