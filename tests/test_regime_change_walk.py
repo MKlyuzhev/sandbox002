@@ -186,5 +186,56 @@ class TestWalkJobsIntegration(unittest.TestCase):
             )
 
 
+class TestEarlyWarningDetect(unittest.TestCase):
+    def test_first_fire_post_vs_score(self) -> None:
+        bars = _flat_bars(60)
+        fire_t = bars[45]["time"]
+        for b in bars[50:]:
+            b["close"] = 1.2100
+            b["high"] = 1.2105
+            b["open"] = 1.2100
+
+        def fake_detect(window, analysis=None, *, instrument=None):
+            if window[-1].get("time") == fire_t:
+                return {
+                    "state": "early_warning",
+                    "score": 0.25,
+                    "direction_from": "up",
+                    "direction_to": "down",
+                }
+            return {
+                "state": "stable",
+                "score": 0.0,
+                "direction_from": None,
+                "direction_to": None,
+            }
+
+        def fake_classify(window):
+            t = str(window[-1].get("time") or "")
+            i = next(idx for idx, b in enumerate(bars) if b["time"] == t)
+            if i >= 50:
+                return {"regime": "range", "direction": None, "confidence": 0.4}
+            return {"regime": "trend", "direction": "up", "confidence": 0.7}
+
+        with mock.patch.object(regime_change_walk.regime_change, "detect", fake_detect):
+            out = regime_change_walk.walk_early_warning(
+                bars,
+                "EUR_USD",
+                lookback=40,
+                start_index=39,
+                classify_fn=fake_classify,
+                horizons=(5, 10),
+            )
+        self.assertEqual(out["event_count"], 1)
+        ev = out["events"][0]
+        self.assertEqual(ev["score"], 0.25)
+        self.assertEqual(ev["direction_to"], "down")
+        h5 = ev["post"]["5"]
+        self.assertTrue(h5["flip"])
+        self.assertEqual(h5["lead_time"], 5)
+        self.assertFalse(h5["dir_hit"])
+        self.assertLess(h5["signed_pips"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

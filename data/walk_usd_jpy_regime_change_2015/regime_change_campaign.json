@@ -1,0 +1,464 @@
+{
+  "instrument": "USD_JPY",
+  "engine": "regime_change",
+  "kind": "regime_change",
+  "fill_mode": "rest",
+  "note": "Causal structural regime-change walk. Stage-3 confirmed first-fire only; next-bar rest fill (long ask / short bid). Tick volume is a proxy. Research only; no orders.",
+  "window": "2015-01-01T00:00:00Z to 2026-09-16T01:50:23Z",
+  "last_daily": "2026-09-14T21:00:00.000000000Z",
+  "value_per_price_unit": 0.006666666666666667,
+  "value_per_price_unit_note": "USD per 1.0 USDJPY move per 1 unit; JPY\u2192USD at 150. Scales cash P&L and size, not R.",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "lookback": 250,
+  "bar_count": 3305,
+  "start_index": 250,
+  "walk_id": "c51921c388e44468b3fd82cffac43e7c",
+  "equity": {
+    "walk_id": "c51921c388e44468b3fd82cffac43e7c",
+    "starting_equity": 10000.0,
+    "ending_equity": 5921.865,
+    "risk_fraction": 0.02,
+    "trade_count": 99,
+    "wins": 26,
+    "losses": 73,
+    "scratches": 0,
+    "win_rate": 0.2626,
+    "sum_r": -24.5591,
+    "mean_r": -0.2481,
+    "max_drawdown": 5673.9402,
+    "max_drawdown_frac": 0.4893
+  },
+  "trade_count": 99,
+  "exits": {
+    "target": 26,
+    "stop": 73
+  },
+  "by_side": {
+    "long": {
+      "n": 44,
+      "mean_r": -0.2552,
+      "win_rate": 0.25,
+      "sum_r": -11.2268
+    },
+    "short": {
+      "n": 55,
+      "mean_r": -0.2424,
+      "win_rate": 0.2727,
+      "sum_r": -13.3323
+    }
+  },
+  "years": [
+    {
+      "year": "2015",
+      "n": 6,
+      "wins": 4,
+      "win_rate": 0.6667,
+      "mean_r": 1.0098,
+      "sum_r": 6.0591,
+      "starting_equity": 10000.0,
+      "ending_equity": 11248.0,
+      "long": 4,
+      "short": 2,
+      "exits": {
+        "target": 4,
+        "stop": 2
+      }
+    },
+    {
+      "year": "2016",
+      "n": 9,
+      "wins": 4,
+      "win_rate": 0.4444,
+      "mean_r": 0.188,
+      "sum_r": 1.692,
+      "starting_equity": 11248.0,
+      "ending_equity": 11595.81,
+      "long": 6,
+      "short": 3,
+      "exits": {
+        "stop": 5,
+        "target": 4
+      }
+    },
+    {
+      "year": "2017",
+      "n": 10,
+      "wins": 1,
+      "win_rate": 0.1,
+      "mean_r": -0.7221,
+      "sum_r": -7.2211,
+      "starting_equity": 11595.81,
+      "ending_equity": 10011.99,
+      "long": 10,
+      "short": 0,
+      "exits": {
+        "stop": 9,
+        "target": 1
+      }
+    },
+    {
+      "year": "2018",
+      "n": 9,
+      "wins": 4,
+      "win_rate": 0.4444,
+      "mean_r": 0.3309,
+      "sum_r": 2.9785,
+      "starting_equity": 10011.99,
+      "ending_equity": 10582.56,
+      "long": 7,
+      "short": 2,
+      "exits": {
+        "target": 4,
+        "stop": 5
+      }
+    },
+    {
+      "year": "2019",
+      "n": 3,
+      "wins": 1,
+      "win_rate": 0.3333,
+      "mean_r": -0.0132,
+      "sum_r": -0.0396,
+      "starting_equity": 10582.56,
+      "ending_equity": 10561.97,
+      "long": 2,
+      "short": 1,
+      "exits": {
+        "stop": 2,
+        "target": 1
+      }
+    },
+    {
+      "year": "2020",
+      "n": 2,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -2.0,
+      "starting_equity": 10561.97,
+      "ending_equity": 10143.72,
+      "long": 1,
+      "short": 1,
+      "exits": {
+        "stop": 2
+      }
+    },
+    {
+      "year": "2021",
+      "n": 6,
+      "wins": 2,
+      "win_rate": 0.3333,
+      "mean_r": -0.0785,
+      "sum_r": -0.4712,
+      "starting_equity": 10143.72,
+      "ending_equity": 10027.97,
+      "long": 1,
+      "short": 5,
+      "exits": {
+        "target": 2,
+        "stop": 4
+      }
+    },
+    {
+      "year": "2022",
+      "n": 16,
+      "wins": 3,
+      "win_rate": 0.1875,
+      "mean_r": -0.4584,
+      "sum_r": -7.3339,
+      "starting_equity": 10027.97,
+      "ending_equity": 8619.11,
+      "long": 7,
+      "short": 9,
+      "exits": {
+        "target": 3,
+        "stop": 13
+      }
+    },
+    {
+      "year": "2023",
+      "n": 16,
+      "wins": 3,
+      "win_rate": 0.1875,
+      "mean_r": -0.4522,
+      "sum_r": -7.235,
+      "starting_equity": 8619.11,
+      "ending_equity": 7422.26,
+      "long": 3,
+      "short": 13,
+      "exits": {
+        "stop": 13,
+        "target": 3
+      }
+    },
+    {
+      "year": "2024",
+      "n": 14,
+      "wins": 3,
+      "win_rate": 0.2143,
+      "mean_r": -0.4191,
+      "sum_r": -5.8672,
+      "starting_equity": 7422.26,
+      "ending_equity": 6574.29,
+      "long": 0,
+      "short": 14,
+      "exits": {
+        "stop": 11,
+        "target": 3
+      }
+    },
+    {
+      "year": "2025",
+      "n": 3,
+      "wins": 0,
+      "win_rate": 0.0,
+      "mean_r": -1.0,
+      "sum_r": -3.0,
+      "starting_equity": 6574.29,
+      "ending_equity": 6187.7,
+      "long": 0,
+      "short": 3,
+      "exits": {
+        "stop": 3
+      }
+    },
+    {
+      "year": "2026",
+      "n": 5,
+      "wins": 1,
+      "win_rate": 0.2,
+      "mean_r": -0.4241,
+      "sum_r": -2.1207,
+      "starting_equity": 6187.7,
+      "ending_equity": 5921.86,
+      "long": 3,
+      "short": 2,
+      "exits": {
+        "target": 1,
+        "stop": 4
+      }
+    }
+  ],
+  "detection": {
+    "horizon": 5,
+    "step_count": 3055,
+    "state_counts": {
+      "confirming": 1727,
+      "confirmed": 1222,
+      "stable": 35,
+      "early_warning": 71
+    },
+    "detections": 22,
+    "true_positives": 13,
+    "precision": 0.5909,
+    "recall": 1.0,
+    "flip_count": 500,
+    "mean_lead_time": 2.615,
+    "episodes_by_first_state": {
+      "confirming": 19,
+      "early_warning": 3
+    },
+    "episodes_followed": 13,
+    "episodes": [
+      {
+        "index": 250,
+        "time": "2015-01-01T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 1
+      },
+      {
+        "index": 257,
+        "time": "2015-01-12T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.5,
+        "followed_by_change": true,
+        "lead_time": 2
+      },
+      {
+        "index": 1046,
+        "time": "2018-01-24T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.25,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 1053,
+        "time": "2018-02-04T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.25,
+        "followed_by_change": true,
+        "lead_time": 1
+      },
+      {
+        "index": 1061,
+        "time": "2018-02-14T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 1064,
+        "time": "2018-02-19T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 3
+      },
+      {
+        "index": 1067,
+        "time": "2018-02-22T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.4,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 1077,
+        "time": "2018-03-08T22:00:00.000000000Z",
+        "state": "early_warning",
+        "direction_to": "up",
+        "score": 0.1,
+        "followed_by_change": true,
+        "lead_time": 5
+      },
+      {
+        "index": 1088,
+        "time": "2018-03-25T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 5
+      },
+      {
+        "index": 1090,
+        "time": "2018-03-27T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.3,
+        "followed_by_change": true,
+        "lead_time": 3
+      },
+      {
+        "index": 1405,
+        "time": "2019-06-06T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 4
+      },
+      {
+        "index": 1420,
+        "time": "2019-06-26T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 2
+      },
+      {
+        "index": 1422,
+        "time": "2019-06-28T21:00:00.000000000Z",
+        "state": "early_warning",
+        "direction_to": "up",
+        "score": 0.25,
+        "followed_by_change": true,
+        "lead_time": 1
+      },
+      {
+        "index": 1770,
+        "time": "2020-10-15T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 1773,
+        "time": "2020-10-20T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.15,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 1818,
+        "time": "2020-12-22T22:00:00.000000000Z",
+        "state": "early_warning",
+        "direction_to": "up",
+        "score": 0.1,
+        "followed_by_change": true,
+        "lead_time": 5
+      },
+      {
+        "index": 1843,
+        "time": "2021-01-27T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.2,
+        "followed_by_change": true,
+        "lead_time": 1
+      },
+      {
+        "index": 2167,
+        "time": "2022-04-26T21:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.15,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 3152,
+        "time": "2026-02-12T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.15,
+        "followed_by_change": true,
+        "lead_time": 1
+      },
+      {
+        "index": 3154,
+        "time": "2026-02-16T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.15,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 3156,
+        "time": "2026-02-18T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "up",
+        "score": 0.3,
+        "followed_by_change": false,
+        "lead_time": null
+      },
+      {
+        "index": 3159,
+        "time": "2026-02-23T22:00:00.000000000Z",
+        "state": "confirming",
+        "direction_to": "down",
+        "score": 0.4,
+        "followed_by_change": false,
+        "lead_time": null
+      }
+    ]
+  }
+}

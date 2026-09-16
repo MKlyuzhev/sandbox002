@@ -39,6 +39,7 @@ from app import indicators, regime as regime_mod, regime_change, regime_walk
 ClassifyFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
 
 DEFAULT_HORIZON = regime_walk.DEFAULT_HORIZON
+EVAL_HORIZONS: tuple[int, ...] = (5, 10, 20)
 STOP_BUFFER_PIPS = 10
 STOP_LOOKBACK = indicators.HIGH_N
 ACTIVE_STATES = ("early_warning", "confirming", "confirmed")
@@ -48,10 +49,13 @@ def _step_record(i: int, bar: dict[str, Any], analysis: dict[str, Any], block: d
     return {
         "index": i,
         "time": bar.get("time"),
+        "close": float(bar["close"]),
         "regime": analysis.get("regime"),
         "direction": analysis.get("direction"),
+        "baseline_confidence": analysis.get("confidence"),
         "state": block["state"],
         "score": block["score"],
+        "direction_from": block.get("direction_from"),
         "direction_to": block["direction_to"],
     }
 
@@ -170,6 +174,146 @@ def _detection_report(
         "flip_count": len(flips),
         "mean_lead_time": mean_lead,
         "episodes": episodes,
+    }
+
+
+def _post_at(
+    series: list[dict[str, Any]],
+    steps: list[dict[str, Any] | None],
+    fire_i: int,
+    horizon: int,
+    pip: float,
+) -> dict[str, Any] | None:
+    """Causal post-event at ``fire_i + horizon``. None if the window is incomplete."""
+    n = len(series)
+    j = fire_i + horizon
+    if j >= n:
+        return None
+    origin = steps[fire_i]
+    later = steps[j]
+    if origin is None or later is None:
+        return None
+    close0 = float(origin["close"])
+    close1 = float(later["close"])
+    move_pips = (close1 - close0) / pip if pip else None
+    direction_to = origin.get("direction_to")
+    signed_pips = None
+    dir_hit = None
+    if move_pips is not None and direction_to == "up":
+        signed_pips = move_pips
+        dir_hit = close1 > close0
+    elif move_pips is not None and direction_to == "down":
+        signed_pips = -move_pips
+        dir_hit = close1 < close0
+    lead = None
+    for k in range(fire_i + 1, j + 1):
+        nxt = steps[k]
+        if nxt is None:
+            continue
+        if regime_walk.regime_changed(origin, nxt):
+            lead = k - fire_i
+            break
+    return {
+        "horizon": horizon,
+        "time": later.get("time"),
+        "regime": later.get("regime"),
+        "direction": later.get("direction"),
+        "flip": bool(lead is not None),
+        "lead_time": lead,
+        "flip_at_horizon": regime_walk.regime_changed(origin, later),
+        "move_pips": round(move_pips, 2) if move_pips is not None else None,
+        "signed_pips": round(signed_pips, 2) if signed_pips is not None else None,
+        "dir_hit": dir_hit,
+    }
+
+
+def walk_early_warning(
+    bars: list[dict[str, Any]],
+    instrument: str,
+    *,
+    lookback: int = regime_walk.DEFAULT_LOOKBACK,
+    start_index: int | None = None,
+    classify_fn: ClassifyFn | None = None,
+    horizons: tuple[int, ...] = EVAL_HORIZONS,
+) -> dict[str, Any]:
+    """Causal early-warning first-fires only. No tickets, no fills.
+
+    A fire is the first bar of an ``early_warning`` run (previous state is not
+    ``early_warning``). Post-event labels use only later bars: Ch.7 flip within
+    each horizon, and close-to-close follow-through vs ``direction_to``.
+    ``score`` is the detector's stated confidence (risk-of-change, not a
+    probability).
+    """
+    if lookback < indicators.MIN_BARS:
+        raise regime_walk.WalkError(
+            f"lookback must be >= {indicators.MIN_BARS}; got {lookback}"
+        )
+    if any(h < 1 for h in horizons):
+        raise regime_walk.WalkError("horizons must be >= 1")
+    series = regime_walk.drop_incomplete(bars)
+    if start_index is None:
+        start_index = lookback - 1
+    if start_index < lookback - 1:
+        raise regime_walk.WalkError(
+            f"start_index {start_index} needs {lookback} bars of history"
+        )
+    if start_index >= len(series):
+        raise regime_walk.WalkError("start_index is past the last complete bar")
+
+    classify = classify_fn or regime_mod.analyze_bars
+    pip = levels_mod.pip_size(instrument)
+    steps: list[dict[str, Any] | None] = [None] * len(series)
+    prev_state = "stable"
+    fire_indices: list[int] = []
+
+    for i in range(start_index, len(series)):
+        bar = series[i]
+        window = series[: i + 1][-lookback:]
+        analysis = dict(classify(window))
+        analysis.setdefault("instrument", instrument)
+        analysis.setdefault("granularity", "D")
+        block = regime_change.detect(window, analysis, instrument=instrument)
+        rec = _step_record(i, bar, analysis, block)
+        steps[i] = rec
+        state = rec["state"]
+        if state == "early_warning" and prev_state != "early_warning":
+            fire_indices.append(i)
+        prev_state = state
+
+    events: list[dict[str, Any]] = []
+    for i in fire_indices:
+        rec = steps[i]
+        assert rec is not None
+        post = {str(h): _post_at(series, steps, i, h, pip) for h in horizons}
+        events.append(
+            {
+                "index": i,
+                "time": rec["time"],
+                "regime": rec["regime"],
+                "direction": rec["direction"],
+                "direction_from": rec["direction_from"],
+                "direction_to": rec["direction_to"],
+                "score": rec["score"],
+                "baseline_confidence": rec["baseline_confidence"],
+                "close": rec["close"],
+                "post": post,
+            }
+        )
+
+    dense = [s for s in steps[start_index:] if s is not None]
+    state_counts: dict[str, int] = {}
+    for step in dense:
+        state_counts[step["state"]] = state_counts.get(step["state"], 0) + 1
+    return {
+        "instrument": instrument,
+        "lookback": lookback,
+        "start_index": start_index,
+        "step_count": len(dense),
+        "state_counts": state_counts,
+        "horizons": list(horizons),
+        "pip": pip,
+        "event_count": len(events),
+        "events": events,
     }
 
 
