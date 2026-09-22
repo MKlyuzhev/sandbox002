@@ -1,0 +1,38 @@
+---
+description: Trader analysis loop — equal-rank corpus, trader definitions, MT4 knowledge stream
+alwaysApply: true
+---
+
+# Trader knowledge playbook
+
+Research only. No orders. Operator manual: [docs/TRADER_KNOWLEDGE.md](docs/TRADER_KNOWLEDGE.md).
+Planner: [docs/AGENT_PLANNER.md](docs/AGENT_PLANNER.md). Lien engines are **opt-in**,
+not a governing layer. Strategy tables for those tools:
+[docs/LIEN_FX_STRATEGIES.md](docs/LIEN_FX_STRATEGIES.md).
+
+## Authority
+
+1. Corpus sources have **equal rank**. Call `search_knowledge` **without**
+   `source` unless the operator names a book. Do not pin `lien-fx` before
+   reading the trader's chart. Cite the book you actually retrieved.
+2. Trader definitions (`trader_definitions`) override book language for
+   operational terms. **Macro trend** is a timeframe the trader owns; do not
+   treat granularity `D` as macro. Read definitions before applying a book's
+   vocabulary.
+3. Chart timeframe is the analysis clock. Do not auto-join `classify_regime`
+   onto trader episodes. `classify_regime` / `scan_regimes` / `entry_*` /
+   `run_walk` are optional toolkit, not a required first step.
+4. Post-trade scores come from `trader_review` (code). Do not recompute MAE,
+   MFE, or invalidation in the model. P&L is context, not the score.
+5. Journaled snapshot without Lien engines: `run_graph` (empty `engines`,
+   empty `source`). Lien experiment: pass `engines` (chapter list or `all`)
+   and optionally `source="lien-fx"`. Measured Lien test: `run_walk`.
+
+## Risk template (library, not MCP)
+
+Prefer ≥ 1:2 R, ≤ ~2% equity (`app/risk.py`) on **new** tickets. Do not
+rewrite historical fills. Never add to losers.
+
+## Not available yet
+
+Risk reversals and implied vol are `unavailable` — do not invent them.

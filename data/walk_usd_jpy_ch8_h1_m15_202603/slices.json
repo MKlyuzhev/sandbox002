@@ -1,0 +1,95 @@
+[
+  {
+    "from_time": "2026-03-01T00:00:00Z",
+    "to_time": "2026-04-01T00:00:00Z",
+    "walk_id": "c6786e4b0545404d9588d96945063171",
+    "starting_equity": 10000.0,
+    "ending_equity": 10374.5423,
+    "trade_count": 1,
+    "wins": 1,
+    "losses": 0,
+    "mean_r": 1.8727,
+    "win_rate": 1.0,
+    "max_drawdown_frac": 0.0,
+    "sides": {
+      "long": 1
+    },
+    "exits": {
+      "target": 1
+    },
+    "ltf_bar_count": 2374,
+    "htf_bar_count": 781,
+    "i": 0
+  },
+  {
+    "from_time": "2026-04-01T00:00:00Z",
+    "to_time": "2026-05-01T00:00:00Z",
+    "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+    "starting_equity": 10374.5423,
+    "ending_equity": 9940.6543,
+    "trade_count": 5,
+    "wins": 1,
+    "losses": 4,
+    "mean_r": -0.4118,
+    "win_rate": 0.2,
+    "max_drawdown_frac": 0.0418,
+    "sides": {
+      "short": 3,
+      "long": 2
+    },
+    "exits": {
+      "stop": 4,
+      "target": 1
+    },
+    "ltf_bar_count": 2362,
+    "htf_bar_count": 778,
+    "i": 1
+  },
+  {
+    "from_time": "2026-05-01T00:00:00Z",
+    "to_time": "2026-06-01T00:00:00Z",
+    "walk_id": "9dcfcd2f069d4cb5b400d5e94beef02f",
+    "starting_equity": 9940.6543,
+    "ending_equity": 10502.3693,
+    "trade_count": 3,
+    "wins": 2,
+    "losses": 1,
+    "mean_r": 0.9434,
+    "win_rate": 0.6667,
+    "max_drawdown_frac": 0.02,
+    "sides": {
+      "short": 1,
+      "long": 2
+    },
+    "exits": {
+      "stop": 1,
+      "target": 2
+    },
+    "ltf_bar_count": 2266,
+    "htf_bar_count": 754,
+    "i": 2
+  },
+  {
+    "from_time": "2026-06-01T00:00:00Z",
+    "to_time": "2026-07-01T00:00:00Z",
+    "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+    "starting_equity": 10502.3693,
+    "ending_equity": 10673.4422,
+    "trade_count": 5,
+    "wins": 2,
+    "losses": 3,
+    "mean_r": 0.1826,
+    "win_rate": 0.4,
+    "max_drawdown_frac": 0.0588,
+    "sides": {
+      "long": 5
+    },
+    "exits": {
+      "stop": 3,
+      "target": 2
+    },
+    "ltf_bar_count": 2362,
+    "htf_bar_count": 778,
+    "i": 3
+  }
+]

@@ -46,7 +46,7 @@ class TestPolicyGates(unittest.TestCase):
         verdict = policy.evaluate(
             _regime(trend_waning=True, regime="mixed", allowed_play_classes=["breakout_watch"]),
             _proposal(),
-            _goal(),
+            _goal(engines=[7]),
         )
         self.assertFalse(verdict.ok)
         self.assertEqual(verdict.action, "wait")
@@ -56,7 +56,7 @@ class TestPolicyGates(unittest.TestCase):
         verdict = policy.evaluate(
             _regime(),
             _proposal(play_class="fade_range"),
-            _goal(),
+            _goal(engines=[7]),
         )
         self.assertFalse(verdict.ok)
         self.assertEqual(verdict.action, "wait")
@@ -105,6 +105,20 @@ class TestPolicyGates(unittest.TestCase):
         )
         self.assertFalse(verdict.ok)
         self.assertEqual(verdict.action, "wait")
+
+    def test_default_ignores_waning_and_play_class(self) -> None:
+        waning = policy.evaluate(
+            _regime(trend_waning=True, allowed_play_classes=["breakout_watch"]),
+            _proposal(),
+            _goal(),
+        )
+        self.assertTrue(waning.ok)
+        mismatch = policy.evaluate(
+            _regime(),
+            _proposal(play_class="fade_range", side="short", stop=1.2720, target=1.2660),
+            _goal(),
+        )
+        self.assertTrue(mismatch.ok)
 
 
 if __name__ == "__main__":

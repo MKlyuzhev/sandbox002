@@ -119,10 +119,14 @@ async def _dispatch_engines(
 ) -> tuple[Proposal | None, list[EngineCandidate]]:
     """Pick a regime-matched engine and merge its ticket into the proposal.
 
-    Falls back to Ch. 7 geometry when no engine matches the regime (e.g.
-    breakout_watch), preserving prior behavior.
+    Engines are opt-in: an empty ``goal.engines`` skips dispatch and leaves
+    the proposal's prices alone. When a chapter list is set, falls back to
+    Ch. 7 geometry if nothing in the list matches the regime.
     """
     started = time.perf_counter()
+    if not goal.engines:
+        traces.append(_trace("engines", started, "skipped (opt-in)"))
+        return proposal, []
     engines = engine_registry.select(analysis, goal)
     if not engines:
         traces.append(_trace("engines", started, "none matched -> ch7 geometry"))
@@ -240,7 +244,7 @@ async def run(
 
     if error is None:
         t2 = time.perf_counter()
-        logger.info("classifying Lien regime...")
+        logger.info("classifying regime (annotation)...")
         try:
             classifier = classify_fn or regime_mod.analyze_bars
             analysis = classifier(used_bars)
@@ -288,12 +292,13 @@ async def run(
             traces.append(_trace("mt4", t3, str(exc)))
             logger.info("mt4 failed: %s", exc)
 
-    waning = bool(analysis.get("trend_waning")) if analysis else True
+    lien_mode = bool(goal.engines)
+    waning_block = lien_mode and bool(analysis.get("trend_waning"))
 
-    if analysis.get("trend_waning"):
-        logger.info("trend_waning: skipping retrieve/propose")
+    if waning_block:
+        logger.info("trend_waning: skipping retrieve/propose (Lien engine mode)")
 
-    if error is None and not waning and not goal.no_rag:
+    if error is None and not waning_block and not goal.no_rag:
         t4 = time.perf_counter()
         logger.info(
             "retrieving %s (embed model %s)...",
@@ -312,7 +317,7 @@ async def run(
             traces.append(_trace("retrieve", t4, str(exc)))
             logger.info("retrieve failed: %s", exc)
 
-    if error is None and not waning:
+    if error is None and not waning_block:
         t5 = time.perf_counter()
         try:
             if propose_fn is not None:

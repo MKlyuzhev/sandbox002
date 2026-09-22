@@ -1,7 +1,8 @@
 # Agent orchestrator — user manual
 
-How to run the headless Lien analysis loop: regime → retrieve → propose →
-entry engines → risk gate → journal, then (optionally) a stub paper fill.
+How to run the analysis loop: candles → regime **annotation** → retrieve (whole
+corpus) → propose → risk gate → journal. Lien engines run only when you pass
+`--engines`. Research / paper-journal only. **No broker orders.**
 
 This is a **research / paper-journal** workflow. It does **not** place, modify,
 or close broker or MT4 orders. Evidence in the corpus is **heuristic**. Treat
@@ -73,9 +74,9 @@ Run from the repo root with the project venv.
    (`GBP_USD` + `D` writes `sandbox002/GBPUSD_D1/`). Other charts keep their
    objects and keep heartbeating. AutoTrading can stay off. Wipe leftover
    objects with `python -m agent.mt4_clear --instrument GBP_USD --granularity D`
-   (default prefix `sbox.`). Recompile the EA after pulling (**v1.04**) so
-   each chart uses its own inbox and hidden objects are deleted, not only
-   deselected.
+   (default prefix `sbox.`). Recompile the EA after pulling (**v1.06**) so
+   each chart writes the trader outbox (`chart.json`, orders, history) as well
+   as drawing `sbox.*` overlays. AutoTrading can stay off.
 
 FastAPI (`localhost:8000`) does **not** need to be running. The graph talks to
 OANDA, Chroma, and Ollama directly.
@@ -84,16 +85,16 @@ OANDA, Chroma, and Ollama directly.
 
 ## 3. Quick start
 
-Regime + journal, prices from Ch. 7 snapshot (no embeddings, no chat):
+Regime annotation + journal (no engines, no embeddings, no chat):
 
 ```bash
 .venv/bin/python -m agent.run --instrument GBP_USD --granularity D --no-rag --no-llm
 ```
 
-Full analysis (needs Ollama + ingested `lien-fx`):
+Lien engine snapshot (opt-in chapters, needs Ollama + corpus for RAG):
 
 ```bash
-.venv/bin/python -m agent.run --instrument GBP_USD --granularity D
+.venv/bin/python -m agent.run --instrument GBP_USD --granularity D --engines all
 ```
 
 Paper-journal a passing setup, then simulate a fill in another process:
@@ -137,8 +138,9 @@ Failures always become `wait`. `breakout_watch` never becomes `pending_exec`.
 | `--mt4` | off | Draw regime overlay (`sbox.regime.`) and, if policy passes, ticket hlines (`sbox.ticket.`) |
 | `--mt4-prefix` | `sbox.regime.` | Regime object prefix; does not clear `sbox.formation.` or `sbox.ticket.` |
 | `--no-rag` | off | Skip Chroma retrieve |
-| `--no-llm` | off | Skeleton thesis; Ch. 7 geometry still fills prices |
-| `--source` | `lien-fx` | Chroma metadata filter |
+| `--no-llm` | off | Skeleton thesis; Lien engines fill prices only if `--engines` is set |
+| `--source` | empty | Optional Chroma metadata filter; empty searches the whole corpus |
+| `--engines` | none | Opt-in Lien chapter list (e.g. `8,7` or `all`) |
 | `--top-k` | `5` | Retrieved chunks |
 | `--journal` | `data/journal/runs.sqlite` | SQLite path |
 | `--no-journal` | off | Print JSON only; do not write the DB |
@@ -484,7 +486,7 @@ accepted. The EA heartbeats that id before drawing (a full overlay can take
 longer than the wait). MCP: `mt4_draw_ticket` (explicit prices or journal
 `run_id`). Display only; no MT4 orders. `cmd.json` is compact; the EA reads
 it as FILE_BIN chunks so `t1` timestamps are not split. Recompile
-`SandboxChartBridge.mq4` after pulling (v1.04: per-chart inbox; acks before
+`SandboxChartBridge.mq4` after pulling (v1.06: trader outbox + per-chart inbox; acks before
 drawing; init does not replay leftover `cmd.json`).
 
 **Paper journal loop** (two terminals):

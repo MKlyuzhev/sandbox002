@@ -37,6 +37,22 @@ def by_chapter() -> dict[int, Engine]:
     return {eng.chapter: eng for eng in REGISTRY}
 
 
+def all_chapters() -> list[int]:
+    return [eng.chapter for eng in REGISTRY]
+
+
+def parse_engines(text: str | None) -> list[int] | None:
+    """Parse CLI/MCP engine text. Empty → None (opt-in off). ``all`` → registry."""
+    if text is None:
+        return None
+    stripped = str(text).strip()
+    if not stripped:
+        return None
+    if stripped.lower() == "all":
+        return all_chapters()
+    return [int(part) for part in stripped.split(",") if part.strip()]
+
+
 def select(analysis: dict[str, Any], goal: Goal) -> list[Engine]:
     """Engines allowed for this regime, in registry priority order.
 

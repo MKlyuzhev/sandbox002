@@ -122,5 +122,17 @@ class TestRunAndPick(unittest.TestCase):
         self.assertEqual(len(results), 1)
 
 
+class TestParseEngines(unittest.TestCase):
+    def test_empty_is_none(self) -> None:
+        self.assertIsNone(registry.parse_engines(""))
+        self.assertIsNone(registry.parse_engines(None))
+
+    def test_all_is_registry_order(self) -> None:
+        self.assertEqual(registry.parse_engines("all"), registry.all_chapters())
+
+    def test_csv(self) -> None:
+        self.assertEqual(registry.parse_engines("8,7"), [8, 7])
+
+
 if __name__ == "__main__":
     unittest.main()

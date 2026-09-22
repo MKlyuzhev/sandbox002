@@ -25,6 +25,7 @@ os.chdir(_REPO_ROOT)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
+from agent.engines.registry import parse_engines as _parse_engines  # noqa: E402
 from app import mt4_bridge, oanda_client  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
@@ -347,13 +348,6 @@ async def detect_regime_change(
     return regime_change.detect(bars, analysis, instrument=instrument)
 
 
-def _parse_engines(engines: str) -> list[int] | None:
-    text = (engines or "").strip()
-    if not text:
-        return None
-    return [int(x) for x in text.split(",") if x.strip()]
-
-
 @mcp.tool()
 async def scan_regimes(
     instruments: str = "",
@@ -408,17 +402,18 @@ async def run_graph(
     no_rag: bool = False,
     mt4: bool = False,
     use_account: bool = False,
-    source: str = "lien-fx",
+    source: str = "",
     top_k: int = 5,
     no_journal: bool = False,
 ) -> dict:
-    """Run the bounded Lien graph (regime → engines → policy → journal).
+    """Run the bounded analysis graph (regime annotation → optional engines → policy → journal).
 
     Same path as ``python -m agent.run``. Policy cannot be skipped. Default
     ``mode=signal`` journals ``log_setup`` / ``wait`` only; ``paper`` queues
-    sqlite ``pending_exec`` (stub fills, no broker). ``no_llm`` defaults true
-    so prices stay on engines. Returns ``RunRecord`` JSON including
-    ``engine_candidates``. Research only; no orders.
+    sqlite ``pending_exec`` (stub fills, no broker). ``no_llm`` defaults true.
+    Lien engines run only when ``engines`` is a chapter list or ``all``.
+    Empty ``source`` searches the whole corpus. Returns ``RunRecord`` JSON
+    including ``engine_candidates``. Research only; no orders.
     """
     from agent.graph import run as graph_run
     from agent.journal import Journal
@@ -846,6 +841,120 @@ async def mt4_draw_ticket(
         prefix=prefix,
         at_time=ticket_at,
     )
+
+
+def _trader_store():
+    from app.trader_store import TraderStore
+
+    return TraderStore()
+
+
+@mcp.tool()
+async def mt4_read_chart(instrument: str, timeframe: str) -> dict:
+    """Read current user chart objects (roles/notes) from the MT4 outbox.
+
+    Skips ``sbox.*`` agent overlays. Refuses if the EA heartbeat is stale or
+    the chart symbol/timeframe does not match. Research only; no orders.
+    """
+    from app import trader_outbox
+
+    ok, reason = mt4_bridge.check_chart(instrument, timeframe)
+    if not ok:
+        return {"ok": False, "error": reason}
+    path = mt4_bridge.chart_dir(instrument, timeframe)
+    payload = trader_outbox.load_chart(path)
+    payload["ok"] = True
+    return payload
+
+
+@mcp.tool()
+async def mt4_read_trades(
+    instrument: str = "", timeframe: str = "", include_history: bool = True
+) -> dict:
+    """Open and (optionally) closed MT4 tickets from the outbox or trader sqlite."""
+    from app import trader_outbox
+
+    if instrument and timeframe:
+        ok, reason = mt4_bridge.check_chart(instrument, timeframe)
+        if not ok:
+            return {"ok": False, "error": reason}
+        path = mt4_bridge.chart_dir(instrument, timeframe)
+        live = trader_outbox.load_orders(path, history=False)
+        hist = (
+            trader_outbox.load_orders(path, history=True)
+            if include_history
+            else {"orders": []}
+        )
+        return {
+            "ok": True,
+            "open": live.get("orders") or [],
+            "closed": hist.get("orders") or [],
+        }
+    store = _trader_store()
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    rows = store.list_orders(symbol=symbol, include_closed=include_history)
+    open_rows = [r for r in rows if r.get("status") == "open"]
+    closed_rows = [r for r in rows if r.get("status") != "open"]
+    return {"ok": True, "open": open_rows, "closed": closed_rows}
+
+
+@mcp.tool()
+async def trader_episodes(
+    instrument: str = "",
+    from_time: str = "",
+    to_time: str = "",
+    has_fill: bool = False,
+) -> dict:
+    """List assembled trader episodes (setups + fills) from trader.sqlite."""
+    from app.mt4_bridge import parse_rfc3339_utc
+
+    store = _trader_store()
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    from_ts = parse_rfc3339_utc(from_time) if from_time else None
+    to_ts = parse_rfc3339_utc(to_time) if to_time else None
+    rows = store.list_episodes(
+        symbol=symbol,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        has_fill=True if has_fill else None,
+    )
+    return {"ok": True, "episodes": rows}
+
+
+@mcp.tool()
+async def trader_review(episode_id: str = "", instrument: str = "") -> dict:
+    """Post-analysis scores (model_fit, entry_quality, exit_quality). Code-owned."""
+    store = _trader_store()
+    if episode_id.strip():
+        review = store.get_review(episode_id.strip())
+        if review is None:
+            return {"ok": False, "error": f"no review for {episode_id}"}
+        return {"ok": True, "reviews": [review]}
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    eps = store.list_episodes(symbol=symbol, has_fill=True)
+    reviews = store.list_reviews([e["id"] for e in eps]) if eps else store.list_reviews()
+    return {"ok": True, "reviews": reviews}
+
+
+@mcp.tool()
+async def trader_rules(status: str = "accepted") -> dict:
+    """Trader rules. Default lists accepted only; pass status=hypothesis to peek."""
+    store = _trader_store()
+    want = status.strip() or None
+    return {"ok": True, "rules": store.list_rules(status=want)}
+
+
+@mcp.tool()
+async def trader_definitions(term: str = "", granularity: str = "", notes: str = "") -> dict:
+    """Get or set trader operational definitions (e.g. macro_trend timeframe).
+
+    Empty ``term`` lists all. Non-empty ``term`` upserts granularity/notes.
+    """
+    store = _trader_store()
+    if term.strip():
+        row = store.set_definition(term.strip(), granularity=granularity, notes=notes)
+        return {"ok": True, "definition": row, "definitions": store.get_definitions()}
+    return {"ok": True, "definitions": store.get_definitions()}
 
 
 if __name__ == "__main__":

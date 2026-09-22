@@ -1,0 +1,149 @@
+{
+  "window": "2015-01-01T00:00:00Z to 2026-09-20T18:05:18Z",
+  "kind": "mtf",
+  "chapter": 8,
+  "engine": "mtf",
+  "fill_mode": "rest",
+  "mtf_entry_mode": "peak",
+  "granularity": "D",
+  "ltf_granularity": "H1",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "universe": [
+    "EUR_USD",
+    "GBP_USD",
+    "USD_JPY",
+    "AUD_USD",
+    "USD_CAD",
+    "USD_CHF",
+    "NZD_USD"
+  ],
+  "pairs": {
+    "EUR_USD": {
+      "ending_equity": 5360.8656,
+      "trade_count": 225,
+      "mean_r": -0.1209,
+      "sum_r": -27.2065,
+      "max_drawdown_frac_chained": 0.4677,
+      "win_rate": 0.3022,
+      "wins": 68,
+      "losses": 157,
+      "exits": {
+        "target": 67,
+        "stop": 155,
+        "window_end": 3
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 24
+    },
+    "GBP_USD": {
+      "ending_equity": 12159.9131,
+      "trade_count": 210,
+      "mean_r": 0.066,
+      "sum_r": 13.8521,
+      "max_drawdown_frac_chained": 0.2173,
+      "win_rate": 0.3762,
+      "wins": 79,
+      "losses": 131,
+      "exits": {
+        "stop": 130,
+        "target": 79,
+        "window_end": 1
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 24
+    },
+    "USD_JPY": {
+      "ending_equity": 13985.1707,
+      "trade_count": 224,
+      "mean_r": 0.0943,
+      "sum_r": 21.1242,
+      "max_drawdown_frac_chained": 0.1572,
+      "win_rate": 0.3812,
+      "wins": 85,
+      "losses": 138,
+      "win_rate_note": "target vs stop; window_end excluded",
+      "exits": {
+        "stop": 138,
+        "target": 85,
+        "window_end": 1
+      },
+      "value_per_price_unit": 0.006666666666666667,
+      "slice_count": 24
+    },
+    "AUD_USD": {
+      "ending_equity": 9967.7604,
+      "trade_count": 202,
+      "mean_r": 0.0178,
+      "sum_r": 3.5874,
+      "max_drawdown_frac_chained": 0.2498,
+      "win_rate": 0.3564,
+      "wins": 72,
+      "losses": 130,
+      "exits": {
+        "stop": 128,
+        "target": 69,
+        "window_end": 5
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 24
+    },
+    "USD_CAD": {
+      "ending_equity": 5046.5234,
+      "trade_count": 542,
+      "mean_r": -0.0451,
+      "sum_r": -24.4222,
+      "max_drawdown_frac_chained": 0.5562,
+      "win_rate": 0.3376,
+      "wins": 183,
+      "losses": 359,
+      "exits": {
+        "target": 180,
+        "stop": 357,
+        "window_end": 5
+      },
+      "value_per_price_unit": 0.7407407407407407,
+      "slice_count": 24
+    },
+    "USD_CHF": {
+      "ending_equity": 10653.6919,
+      "trade_count": 201,
+      "mean_r": 0.0342,
+      "sum_r": 6.8708,
+      "max_drawdown_frac_chained": 0.3213,
+      "win_rate": 0.3682,
+      "wins": 74,
+      "losses": 127,
+      "exits": {
+        "stop": 126,
+        "target": 72,
+        "window_end": 3
+      },
+      "value_per_price_unit": 1.1111111111111112,
+      "slice_count": 24
+    },
+    "NZD_USD": {
+      "ending_equity": 894.4866,
+      "trade_count": 531,
+      "mean_r": -0.2106,
+      "sum_r": -111.8467,
+      "max_drawdown_frac_chained": 0.9106,
+      "win_rate": 0.2787,
+      "wins": 148,
+      "losses": 383,
+      "exits": {
+        "target": 147,
+        "stop": 381,
+        "window_end": 3
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 24
+    }
+  },
+  "citation": {
+    "source": "lien-fx",
+    "chunk_index": 70,
+    "claim": "Daily trend first, hourly entry; buy RSI dips in an uptrend rather than fade the higher-TF move."
+  },
+  "note": "Paper walk, rest fill (next-bar bid/ask). No broker orders. Matching half-year slices reused from prior rest-fill MTF dumps; USD_CAD and NZD_USD are new. Last slice re-run to window end."
+}

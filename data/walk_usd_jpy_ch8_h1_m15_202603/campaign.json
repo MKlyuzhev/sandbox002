@@ -1,0 +1,454 @@
+{
+  "instrument": "USD_JPY",
+  "kind": "mtf",
+  "chapter": 8,
+  "granularity": "H1",
+  "ltf_granularity": "M15",
+  "entry_mode": "peak",
+  "fill_mode": "rest",
+  "from_time": "2026-03-01T00:00:00Z",
+  "to_time": "2026-07-01T00:00:00Z",
+  "lookback": 250,
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "value_per_price_unit": 0.006666666666666667,
+  "value_per_price_unit_note": "USD per 1.0 USDJPY move per 1 unit; JPY\u2192USD at 150. Scales cash P&L and size, not R.",
+  "ending_equity": 10673.4422,
+  "slice_count": 4,
+  "trade_count": 14,
+  "wins": 6,
+  "losses": 8,
+  "win_rate": 0.4286,
+  "mean_r": 0.2541,
+  "sum_r": 3.5569,
+  "max_drawdown_frac_chained": 0.0418,
+  "exits": {
+    "target": 6,
+    "stop": 8
+  },
+  "citation": {
+    "source": "lien-fx",
+    "chunk_index": 70,
+    "claim": "Higher TF sets direction; lower TF times RSI dip/rally with the trend. H1+M15 is the book's shorter-term form."
+  },
+  "note": "Monthly M15 slices (OANDA 5000-bar cap). window_end at slice edges. Balance chained. Paper rest fill; no broker orders.",
+  "slices": [
+    {
+      "from_time": "2026-03-01T00:00:00Z",
+      "to_time": "2026-04-01T00:00:00Z",
+      "walk_id": "c6786e4b0545404d9588d96945063171",
+      "starting_equity": 10000.0,
+      "ending_equity": 10374.5423,
+      "trade_count": 1,
+      "wins": 1,
+      "losses": 0,
+      "mean_r": 1.8727,
+      "win_rate": 1.0,
+      "max_drawdown_frac": 0.0,
+      "sides": {
+        "long": 1
+      },
+      "exits": {
+        "target": 1
+      },
+      "ltf_bar_count": 2374,
+      "htf_bar_count": 781,
+      "i": 0
+    },
+    {
+      "from_time": "2026-04-01T00:00:00Z",
+      "to_time": "2026-05-01T00:00:00Z",
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "starting_equity": 10374.5423,
+      "ending_equity": 9940.6543,
+      "trade_count": 5,
+      "wins": 1,
+      "losses": 4,
+      "mean_r": -0.4118,
+      "win_rate": 0.2,
+      "max_drawdown_frac": 0.0418,
+      "sides": {
+        "short": 3,
+        "long": 2
+      },
+      "exits": {
+        "stop": 4,
+        "target": 1
+      },
+      "ltf_bar_count": 2362,
+      "htf_bar_count": 778,
+      "i": 1
+    },
+    {
+      "from_time": "2026-05-01T00:00:00Z",
+      "to_time": "2026-06-01T00:00:00Z",
+      "walk_id": "9dcfcd2f069d4cb5b400d5e94beef02f",
+      "starting_equity": 9940.6543,
+      "ending_equity": 10502.3693,
+      "trade_count": 3,
+      "wins": 2,
+      "losses": 1,
+      "mean_r": 0.9434,
+      "win_rate": 0.6667,
+      "max_drawdown_frac": 0.02,
+      "sides": {
+        "short": 1,
+        "long": 2
+      },
+      "exits": {
+        "stop": 1,
+        "target": 2
+      },
+      "ltf_bar_count": 2266,
+      "htf_bar_count": 754,
+      "i": 2
+    },
+    {
+      "from_time": "2026-06-01T00:00:00Z",
+      "to_time": "2026-07-01T00:00:00Z",
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "starting_equity": 10502.3693,
+      "ending_equity": 10673.4422,
+      "trade_count": 5,
+      "wins": 2,
+      "losses": 3,
+      "mean_r": 0.1826,
+      "win_rate": 0.4,
+      "max_drawdown_frac": 0.0588,
+      "sides": {
+        "long": 5
+      },
+      "exits": {
+        "stop": 3,
+        "target": 2
+      },
+      "ltf_bar_count": 2362,
+      "htf_bar_count": 778,
+      "i": 3
+    }
+  ],
+  "trades": [
+    {
+      "run_id": "1248febeeb4546cabac13184eb5e3d64",
+      "entry_index": 1129,
+      "entry_time": "2026-03-13T00:45:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 159.185,
+      "stop": 158.91,
+      "target": 159.70000000000002,
+      "exit_index": 1207,
+      "exit_time": "2026-03-13T20:15:00.000000000Z",
+      "exit_price": 159.70000000000002,
+      "exit_status": "target",
+      "r_realized": 1.8727,
+      "reasons": [
+        "mtf peak confidence 0.252 at 2026-03-13T00:15:00.000000000Z rolled over; entry at LTF bar 1128"
+      ],
+      "walk_id": "c6786e4b0545404d9588d96945063171",
+      "pnl": 374.5423,
+      "equity_after": 10374.5423,
+      "units": 109090,
+      "slice": 0
+    },
+    {
+      "run_id": "dfcc71fe4b0649b080cf017e127d251a",
+      "entry_index": 1349,
+      "entry_time": "2026-04-16T10:45:00.000000000Z",
+      "side": "short",
+      "play_class": "join_trend",
+      "entry": 159.053,
+      "stop": 159.23,
+      "target": 158.72,
+      "exit_index": 1361,
+      "exit_time": "2026-04-16T13:45:00.000000000Z",
+      "exit_price": 159.23,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.219 at 2026-04-16T10:15:00.000000000Z rolled over; entry at LTF bar 1348"
+      ],
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "pnl": -207.49,
+      "equity_after": 10167.0523,
+      "units": 175839,
+      "slice": 1
+    },
+    {
+      "run_id": "cad02d7459d54c3b9f7c341f0ac408ee",
+      "entry_index": 1491,
+      "entry_time": "2026-04-19T22:15:00.000000000Z",
+      "side": "short",
+      "play_class": "join_trend",
+      "entry": 158.954,
+      "stop": 159.17000000000002,
+      "target": 158.54,
+      "exit_index": 1497,
+      "exit_time": "2026-04-19T23:45:00.000000000Z",
+      "exit_price": 159.17000000000002,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.355 at 2026-04-19T21:45:00.000000000Z rolled over; entry at LTF bar 1490"
+      ],
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "pnl": -203.341,
+      "equity_after": 9963.7113,
+      "units": 141209,
+      "slice": 1
+    },
+    {
+      "run_id": "5e9ef37ab18a4e79961d0540f5fc0941",
+      "entry_index": 1500,
+      "entry_time": "2026-04-20T00:30:00.000000000Z",
+      "side": "short",
+      "play_class": "join_trend",
+      "entry": 159.062,
+      "stop": 159.3,
+      "target": 158.6,
+      "exit_index": 1553,
+      "exit_time": "2026-04-20T13:45:00.000000000Z",
+      "exit_price": 158.6,
+      "exit_status": "target",
+      "r_realized": 1.9412,
+      "reasons": [
+        "mtf peak confidence 0.322 at 2026-04-20T00:00:00.000000000Z rolled over; entry at LTF bar 1499"
+      ],
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "pnl": 386.8234,
+      "equity_after": 10350.5347,
+      "units": 125592,
+      "slice": 1
+    },
+    {
+      "run_id": "b744605c5b0b45f1abd9cde073da1e3e",
+      "entry_index": 1836,
+      "entry_time": "2026-04-23T12:30:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 159.549,
+      "stop": 159.34,
+      "target": 159.94,
+      "exit_index": 1847,
+      "exit_time": "2026-04-23T15:15:00.000000000Z",
+      "exit_price": 159.34,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.338 at 2026-04-23T12:00:00.000000000Z rolled over; entry at LTF bar 1835"
+      ],
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "pnl": -207.0103,
+      "equity_after": 10143.5244,
+      "units": 148572,
+      "slice": 1
+    },
+    {
+      "run_id": "b0ba1bab68254b7ca9780b7dfd1d36a7",
+      "entry_index": 1929,
+      "entry_time": "2026-04-24T11:45:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 159.427,
+      "stop": 159.24,
+      "target": 159.79,
+      "exit_index": 1992,
+      "exit_time": "2026-04-27T03:30:00.000000000Z",
+      "exit_price": 159.24,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.341 at 2026-04-24T11:15:00.000000000Z rolled over; entry at LTF bar 1928"
+      ],
+      "walk_id": "da06c4877bf34fd7a096a80c035fc2ff",
+      "pnl": -202.8701,
+      "equity_after": 9940.6543,
+      "units": 162730,
+      "slice": 1
+    },
+    {
+      "run_id": "3e68fd002e3e4f7d910aa211e24f5880",
+      "entry_index": 946,
+      "entry_time": "2026-05-12T06:00:00.000000000Z",
+      "side": "short",
+      "play_class": "join_trend",
+      "entry": 157.298,
+      "stop": 157.85,
+      "target": 156.23,
+      "exit_index": 1049,
+      "exit_time": "2026-05-13T07:45:00.000000000Z",
+      "exit_price": 157.85,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.352 at 2026-05-12T05:30:00.000000000Z rolled over; entry at LTF bar 945"
+      ],
+      "walk_id": "9dcfcd2f069d4cb5b400d5e94beef02f",
+      "pnl": -198.812,
+      "equity_after": 9741.8423,
+      "units": 54025,
+      "slice": 2
+    },
+    {
+      "run_id": "5e3ab105654f4a1d929f972c368f6f85",
+      "entry_index": 1170,
+      "entry_time": "2026-05-14T14:00:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 157.922,
+      "stop": 157.21,
+      "target": 159.31,
+      "exit_index": 1648,
+      "exit_time": "2026-05-21T13:30:00.000000000Z",
+      "exit_price": 159.31,
+      "exit_status": "target",
+      "r_realized": 1.9494,
+      "reasons": [
+        "mtf peak confidence 0.472 at 2026-05-14T13:30:00.000000000Z rolled over; entry at LTF bar 1169"
+      ],
+      "walk_id": "9dcfcd2f069d4cb5b400d5e94beef02f",
+      "pnl": 379.8216,
+      "equity_after": 10121.6639,
+      "units": 41047,
+      "slice": 2
+    },
+    {
+      "run_id": "0ed28690613c47d09849a44ece089c54",
+      "entry_index": 1667,
+      "entry_time": "2026-05-21T18:15:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 158.963,
+      "stop": 158.72,
+      "target": 159.42000000000002,
+      "exit_index": 2011,
+      "exit_time": "2026-05-27T08:15:00.000000000Z",
+      "exit_price": 159.42000000000002,
+      "exit_status": "target",
+      "r_realized": 1.8807,
+      "reasons": [
+        "mtf peak confidence 0.165 at 2026-05-21T17:30:00.000000000Z rolled over; entry at LTF bar 1666"
+      ],
+      "walk_id": "9dcfcd2f069d4cb5b400d5e94beef02f",
+      "pnl": 380.7054,
+      "equity_after": 10502.3693,
+      "units": 124958,
+      "slice": 2
+    },
+    {
+      "run_id": "b63e7dba217f4c889fd77aac73aa1c00",
+      "entry_index": 474,
+      "entry_time": "2026-06-03T08:00:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 159.711,
+      "stop": 159.45000000000002,
+      "target": 160.20000000000002,
+      "exit_index": 476,
+      "exit_time": "2026-06-03T08:30:00.000000000Z",
+      "exit_price": 159.45000000000002,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.385 at 2026-06-03T07:30:00.000000000Z rolled over; entry at LTF bar 473"
+      ],
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "pnl": -210.0458,
+      "equity_after": 10292.3235,
+      "units": 120716,
+      "slice": 3
+    },
+    {
+      "run_id": "8165fefed369499189ac89379c215a27",
+      "entry_index": 767,
+      "entry_time": "2026-06-08T09:15:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 160.047,
+      "stop": 159.74,
+      "target": 160.64000000000001,
+      "exit_index": 1096,
+      "exit_time": "2026-06-11T19:30:00.000000000Z",
+      "exit_price": 159.74,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.214 at 2026-06-08T08:45:00.000000000Z rolled over; entry at LTF bar 766"
+      ],
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "pnl": -205.8455,
+      "equity_after": 10086.478,
+      "units": 100576,
+      "slice": 3
+    },
+    {
+      "run_id": "6183d8dff4fe4272a983e83693559dd2",
+      "entry_index": 1420,
+      "entry_time": "2026-06-17T04:30:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 160.302,
+      "stop": 160.17000000000002,
+      "target": 160.53,
+      "exit_index": 1434,
+      "exit_time": "2026-06-17T08:00:00.000000000Z",
+      "exit_price": 160.17000000000002,
+      "exit_status": "stop",
+      "r_realized": -1.0,
+      "reasons": [
+        "mtf peak confidence 0.31 at 2026-06-17T04:00:00.000000000Z rolled over; entry at LTF bar 1419"
+      ],
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "pnl": -201.7294,
+      "equity_after": 9884.7486,
+      "units": 229238,
+      "slice": 3
+    },
+    {
+      "run_id": "5d92e81e297d4a86aaecde535e27b4f6",
+      "entry_index": 1751,
+      "entry_time": "2026-06-22T15:15:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 161.215,
+      "stop": 160.97,
+      "target": 161.70000000000002,
+      "exit_index": 1811,
+      "exit_time": "2026-06-23T06:15:00.000000000Z",
+      "exit_price": 161.70000000000002,
+      "exit_status": "target",
+      "r_realized": 1.9796,
+      "reasons": [
+        "mtf peak confidence 0.528 at 2026-06-22T14:45:00.000000000Z rolled over; entry at LTF bar 1750"
+      ],
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "pnl": 391.353,
+      "equity_after": 10276.1016,
+      "units": 121037,
+      "slice": 3
+    },
+    {
+      "run_id": "51f017de21b74490abf9297dca197076",
+      "entry_index": 1985,
+      "entry_time": "2026-06-25T01:45:00.000000000Z",
+      "side": "long",
+      "play_class": "join_trend",
+      "entry": 161.685,
+      "stop": 161.46,
+      "target": 162.12,
+      "exit_index": 2269,
+      "exit_time": "2026-06-30T00:45:00.000000000Z",
+      "exit_price": 162.12,
+      "exit_status": "target",
+      "r_realized": 1.9333,
+      "reasons": [
+        "mtf peak confidence 0.383 at 2026-06-25T01:15:00.000000000Z rolled over; entry at LTF bar 1984"
+      ],
+      "walk_id": "fc2e6a45e5484962b26ad9b8aef7bdce",
+      "pnl": 397.3406,
+      "equity_after": 10673.4422,
+      "units": 137014,
+      "slice": 3
+    }
+  ]
+}

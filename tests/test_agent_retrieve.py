@@ -115,6 +115,25 @@ class TestSearchKnowledgeSource(unittest.TestCase):
         self.assertIn("lien-fx", sources)
 
 
+class TestDefaultQuery(unittest.TestCase):
+    def test_does_not_pin_lien(self) -> None:
+        q = retrieve.default_query(
+            {
+                "instrument": "GBP_USD",
+                "granularity": "H1",
+                "regime": "trend",
+                "allowed_play_classes": ["join_trend"],
+                "notes": ["foo"],
+            }
+        )
+        lower = q.lower()
+        self.assertNotIn("kathy", lower)
+        self.assertNotIn("lien", lower)
+        self.assertNotIn("join_trend", q)
+        self.assertIn("GBP_USD", q)
+        self.assertIn("H1", q)
+
+
 class TestGetSourceChunk(unittest.TestCase):
     def test_prefers_text_over_figure(self) -> None:
         fake = _FakeCollection(_ROWS)

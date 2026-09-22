@@ -1,26 +1,28 @@
 ---
-description: Lien FX governing layer — classify regime in code before proposing technical setups
-alwaysApply: true
+description: Lien FX engines — opt-in toolkit (classify, entry_*, run_walk). Not the default analysis loop.
+alwaysApply: false
 ---
 
-# Lien FX playbook
+# Lien FX playbook (opt-in)
 
+Use this when the operator **explicitly** asked for a Lien engine experiment.
+Default analysis follows [docs/TRADER_KNOWLEDGE.md](docs/TRADER_KNOWLEDGE.md).
 Research only. No orders. Full strategy tables: [docs/LIEN_FX_STRATEGIES.md](docs/LIEN_FX_STRATEGIES.md).
-Planner operator manual: [docs/AGENT_PLANNER.md](docs/AGENT_PLANNER.md).
 
-## Before any Lien technical setup
+## Before a Lien technical setup
 
 1. For one pair: `classify_regime` (oanda-research). For a universe: `scan_regimes`
    (max 32; default USD majors; aliases `lien-fx-ch4` / `lien-fx` for the
    book boards; other OANDA names as a CSV).
-   Research pool: `agent/lien_pairs.py`. Default granularity **D**. Do not compute ADX,
+   Research pool: `agent/lien_pairs.py`. Default granularity **D** for this
+   toolkit only — that is not the trader's "macro trend". Do not compute ADX,
    Bollinger, SMA, RSI, stochastics, or MACD in the model. Drop `trend_waning`.
 2. Match the play class to the result: `join_trend`, `fade_range`, or `breakout_watch`. If `trend_waning` is true, do not aggress.
 3. Optional: `mt4_draw_regime` on a **matching** symbol/timeframe chart (prefix `sbox.regime.`). Oscillators stay in JSON; the overlay is bands, MA stack, 10-bar high/low, channel rails, and a regime label. `classify_regime` includes compact `visual` rails (display only; not a Ch.15 entry). Paper/signal tickets: `mt4_draw_ticket` (prefix `sbox.ticket.`; hlines only, no orders).
 4. Cite `lien-fx` via `rag-knowledge` (`search_knowledge` with `source="lien-fx"`,
-   then `get_source_chunk`). Evidence is heuristic. Pin claims × chunk × engine
+   then `get_source_chunk`) **only for this Lien experiment**. Evidence is heuristic. Pin claims × chunk × engine
    with `python -m agent.fidelity` (add `--pin` when the corpus is ingested).
-5. Journaled snapshot: `run_graph` (policy + `engine_candidates`). Measured test:
+5. Journaled snapshot: `run_graph` with `engines` set (policy + `engine_candidates`). Measured test:
    `run_walk` (`ch7` / `mtf` / `lien`). MCP `entry_*` is a peek only.
 
 ## Risk template (library, not MCP)

@@ -1,0 +1,148 @@
+{
+  "window": "2026-03-01T00:00:00Z to 2026-07-01T00:00:00Z",
+  "kind": "mtf",
+  "chapter": 8,
+  "engine": "mtf",
+  "fill_mode": "rest",
+  "mtf_entry_mode": "peak",
+  "granularity": "H1",
+  "ltf_granularity": "M5",
+  "starting_equity": 10000.0,
+  "risk_fraction": 0.02,
+  "universe": [
+    "EUR_USD",
+    "GBP_USD",
+    "USD_JPY",
+    "AUD_USD",
+    "USD_CAD",
+    "USD_CHF",
+    "NZD_USD"
+  ],
+  "slice_days": 14,
+  "pairs": {
+    "EUR_USD": {
+      "ending_equity": 10394.0193,
+      "trade_count": 70,
+      "mean_r": 0.046,
+      "sum_r": 3.2171,
+      "max_drawdown_frac_chained": 0.147,
+      "win_rate": 0.3714,
+      "wins": 26,
+      "losses": 44,
+      "exits": {
+        "target": 25,
+        "stop": 43,
+        "window_end": 2
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 9
+    },
+    "GBP_USD": {
+      "ending_equity": 10373.3555,
+      "trade_count": 94,
+      "mean_r": 0.0376,
+      "sum_r": 3.5332,
+      "max_drawdown_frac_chained": 0.141,
+      "win_rate": 0.3723,
+      "wins": 35,
+      "losses": 59,
+      "exits": {
+        "stop": 59,
+        "target": 35
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 9
+    },
+    "USD_JPY": {
+      "ending_equity": 9683.9937,
+      "trade_count": 94,
+      "mean_r": 0.0008,
+      "sum_r": 0.0786,
+      "max_drawdown_frac_chained": 0.1722,
+      "win_rate": 0.3723,
+      "wins": 35,
+      "losses": 59,
+      "exits": {
+        "target": 31,
+        "stop": 59,
+        "window_end": 4
+      },
+      "value_per_price_unit": 0.006666666666666667,
+      "slice_count": 9
+    },
+    "AUD_USD": {
+      "ending_equity": 9556.0354,
+      "trade_count": 85,
+      "mean_r": -0.0089,
+      "sum_r": -0.7559,
+      "max_drawdown_frac_chained": 0.2911,
+      "win_rate": 0.3529,
+      "wins": 30,
+      "losses": 55,
+      "exits": {
+        "target": 29,
+        "stop": 54,
+        "window_end": 2
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 9
+    },
+    "USD_CAD": {
+      "ending_equity": 10158.2649,
+      "trade_count": 74,
+      "mean_r": 0.0285,
+      "sum_r": 2.1117,
+      "max_drawdown_frac_chained": 0.1843,
+      "win_rate": 0.3649,
+      "wins": 27,
+      "losses": 47,
+      "exits": {
+        "target": 27,
+        "stop": 46,
+        "window_end": 1
+      },
+      "value_per_price_unit": 0.7407407407407407,
+      "slice_count": 9
+    },
+    "USD_CHF": {
+      "ending_equity": 8182.6766,
+      "trade_count": 78,
+      "mean_r": -0.1119,
+      "sum_r": -8.7297,
+      "max_drawdown_frac_chained": 0.183,
+      "win_rate": 0.3205,
+      "wins": 25,
+      "losses": 53,
+      "exits": {
+        "stop": 52,
+        "target": 23,
+        "window_end": 3
+      },
+      "value_per_price_unit": 1.1111111111111112,
+      "slice_count": 9
+    },
+    "NZD_USD": {
+      "ending_equity": 8044.4127,
+      "trade_count": 84,
+      "mean_r": -0.1123,
+      "sum_r": -9.4335,
+      "max_drawdown_frac_chained": 0.3141,
+      "win_rate": 0.3095,
+      "wins": 26,
+      "losses": 58,
+      "exits": {
+        "target": 26,
+        "stop": 55,
+        "window_end": 3
+      },
+      "value_per_price_unit": 1.0,
+      "slice_count": 9
+    }
+  },
+  "citation": {
+    "source": "lien-fx",
+    "chunk_index": 70,
+    "claim": "Higher-TF trend first; lower-TF RSI dip/rally with the trend. Book's common form is D+H1; this campaign shifts the clock to H1+M5 (closer to the 15-minute RSI example under a higher-TF trend)."
+  },
+  "note": "Paper walk, rest fill (next-bar bid/ask). No broker orders. M5 sliced at 14 days. window_end at slice edges. H1 is the analysis clock here, not daily and not the trader's macro trend."
+}

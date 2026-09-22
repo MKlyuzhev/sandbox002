@@ -36,7 +36,7 @@ class Goal(BaseModel):
     exposure_cap: float = 0.06
     value_per_price_unit: float = 1.0
     fill_mode: FillMode = "close"
-    source_filter: str = "lien-fx"
+    source_filter: str = ""
     top_k: int = 5
     mt4: bool = False
     mt4_prefix: str = "sbox.regime."

@@ -21,10 +21,10 @@ Keep knowledge, planning, coded decisions, and execution separate:
 
 | Layer | Role | Status in this repo |
 |-------|------|---------------------|
-| **Knowledge** | Rules, definitions, frameworks from ingested books | RAG + MCP (`search_knowledge`, `get_source_chunk`); corpora include `lien-fx`, `murphy-digital` |
-| **Orchestrator** | Regime → engines → policy → journal | **Done** — bounded graph (`agent/`); optional `llm_propose` is narration only |
-| **Planner (LLM agent)** | Outer-loop ReAct: scan, experiment, sweep, retrieve, compare, natural language → Goal | **Prototype** — Cursor + MCP; not in `agent/` or the dashboard |
-| **Execution** | Prices, orders, positions, risk | **Stub only** — journal + `agent.executor` sim fills; no broker orders |
+| **Knowledge** | Books (equal rank) + trader MT4 journal (`trader-mt4`) | RAG + MCP; capture/review in `app/trader_*.py` |
+| **Orchestrator** | Regime annotation → optional Lien engines → policy → journal | **Done** — engines opt-in (`goal.engines`) |
+| **Planner (LLM agent)** | Read marks/reviews; retrieve; opt-in Lien experiments | **Prototype** — Cursor + MCP |
+| **Execution** | Prices, orders, positions, risk | **Stub** from this repo; MT4 fills captured read-only |
 
 - RAG answers: *"What does Murphy say about X?"*
 - The **orchestrator** answers: *"Given this instrument and bar, does a coded engine pass policy?"*

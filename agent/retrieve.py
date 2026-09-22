@@ -8,13 +8,17 @@ from app import ollama_client, store
 
 
 def default_query(regime: dict[str, Any]) -> str:
-    plays = ", ".join(regime.get("allowed_play_classes") or [])
-    label = regime.get("regime") or "mixed"
-    direction = regime.get("direction") or ""
-    return (
-        f"Kathy Lien {label} {direction} {plays} "
-        "currency market regime filter strategy"
-    ).strip()
+    """Corpus-agnostic retrieve query. Do not pin a book or play class."""
+    instrument = str(regime.get("instrument") or "").strip()
+    granularity = str(regime.get("granularity") or "").strip()
+    raw_notes = regime.get("notes")
+    if isinstance(raw_notes, list):
+        notes = "; ".join(str(item) for item in raw_notes if item)
+    else:
+        notes = str(raw_notes or "").strip()
+    parts = [part for part in (instrument, granularity, notes) if part]
+    parts.append("trend range support resistance channel")
+    return " ".join(parts)
 
 
 def _to_str(value: Any) -> str | None:

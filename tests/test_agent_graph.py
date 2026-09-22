@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from agent.engines.registry import all_chapters
 from agent.graph import run
 from agent.journal import Journal
 from agent.schema import Goal, Proposal
@@ -22,6 +23,12 @@ def _goal(**kwargs) -> Goal:
     }
     data.update(kwargs)
     return Goal.model_validate(data)
+
+
+def _lien_goal(**kwargs) -> Goal:
+    data = {"engines": all_chapters()}
+    data.update(kwargs)
+    return _goal(**data)
 
 
 def _join_trend_proposal(regime: dict, _chunks, _goal: Goal) -> Proposal:
@@ -98,7 +105,7 @@ class TestGraph(unittest.TestCase):
         # Ch.7 join_trend engine fires and the setup is logged.
         record = asyncio.run(
             run(
-                _goal(),
+                _lien_goal(),
                 bars=_trend_bars(250, step=0.008),
                 propose_fn=_fade_proposal,
             )
@@ -128,7 +135,7 @@ class TestGraph(unittest.TestCase):
 
         record = asyncio.run(
             run(
-                _goal(),
+                _lien_goal(),
                 bars=_trend_bars(80, step=0.01),
                 classify_fn=classify,
                 propose_fn=boom,
@@ -160,7 +167,7 @@ class TestGraph(unittest.TestCase):
 
     def test_no_llm_geometry_logs_setup(self) -> None:
         record = asyncio.run(
-            run(_goal(no_llm=True), bars=_trend_bars(250, step=0.008))
+            run(_lien_goal(no_llm=True), bars=_trend_bars(250, step=0.008))
         )
         self.assertIsNone(record.error)
         self.assertEqual(record.action, "log_setup")
@@ -175,7 +182,7 @@ class TestGraph(unittest.TestCase):
 
     def test_no_llm_range_fades(self) -> None:
         record = asyncio.run(
-            run(_goal(no_llm=True), bars=_range_bars(80, amp=0.0003))
+            run(_lien_goal(no_llm=True), bars=_range_bars(80, amp=0.0003))
         )
         self.assertEqual(record.proposal.play_class, "fade_range")
         self.assertIn(record.proposal.side, ("long", "short"))
@@ -194,7 +201,7 @@ class TestGraph(unittest.TestCase):
 
         record = asyncio.run(
             run(
-                _goal(no_llm=True),
+                _lien_goal(no_llm=True),
                 bars=_range_bars(80, amp=0.0003),
                 classify_fn=classify,
             )
@@ -209,7 +216,7 @@ class TestGraph(unittest.TestCase):
             journal = Journal(Path(tmp.name) / "runs.sqlite")
             record = asyncio.run(
                 run(
-                    _goal(mode="paper", no_llm=True, no_rag=True),
+                    _lien_goal(mode="paper", no_llm=True, no_rag=True),
                     bars=_trend_bars(250, step=0.008),
                     journal=journal,
                 )
@@ -222,7 +229,7 @@ class TestGraph(unittest.TestCase):
     def test_mtf_engine_wins_on_ltf_dip(self) -> None:
         record = asyncio.run(
             run(
-                _goal(no_llm=True),
+                _lien_goal(no_llm=True),
                 bars=_trend_bars(250, step=0.008),
                 fetch_analyses_fn=_fetch_ltf(20.0),
             )
@@ -237,7 +244,7 @@ class TestGraph(unittest.TestCase):
     def test_ch7_fallback_when_mtf_quiet(self) -> None:
         record = asyncio.run(
             run(
-                _goal(no_llm=True),
+                _lien_goal(no_llm=True),
                 bars=_trend_bars(250, step=0.008),
                 fetch_analyses_fn=_fetch_ltf(55.0),
             )
@@ -264,7 +271,7 @@ class TestGraph(unittest.TestCase):
 
         record = asyncio.run(
             run(
-                _goal(mt4=True, no_llm=True),
+                _lien_goal(mt4=True, no_llm=True),
                 bars=_trend_bars(250, step=0.008),
                 apply_mt4_fn=regime_draw,
                 apply_mt4_ticket_fn=ticket_draw,
@@ -278,6 +285,47 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(drawn["at_time"], record.regime.get("last_time"))
         self.assertAlmostEqual(drawn["entry"], record.proposal.entry)
         self.assertTrue(record.regime.get("mt4_ticket", {}).get("ok"))
+
+    def test_default_skips_engines(self) -> None:
+        record = asyncio.run(
+            run(_goal(no_llm=True), bars=_trend_bars(250, step=0.008))
+        )
+        self.assertEqual(record.engine_candidates, [])
+        self.assertIsNone(record.proposal.engine)
+        names = [t.name for t in record.tool_trace]
+        self.assertIn("engines", names)
+        engines_trace = next(t for t in record.tool_trace if t.name == "engines")
+        self.assertIn("opt-in", engines_trace.detail)
+
+    def test_default_waning_still_proposes(self) -> None:
+        called = {"n": 0}
+
+        def classify(_bars):
+            return {
+                "regime": "mixed",
+                "direction": "up",
+                "trend_waning": True,
+                "allowed_play_classes": ["breakout_watch"],
+                "last_close": 1.2,
+                "notes": ["trend_waning"],
+            }
+
+        def propose(regime, _chunks, _goal):
+            called["n"] += 1
+            return _join_trend_proposal(regime, _chunks, _goal)
+
+        record = asyncio.run(
+            run(
+                _goal(),
+                bars=_trend_bars(80, step=0.01),
+                classify_fn=classify,
+                propose_fn=propose,
+            )
+        )
+        self.assertEqual(called["n"], 1)
+        self.assertIsNotNone(record.proposal)
+        self.assertEqual(record.action, "log_setup")
+        self.assertTrue(record.risk.ok)
 
 
 if __name__ == "__main__":

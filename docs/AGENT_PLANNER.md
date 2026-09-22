@@ -1,15 +1,16 @@
 # Agent planner — operator manual
 
-How to use **Cursor as the ReAct planner** in front of the coded Lien graph:
-scan a universe, peek engines, journal a snapshot, and measure a causal walk.
-Research / paper-journal only. **No broker or MT4 orders.** Corpus evidence is
-**heuristic**. Treat every ticket as a replayable brief, not a signal service.
+How to use **Cursor as the ReAct planner**: read the trader's MT4 marks and
+reviews, retrieve the **whole corpus** (equal rank), and only then opt into a
+Lien engine experiment if asked. Research / paper-journal only. **No broker or
+MT4 orders.** Book evidence is **heuristic**; trader reviews are **empirical**.
 
-This is the operator manual. Architecture and phases live in
-[AGENTIC_TRADING_ROADMAP.md](AGENTIC_TRADING_ROADMAP.md) §1c. The graph itself
-(CLI flags, policy, journal schema) is [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md).
-Strategy tables: [LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). Always-on
-Cursor rule: `.cursor/rules/lien-fx-playbook.mdc`.
+This is the operator manual. Architecture lives in
+[AGENTIC_TRADING_ROADMAP.md](AGENTIC_TRADING_ROADMAP.md). The graph itself is
+[AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md). Trader capture and post-trade
+scores: [TRADER_KNOWLEDGE.md](TRADER_KNOWLEDGE.md). Lien engine tables (opt-in):
+[LIEN_FX_STRATEGIES.md](LIEN_FX_STRATEGIES.md). Always-on Cursor rule:
+`.cursor/rules/trader-knowledge.mdc`.
 
 ---
 
@@ -27,10 +28,10 @@ through that graph. They are not the same planner: ReAct does the work
 
 | Layer | Answers | Lives in |
 |-------|---------|----------|
-| Knowledge | “What does Lien say about the Fader?” | RAG MCP + Chroma (`lien-fx`) |
-| Orchestrator | “On this bar, does a coded engine pass policy?” | `agent/graph.py`, policy, engines |
-| **Planner** | “Which pair, engine, and window should we run next — and what did the last walk show?” | Cursor + MCP (this document) |
-| Execution | Orders, positions | **Stub only** — journal `pending_exec` → `agent.executor`; no OANDA/MT4 orders |
+| Knowledge | What books *and* the trader journal say | RAG MCP + Chroma (no default source pin); `trader-mt4` |
+| Orchestrator | Optional Lien engine on this bar + policy | `agent/graph.py` (`engines` opt-in) |
+| **Planner** | Systematize marks/reviews; choose the next experiment | Cursor + MCP |
+| Execution | Orders, positions | **Stub only** from this repo; MT4 fills are captured read-only |
 
 ```mermaid
 flowchart LR
@@ -149,10 +150,13 @@ Optional `run_graph` args that map onto `Goal`: `instrument`, `granularity`,
 
 | Tool | When |
 |------|------|
-| `search_knowledge` | Always pass `source="lien-fx"` for Lien work so other corpora cannot leak. |
+| `search_knowledge` | Default: **omit** `source` (equal-rank corpus). Pass `source` only when the operator names a book or `trader-mt4`. |
 | `get_source_chunk` | Exact citation after a hit (`source` + `chunk_index`). Prefers `chunk_type=text` over a figure caption at the same index. |
 | `corpus_stats` | What is ingested. |
-| `python -m agent.fidelity` | **CLI, not MCP.** Static claims × engines always; `--pin` / `--corpus` against ingested `lien-fx`. |
+| `mt4_read_chart` / `mt4_read_trades` | Live user objects and tickets (heartbeat gate). |
+| `trader_episodes` / `trader_review` | Setups and code-owned post-trade scores. Do not recompute MAE/MFE. |
+| `trader_definitions` | Trader-owned terms (e.g. macro trend timeframe). Read before applying book language. |
+| `python -m agent.fidelity` | **CLI, not MCP.** Lien claim pins; use only in a Lien engine experiment. |
 
 Risk reversals and implied vol are `unavailable`. Do not invent them.
 
@@ -166,7 +170,10 @@ context. They do not size a ticket and do not replace `run_graph`.
 
 | Command | Same as |
 |---------|---------|
-| `python -m agent.run` | `run_graph` |
+| `python -m agent.run` | `run_graph` (empty `engines` / `source` by default) |
+| `python -m agent.trader_sync` | MT4 outbox → `trader.sqlite` + reviews |
+| `python -m agent.trader_distill` | Hypothesis rules from review clusters |
+| `python -m agent.trader_ingest` | Rebuild Chroma `trader-mt4` |
 | `python -m agent.walk` | `run_walk kind=ch7` |
 | `python -m agent.walk_mtf` | `run_walk kind=mtf` |
 | `python -m agent.walk_lien --chapter N` | `run_walk kind=lien` |
@@ -181,24 +188,14 @@ context. They do not size a ticket and do not replace `run_graph`.
 A typical session is **not** one `agent.run`. It is a campaign. Walks already
 set `no_llm`: the outer model only chooses argv and interprets JSON.
 
-1. **Intent** — one question, e.g. “Is the Fader worth paper-journaling on quieter majors in 2024?”
-2. **Cite** — `search_knowledge(..., source="lien-fx")` then `get_source_chunk`. Pin with `python -m agent.fidelity` (add `--pin` if the corpus is ingested).
-3. **Filter** — `scan_regimes` on a small universe (default D). Keep the play class you care about; trust `kept` / `dropped`. Drop waning.
-4. **Peek** — `entry_*` on one survivor to see if the engine fires *now*. This is not a measured test.
-5. **Snapshot (journaled)** — `run_graph` when you want policy + `engine_candidates` in sqlite. Default `signal`.
-6. **Baseline walk** — **one** `run_walk` per survivor with **book defaults** (do not start by sweeping). Record `walk_id` and `equity`.
-7. **Cross-section** — same engine, other kept pairs or another year. Still defaults.
-8. **Optional knob trial** — **one** axis (LTF, `lookback`, `rsi_os`, `buffer_pips`). Small grid. Winners are hypotheses, not new encoded rules.
-9. **Report and stop** — or change chapter / universe. Do not keep sweeping until a curve looks good.
+1. **Intent** — one question, e.g. “How well did my H1 GBPUSD channel fades work last week?” or a Lien experiment if you asked for one.
+2. **Chart / definitions** — `mt4_read_chart`, `trader_definitions`. Chart TF is the clock; do not assume D is macro trend.
+3. **Reviews** — `trader_review` on closed episodes. Do not recompute MAE/MFE.
+4. **Cite** — `search_knowledge` **without** `source` unless you named a book (or `trader-mt4`). Cite the source that came back.
+5. **Optional Lien toolkit** — `scan_regimes` / `entry_*` / `run_graph(engines=…)` / `run_walk` only when the operator asked for that experiment. Then you *may* pin `source="lien-fx"`.
+6. **Hypotheses** — `python -m agent.trader_distill`. Accept rules yourself; the agent does not encode engines from this.
 
-Example (Fader, 2024, quieter majors):
-
-1. `search_knowledge(query="Fader ADX probe fade range", source="lien-fx")`
-2. `scan_regimes(play_class="fade_range")` — use `kept`
-3. `entry_lien(chapter=13, instrument=<kept pair>)` — peek
-4. `run_walk(kind="lien", chapter=13, instrument=<pair>, from_time="2024-01-01T00:00:00Z", to_time="2025-01-01T00:00:00Z")`
-5. Read `equity.mean_r`, `max_drawdown_frac`, `trade_count`. Ask: did it fire only when daily ADX was in the range Lien requires?
-6. Repeat on the next `kept` name. Stop after a handful of walks.
+Lien engine campaign (opt-in only): `search_knowledge(..., source="lien-fx")`, `scan_regimes`, peek `entry_*`, `run_graph` with `engines` set, one `run_walk` with book defaults. Waning / play-class gates apply in that mode.
 
 ---
 
@@ -260,11 +257,11 @@ That is **not** `POST /v3/accounts/.../orders` on the practice host.
 - **No inventing indicators or prices.** Indicators stay in `app/regime.py` /
   `app/indicators.py`. Engines overwrite play, side, and levels.
 - **No `pending_exec` except via the graph** (`run_graph` / `agent.run` / walks).
-- **Do not aggress on `trend_waning`.** Scan drops these by default; the graph waits.
+- **Do not aggress on `trend_waning` in Lien-engine mode** (`engines` set). Default analysis treats regime as annotation only.
 - **Unencoded chapters:** retrieve and explain, or skip. No fake ticket, no fake back-test. Ch. 12/15 are documentation-only (`breakout_watch` paper policy). Ch. 10 is `entry_lien(chapter=10)`. Ch. 11 is `entry_lien(chapter=11)`. FOMC skip-day is perspective hygiene (optional; not in `waiting_deal` / `double_zeros`): no **new** ticket on a scheduled statement London date. Do not invent a flatten or a next-day-only engine.
 - **Peek ≠ act.** `entry_*` / `classify_regime` do not journal. Journaled snapshot or measured equity requires `run_graph` / `run_walk` (or the matching CLI).
-- **Book defaults first.** Sweep one axis; cap the grid. Do not silently rewrite `agent/engines/*.py` from a lucky window. Do not sweep Lien’s 65/50/195-pip templates back into tickets (2R + buffer).
-- **Cite `lien-fx`.** Always `source="lien-fx"` on Lien searches. Evidence is heuristic.
+- **Book defaults first** on Lien walks. Sweep one axis; cap the grid. Do not silently rewrite `agent/engines/*.py` from a lucky window. Do not sweep Lien’s 65/50/195-pip templates back into tickets (2R + buffer).
+- **Equal-rank corpus.** Omit `source` on `search_knowledge` unless the operator named a book. `lien-fx` is not the default pin. Trader reviews are empirical (`trader-mt4`).
 - **Cap tool rounds.** Walks and tester are expensive. Preview a structured plan before acting (dashboard `POST /api/jobs/preview` is the pattern for CLI; in chat, state the grid before calling `run_walk`).
 
 Risk library (not an MCP tool): prefer ≥ 1:2 R, ≤ ~2% equity (`app/risk.py`).

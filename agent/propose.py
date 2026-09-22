@@ -12,13 +12,12 @@ from app import ollama_client
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 SYSTEM = (
-    "You map a Lien Ch.7 regime snapshot and book excerpts to a trade proposal. "
-    "Return ONLY a JSON object with keys: thesis, play_class, side, entry, stop, "
-    "target, confidence, citations, notes. "
-    "play_class must be one of join_trend, fade_range, breakout_watch and should "
-    "match allowed_play_classes. "
-    "side, entry, stop, and target will be overwritten by Ch.7 geometry in code "
-    "from the indicator snapshot — set side to none and entry/stop/target to null. "
+    "You map a market snapshot and book excerpts to a trade proposal. "
+    "No single book is authoritative. Return ONLY a JSON object with keys: "
+    "thesis, play_class, side, entry, stop, target, confidence, citations, notes. "
+    "play_class must be one of join_trend, fade_range, breakout_watch. "
+    "When Lien engines will run they overwrite side, entry, stop, and target — "
+    "set side to none and entry/stop/target to null in that case. "
     "citations is a list of {source, chunk_index} from the excerpts. "
     "Do not invent prices, risk_reversals, or implied vol. "
     "Do not recompute ADX, Bollinger, SMA, RSI, stochastics, or MACD. "
@@ -92,7 +91,7 @@ def parse_proposal(
 def skeleton_proposal(regime: dict[str, Any]) -> Proposal:
     plays = list(regime.get("allowed_play_classes") or ["breakout_watch"])
     return Proposal(
-        thesis="no-llm skeleton; Ch.7 geometry fills prices from the snapshot",
+        thesis="no-llm skeleton; engines (if requested) fill prices from the snapshot",
         play_class=plays[0],
         side="none",
         notes="--no-llm",

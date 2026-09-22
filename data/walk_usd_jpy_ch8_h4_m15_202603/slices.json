@@ -1,0 +1,97 @@
+[
+  {
+    "from_time": "2026-03-01T00:00:00Z",
+    "to_time": "2026-04-01T00:00:00Z",
+    "walk_id": "fbc84624d58245a1956b60c39e5986b0",
+    "starting_equity": 10000.0,
+    "ending_equity": 9094.6869,
+    "trade_count": 16,
+    "wins": 4,
+    "losses": 12,
+    "mean_r": -0.2803,
+    "win_rate": 0.25,
+    "max_drawdown_frac": 0.1344,
+    "sides": {
+      "long": 11,
+      "short": 5
+    },
+    "exits": {
+      "stop": 12,
+      "target": 4
+    },
+    "ltf_bar_count": 2374,
+    "htf_bar_count": 383,
+    "i": 0
+  },
+  {
+    "from_time": "2026-04-01T00:00:00Z",
+    "to_time": "2026-05-01T00:00:00Z",
+    "walk_id": "7d7bc628507e4a009dca3edbbb1d799d",
+    "starting_equity": 9094.6869,
+    "ending_equity": 9321.2062,
+    "trade_count": 13,
+    "wins": 5,
+    "losses": 8,
+    "mean_r": 0.1144,
+    "win_rate": 0.3846,
+    "max_drawdown_frac": 0.0831,
+    "sides": {
+      "long": 3,
+      "short": 10
+    },
+    "exits": {
+      "target": 5,
+      "stop": 8
+    },
+    "ltf_bar_count": 2362,
+    "htf_bar_count": 382,
+    "i": 1
+  },
+  {
+    "from_time": "2026-05-01T00:00:00Z",
+    "to_time": "2026-06-01T00:00:00Z",
+    "walk_id": "56aeee54f309451ca47bc4b2835dd201",
+    "starting_equity": 9321.2062,
+    "ending_equity": 9508.4108,
+    "trade_count": 10,
+    "wins": 4,
+    "losses": 6,
+    "mean_r": 0.1184,
+    "win_rate": 0.4,
+    "max_drawdown_frac": 0.0961,
+    "sides": {
+      "short": 9,
+      "long": 1
+    },
+    "exits": {
+      "target": 4,
+      "stop": 6
+    },
+    "ltf_bar_count": 2266,
+    "htf_bar_count": 376,
+    "i": 2
+  },
+  {
+    "from_time": "2026-06-01T00:00:00Z",
+    "to_time": "2026-07-01T00:00:00Z",
+    "walk_id": "7cb0a3b79dd04601ac0c52f2718c4bdd",
+    "starting_equity": 9508.4108,
+    "ending_equity": 10231.6936,
+    "trade_count": 5,
+    "wins": 3,
+    "losses": 2,
+    "mean_r": 0.759,
+    "win_rate": 0.6,
+    "max_drawdown_frac": 0.02,
+    "sides": {
+      "long": 5
+    },
+    "exits": {
+      "stop": 2,
+      "target": 3
+    },
+    "ltf_bar_count": 2362,
+    "htf_bar_count": 382,
+    "i": 3
+  }
+]

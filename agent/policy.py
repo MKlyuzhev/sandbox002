@@ -31,21 +31,29 @@ def evaluate(
     proposal: Proposal | None,
     goal: Goal,
 ) -> RiskVerdict:
-    """Return a verdict. Failures always map to action=wait."""
-    if regime.get("trend_waning"):
+    """Return a verdict. Failures always map to action=wait.
+
+    Lien ``trend_waning`` and play-class gates apply only when ``goal.engines``
+    is a non-empty chapter list (opt-in toolkit). Default analysis still
+    sizes a ticket if one is present.
+    """
+    lien_mode = bool(goal.engines)
+    if lien_mode and regime.get("trend_waning"):
         return _wait(goal, ["trend_waning: do not aggress"])
 
-    allowed = list(regime.get("allowed_play_classes") or [])
     if proposal is None:
         return _wait(goal, ["no proposal"])
 
-    if proposal.play_class not in allowed:
-        return _wait(
-            goal,
-            [
-                f"play_class {proposal.play_class!r} not in allowed_play_classes {allowed}"
-            ],
-        )
+    if lien_mode:
+        allowed = list(regime.get("allowed_play_classes") or [])
+        if proposal.play_class not in allowed:
+            return _wait(
+                goal,
+                [
+                    f"play_class {proposal.play_class!r} not in allowed_play_classes "
+                    f"{allowed}"
+                ],
+            )
 
     missing: list[str] = []
     if proposal.side == "none":

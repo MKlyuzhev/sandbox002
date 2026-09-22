@@ -13,6 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from agent.engines.registry import parse_engines  # noqa: E402
 from agent.graph import run  # noqa: E402
 from agent.journal import DEFAULT_DB_PATH, Journal  # noqa: E402
 from agent.schema import Goal  # noqa: E402
@@ -31,9 +32,11 @@ def _configure_logging(quiet: bool) -> None:
 
 
 async def _async_main(args: argparse.Namespace) -> int:
-    engines = None
-    if args.engines:
-        engines = [int(x) for x in args.engines.split(",") if x.strip()]
+    try:
+        engines = parse_engines(args.engines)
+    except ValueError:
+        print("invalid --engines; use chapter ids (e.g. 8,7) or all", file=sys.stderr)
+        return 1
     goal = Goal(
         instrument=args.instrument,
         granularity=args.granularity,
@@ -65,8 +68,9 @@ async def _async_main(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Lien analysis orchestrator: regime → retrieve → propose → risk gate "
-            "→ journal. Research / paper-journal only; no broker orders."
+            "Analysis orchestrator: candles → regime annotation → retrieve → "
+            "propose → risk gate → journal. Lien engines are opt-in "
+            "(--engines). Research / paper-journal only; no broker orders."
         )
     )
     parser.add_argument("--instrument", default="EUR_USD")
@@ -80,7 +84,10 @@ def main() -> int:
         "--engines",
         default=None,
         metavar="CHAPTERS",
-        help="Comma-separated chapter allow-list (e.g. 8,7). Default: all matching.",
+        help=(
+            "Comma-separated Lien chapter allow-list (e.g. 8,7) or 'all'. "
+            "Default: none (engines are opt-in)."
+        ),
     )
     parser.add_argument("--count", type=int, default=250)
     parser.add_argument("--from", dest="from_time", default=None, metavar="RFC3339")
@@ -103,7 +110,11 @@ def main() -> int:
     parser.add_argument("--mt4-prefix", default="sbox.regime.")
     parser.add_argument("--no-rag", action="store_true")
     parser.add_argument("--no-llm", action="store_true")
-    parser.add_argument("--source", default="lien-fx")
+    parser.add_argument(
+        "--source",
+        default="",
+        help="Optional Chroma source filter (e.g. lien-fx). Empty searches the whole corpus.",
+    )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--journal", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--no-journal", action="store_true")

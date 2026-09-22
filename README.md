@@ -207,8 +207,12 @@ Tools: `get_account_summary`, `list_accounts`, `list_instruments`, `get_pricing`
 `indicator_snapshot`, `run_graph`, `run_walk`, `mt4_draw_regime`, plus MT4
 display helpers `mt4_status`, `mt4_upsert_objects`, `mt4_delete_objects`,
 `mt4_clear_layer`, `mt4_draw_formation`, `mt4_draw_ticket` (chart objects via a
-file inbox; no MT4 orders). `entry_mtf`, `entry_dbb`, and `entry_lien` are
-snapshot peeks (no policy/journal).
+file inbox; no MT4 orders). Trader capture (read-only): `mt4_read_chart`,
+`mt4_read_trades`, `trader_episodes`, `trader_review`, `trader_rules`,
+`trader_definitions`. See [docs/TRADER_KNOWLEDGE.md](docs/TRADER_KNOWLEDGE.md).
+`entry_mtf`, `entry_dbb`, and `entry_lien` are snapshot peeks (no policy/journal).
+`run_graph` searches the whole corpus by default; Lien engines are opt-in
+(`engines`).
 
 A second read-only server, `rag-knowledge` (`app/rag_mcp.py`), exposes the
 ingested corpus for retrieval: `search_knowledge` (optional `source` filter,
