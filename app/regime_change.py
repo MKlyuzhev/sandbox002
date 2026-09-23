@@ -27,6 +27,15 @@ State = Literal["stable", "early_warning", "confirming", "confirmed"]
 
 CONFIRMED_THRESHOLD = 0.6
 
+# Structural evidence must describe a *recent event*, not a latched state.
+# ``app.structure`` reports the most recent qualifying event anywhere in the
+# lookback window, so an untouched read fires for as long as the window holds
+# it: measured over 21,334 causal daily bars on the seven USD majors, the
+# trendline break it returned had a median age of 53 bars and fired on 85% of
+# bars, which pushed ``confirmed`` to 44% of all bars and left ``stable`` at
+# 0.7%. Only events no older than this many bars count as evidence.
+EVENT_RECENCY_BARS = 5
+
 # Evidence catalog: signal -> stage, weight, and the corpus chunk that grounds
 # it. ``agent/structure_fidelity.py`` pins these same (source, chunk_index)
 # pairs so the code and the citations stay in lockstep.
@@ -123,7 +132,12 @@ def _round(value: float | None, digits: int = 4) -> float | None:
     return round(float(value), digits)
 
 
-def _evidence(signal: str, direction: str | None, extra: str = "") -> dict[str, Any]:
+def _evidence(
+    signal: str,
+    direction: str | None,
+    extra: str = "",
+    age: int | None = None,
+) -> dict[str, Any]:
     spec = EVIDENCE_CATALOG[signal]
     detail = spec["detail"] if not extra else f"{spec['detail']}: {extra}"
     return {
@@ -131,9 +145,23 @@ def _evidence(signal: str, direction: str | None, extra: str = "") -> dict[str, 
         "stage": spec["stage"],
         "weight": spec["weight"],
         "direction": direction,
+        # Bars between the triggering event and the decision bar. ``None`` for
+        # signals read off the current bar's state (no discrete event index).
+        "age": age,
         "citation": {"source": spec["source"], "chunk_index": spec["chunk_index"]},
         "detail": detail,
     }
+
+
+def _age(last_index: int, event_index: Any) -> int | None:
+    if event_index is None:
+        return None
+    return last_index - int(event_index)
+
+
+def _fresh(age: int | None, recency: int) -> bool:
+    """True when a discrete event is recent enough to count as evidence."""
+    return age is not None and 0 <= age <= recency
 
 
 def _opposite(direction: str | None) -> str | None:
@@ -165,11 +193,16 @@ def detect(
     analysis: dict[str, Any] | None = None,
     *,
     instrument: str | None = None,
+    recency: int = EVENT_RECENCY_BARS,
 ) -> dict[str, Any]:
     """Return the staged ``regime_change`` block for ``bars``.
 
     ``analysis`` may be a precomputed :func:`app.regime.analyze_bars` result
     (the walk passes it to avoid recomputing indicators).
+
+    ``recency`` bounds how old a discrete structural event may be and still
+    count as evidence (see :data:`EVENT_RECENCY_BARS`). Pass a large value to
+    recover the old unbounded behaviour for comparison.
     """
     if analysis is None:
         analysis = regime_mod.analyze_bars(bars)
@@ -186,35 +219,61 @@ def detect(
     candles = candles_mod.analyze_candles(bars, levels=levels)
 
     evidence: list[dict[str, Any]] = []
+    last_index = int(struct["bar_count"]) - 1
 
     # --- Stage 1 -----------------------------------------------------------
+    # ``trend_waning``, the channel rails and the swing read are all evaluated
+    # against the decision bar's close, so they need no recency gate.
     if analysis.get("trend_waning"):
         evidence.append(_evidence("trend_waning", _opposite(trend_direction)))
 
+    # The far-rail warning now dates the failing swing, so it is gated like any
+    # other discrete event.
     channel = struct["channel"]
-    if channel.get("far_rail_failure"):
+    far_fail = channel.get("far_rail_failure_event")
+    far_age = _age(last_index, far_fail.get("index")) if far_fail else None
+    if far_fail and _fresh(far_age, recency):
         evidence.append(
-            _evidence("channel_far_rail_failure", _opposite(trend_direction))
+            _evidence(
+                "channel_far_rail_failure",
+                _opposite(trend_direction),
+                f"fell {far_fail['gap_frac']:.2f} of width short; "
+                f"rail last tagged {far_fail['bars_since_reach']} bars earlier",
+                age=far_age,
+            )
         )
 
     swing = struct["swing_flip"]
     if swing.get("broke_prior_swing") and not swing.get("flip"):
         evidence.append(_evidence("minor_sr_break", swing.get("direction_to")))
 
+    # Fan lines carry the break index of the line that gave way; the youngest
+    # broken line dates the fan signal.
     fan = struct["fan"]
-    if fan.get("first_line_broken") and not fan.get("third_line_broken"):
+    fan_ages = [
+        age
+        for age in (_age(last_index, b.get("break_index")) for b in fan.get("broken") or [])
+        if age is not None
+    ]
+    fan_age = min(fan_ages) if fan_ages else None
+    fan_fresh = _fresh(fan_age, recency)
+    if fan.get("first_line_broken") and not fan.get("third_line_broken") and fan_fresh:
         # Fan lines break against the trend, i.e. toward the reversal.
-        evidence.append(_evidence("fan_first_line", _opposite(trend_direction)))
+        evidence.append(
+            _evidence("fan_first_line", _opposite(trend_direction), age=fan_age)
+        )
 
     # --- Stage 2 -----------------------------------------------------------
     tl = struct["trendline_break"]
     tl_valid = tl.get("latest_valid")
-    if tl_valid:
+    tl_age = _age(last_index, tl_valid.get("break_index")) if tl_valid else None
+    if tl_valid and _fresh(tl_age, recency):
         evidence.append(
             _evidence(
                 "trendline_break_valid",
                 tl_valid.get("direction"),
                 f"{tl_valid['bars_beyond']} closes beyond a {tl_valid['kind']} line",
+                age=tl_age,
             )
         )
 
@@ -224,12 +283,15 @@ def detect(
         )
 
     rr = struct["role_reversal"]
-    if rr.get("latest"):
+    rr_latest = rr.get("latest")
+    rr_age = _age(last_index, rr_latest.get("retest_index")) if rr_latest else None
+    if rr_latest and _fresh(rr_age, recency):
         evidence.append(
             _evidence(
                 "sr_role_reversal",
-                rr["latest"].get("direction"),
-                f"{rr['latest']['from_role']}->{rr['latest']['to_role']}",
+                rr_latest.get("direction"),
+                f"{rr_latest['from_role']}->{rr_latest['to_role']}",
+                age=rr_age,
             )
         )
 
@@ -238,13 +300,25 @@ def detect(
             _evidence("swing_structure_flip", swing.get("direction_to"))
         )
 
-    if candles.get("reversal_direction") and candles.get("any_at_level"):
-        names = ", ".join(
-            p["pattern"] for p in candles["patterns"] if p.get("at_level")
-        )
+    at_level = [p for p in candles["patterns"] if p.get("at_level")]
+    cand_ages = [
+        age
+        for age in (_age(last_index, p.get("index")) for p in at_level)
+        if age is not None
+    ]
+    cand_age = min(cand_ages) if cand_ages else None
+    if (
+        candles.get("reversal_direction")
+        and candles.get("any_at_level")
+        and _fresh(cand_age, recency)
+    ):
+        names = ", ".join(p["pattern"] for p in at_level)
         evidence.append(
             _evidence(
-                "candle_reversal_at_level", candles["reversal_direction"], names
+                "candle_reversal_at_level",
+                candles["reversal_direction"],
+                names,
+                age=cand_age,
             )
         )
 
@@ -264,8 +338,10 @@ def detect(
             _evidence("volume_pickup", candles.get("reversal_direction"))
         )
 
-    if fan.get("third_line_broken"):
-        evidence.append(_evidence("fan_third_line", _opposite(trend_direction)))
+    if fan.get("third_line_broken") and fan_fresh:
+        evidence.append(
+            _evidence("fan_third_line", _opposite(trend_direction), age=fan_age)
+        )
 
     # --- Aggregate ---------------------------------------------------------
     warnings = [e for e in evidence if e["stage"] == "early_warning"]
@@ -283,10 +359,12 @@ def detect(
 
     direction_to = _vote_direction(evidence, trend_direction) if evidence else None
 
+    # A projection is only as current as the event it is measured from, so a
+    # stale trendline break does not supply one.
     measured_move = None
     if channel.get("measured_move"):
         measured_move = {"source": "channel", **channel["measured_move"]}
-    elif tl_valid and tl_valid.get("measured_move"):
+    elif tl_valid and tl_valid.get("measured_move") and _fresh(tl_age, recency):
         measured_move = {"source": "trendline", **tl_valid["measured_move"]}
 
     citations = _unique_citations(evidence)
@@ -299,6 +377,7 @@ def detect(
         "direction_from": baseline_direction,
         "direction_to": direction_to,
         "score": _round(score),
+        "recency_bars": recency,
         "stage_counts": {
             "early_warning": len(warnings),
             "confirming": len(confirmations),

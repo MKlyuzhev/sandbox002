@@ -8,7 +8,8 @@ into the structural evidence the regime-change scorer consumes:
   prior-day high/low),
 * support/resistance role reversal (a broken level flips role),
 * valid trendline breaks (close + time + price/ATR filters, anti-whipsaw),
-* channel state (far-rail failure as an early warning; basic-rail break),
+* channel state (a failed leg toward the far rail as an early warning;
+  basic-rail break),
 * the fan principle (successive broken trendlines), and
 * swing-structure flips (failed new extreme + prior-swing break).
 
@@ -40,6 +41,13 @@ TIME_FILTER = 2
 # Failure to reach the far channel rail by this fraction of channel width is an
 # early warning that the trend is shifting (Murphy 4.17).
 FAR_RAIL_FAIL_FRAC = 0.25
+# Murphy's warning is a *failed leg*: a rally that previously tagged the return
+# line and then falls short of it. A swing whose extreme comes within this
+# fraction of the channel width counts as having reached the rail, and only a
+# later swing can fail against it. Without the prior-reach requirement the test
+# degenerates into "price is not at the rail", which is true of roughly half of
+# all bars.
+FAR_RAIL_REACH_FRAC = 0.10
 # Round-number figures within this many ATRs of the last close are considered.
 ROUND_NUMBER_ATR_SPAN = 3.0
 FIGURE_PIPS = 100.0  # a "double zero" figure is 100 pips
@@ -91,6 +99,16 @@ def _line_price_at(line: dict[str, Any], i: int) -> float:
         return p0
     slope = (p1 - p0) / (i1 - i0)
     return p0 + slope * (i - i0)
+
+
+def _rail_price_at(rail: dict[str, Any], i: int) -> float:
+    """Interpolate a channel rail (``i1/p1`` .. ``i2/p2``) at bar ``i``."""
+    i1, i2 = int(rail["i1"]), int(rail["i2"])
+    p1, p2 = float(rail["p1"]), float(rail["p2"])
+    if i2 == i1:
+        return p1
+    slope = (p2 - p1) / (i2 - i1)
+    return p1 + slope * (i - i1)
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +506,65 @@ def _trendline_measured_move(
 # ---------------------------------------------------------------------------
 
 
+def _far_rail_failure_event(
+    bars: list[dict],
+    far_rail: dict[str, Any],
+    direction: Direction,
+    width: float,
+    *,
+    swing_left: int,
+    swing_right: int,
+    fail_frac: float,
+    reach_frac: float,
+) -> dict[str, Any] | None:
+    """The most recent completed swing that fell short of a previously tagged rail.
+
+    Murphy 4.17 reads the *inability* of a rally to reach the return line, which
+    presupposes an earlier rally that did reach it. Returns ``None`` unless both
+    legs exist in order, so the warning marks a turning point rather than
+    price's resting position inside the channel.
+    """
+    if width <= 0:
+        return None
+    want = "high" if direction == "up" else "low"
+    pivots = [
+        p
+        for p in patterns.detect_swings(bars, left=swing_left, right=swing_right)
+        if p.get("kind") == want
+    ]
+    if len(pivots) < 2:
+        return None
+
+    legs: list[dict[str, Any]] = []
+    for p in pivots:
+        idx = int(p["index"])
+        rail_price = _rail_price_at(far_rail, idx)
+        extreme = float(p["price"])
+        gap = rail_price - extreme if direction == "up" else extreme - rail_price
+        legs.append({"index": idx, "price": extreme, "gap_frac": gap / width})
+
+    latest = legs[-1]
+    # Murphy's warning describes a rally *inside* the channel that fell short.
+    # A gap of a full width or more puts the swing at or beyond the basic rail,
+    # where the channel is already broken and ``basic_rail_break`` is the
+    # applicable signal instead.
+    if not fail_frac <= latest["gap_frac"] < 1.0:
+        return None
+    reached = [lg for lg in legs[:-1] if lg["gap_frac"] <= reach_frac]
+    if not reached:
+        return None
+    prior = reached[-1]
+    return {
+        "index": latest["index"],
+        "price": _round(latest["price"]),
+        "gap_frac": _round(latest["gap_frac"], 4),
+        "prior_reach_index": prior["index"],
+        "prior_reach_price": _round(prior["price"]),
+        "prior_reach_gap_frac": _round(prior["gap_frac"], 4),
+        "bars_since_reach": latest["index"] - prior["index"],
+    }
+
+
 def channel_state(
     bars: list[dict],
     direction: Direction | None,
@@ -496,7 +573,9 @@ def channel_state(
     pip: float | None = None,
     break_atr_frac: float = BREAK_ATR_FRAC,
     far_rail_fail_frac: float = FAR_RAIL_FAIL_FRAC,
-    reach_bars: int = SWING_RIGHT + 1,
+    far_rail_reach_frac: float = FAR_RAIL_REACH_FRAC,
+    swing_left: int = SWING_LEFT,
+    swing_right: int = SWING_RIGHT,
 ) -> dict[str, Any]:
     """Trend-channel rails + far-rail-failure early warning + basic-rail break.
 
@@ -504,6 +583,11 @@ def channel_state(
     return line. A move that fails to reach the far rail is an early warning
     the trend is shifting; a break of the *basic* rail is a trend-change signal
     (measured move = channel width).
+
+    The far-rail warning is a **failed leg**, not a position in the channel: it
+    needs a completed swing that tagged the return line, followed by a later
+    completed swing that fell short of it. ``far_rail_failure_event`` dates that
+    failing swing so the scorer can apply a recency gate.
     """
     _validate_bars(bars)
     pip = pip if pip is not None else pip_size(instrument)
@@ -522,23 +606,30 @@ def channel_state(
     close = float(bars[-1]["close"])
 
     # Basic rail is the trend-support side; far (return) rail is the other.
+    far_rail = upper if direction == "up" else lower
     if direction == "up":
         far_rail_price = upper_at_last
         basic_rail_price = lower_at_last
-        reach = max(float(b["high"]) for b in bars[-reach_bars:])
-        far_gap = far_rail_price - reach
         basic_break = close < basic_rail_price - break_tol
         far_break = close > far_rail_price + break_tol
     else:
         far_rail_price = lower_at_last
         basic_rail_price = upper_at_last
-        reach = min(float(b["low"]) for b in bars[-reach_bars:])
-        far_gap = reach - far_rail_price
         basic_break = close > basic_rail_price + break_tol
         far_break = close < far_rail_price - break_tol
 
-    far_gap_frac = far_gap / width if width > 0 else 0.0
-    far_rail_failure = width > 0 and far_gap_frac >= far_rail_fail_frac
+    fail_event = _far_rail_failure_event(
+        bars,
+        far_rail,
+        direction,
+        width,
+        swing_left=swing_left,
+        swing_right=swing_right,
+        fail_frac=far_rail_fail_frac,
+        reach_frac=far_rail_reach_frac,
+    )
+    far_rail_failure = fail_event is not None
+    far_gap_frac = fail_event["gap_frac"] if fail_event else None
 
     measured_move = None
     if basic_break and width > 0:
@@ -556,8 +647,9 @@ def channel_state(
         "width": _round(width),
         "close": _round(close),
         "far_rail": "upper" if direction == "up" else "lower",
-        "far_rail_gap_frac": _round(far_gap_frac, 4),
+        "far_rail_gap_frac": _round(far_gap_frac, 4) if far_gap_frac is not None else None,
         "far_rail_failure": bool(far_rail_failure),
+        "far_rail_failure_event": fail_event,
         "basic_rail_break": bool(basic_break),
         "far_rail_break": bool(far_break),
         "measured_move": measured_move,
