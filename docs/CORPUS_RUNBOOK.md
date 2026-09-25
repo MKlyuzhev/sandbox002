@@ -189,6 +189,53 @@ Pin Lien strategy chapters to encoded engines (no LLM):
 | Ingest very slow | Normal for large PDFs + moondream captions; run one book at a time |
 | Re-ingest same source | Same `source_id` overwrites text chunks; figures skip if IDs exist |
 | Missing file in batch | Script lists missing paths; acquire file and re-run |
+| Retrieval keeps returning one book | Audit for a duplicate `source_id` (below) |
+
+### Duplicate sources
+
+A `source_id` that differs from an existing one (a `-test` suffix, a typo)
+ingests the same book **again** under the new name instead of overwriting it.
+Nothing in the pipeline detects this: the manifest is not compared against the
+collection, so the extra copy is invisible except in retrieval, where it halves
+the effective diversity of every `top_k`. `edwards-magee-test` sat in the store
+this way until 2026-09-25 — 1,309 chunks, 12% of the collection — and the
+`head_shoulders` smoke test recorded the symptom without flagging it: it expected
+`murphy-digital, edwards-magee, pring-ta` and retrieved
+`edwards-magee, edwards-magee-test`.
+
+Audit the collection against the manifest:
+
+```bash
+.venv/bin/python - <<'PY'
+from collections import Counter
+import yaml
+from app import store
+manifest = yaml.safe_load(open("data/corpus/manifest.yaml"))
+declared = {d["source_id"] for d in manifest["documents"]}
+res = store.get_collection().get(include=["metadatas"], limit=200000)
+actual = Counter(m.get("source") for m in res["metadatas"])
+for src, n in actual.most_common():
+    flag = "" if src in declared else "   <-- NOT IN MANIFEST"
+    print(f"{src:28s} {n:6d}{flag}")
+print("\ndeclared but absent:", sorted(declared - set(actual)))
+PY
+```
+
+Remove an undeclared source (irreversible — the store is gitignored, so export
+first):
+
+```bash
+.venv/bin/python -c "
+from app import store
+c = store.get_collection()
+c.delete(where={'source': 'BAD_SOURCE_ID'})
+print('remaining:', c.count())"
+```
+
+Then reload the `rag-knowledge` MCP server in Cursor: `app/rag_mcp.py` holds an
+open `PersistentClient`, so a running instance keeps serving deleted chunks from
+its in-memory index until restarted. Record what you removed under
+`maintenance` in `.ingest_state.json`.
 
 ---
 

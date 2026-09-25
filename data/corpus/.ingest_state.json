@@ -95,7 +95,8 @@
         "edwards-magee",
         "edwards-magee-test"
       ],
-      "answer": "According to the context, a Head-and-Shoulders Reversal (or \"Kilroy Bottom\") is a formation that develops at an important Reversal of Trend from down to up, with three stages:\n\nA. "
+      "answer": "According to the context, a Head-and-Shoulders Reversal (or \"Kilroy Bottom\") is a formation that develops at an important Reversal of Trend from down to up, with three stages:\n\nA. ",
+      "stale_note": "Recorded before the 2026-09-25 edwards-magee-test dedup. The stored sources [edwards-magee, edwards-magee-test] show the duplicate crowding out expected books; re-running the same query now returns [aronson-ebta, edwards-magee, murphy-digital]. The stored answer is from the pre-dedup run."
     },
     "fx_sessions": {
       "pass": true,
@@ -192,5 +193,21 @@
       "pass": false,
       "note": "reminiscences disabled; wrong Gutenberg file previously ingested"
     }
-  }
+  },
+  "maintenance": [
+    {
+      "date": "2026-09-25",
+      "action": "deleted duplicate Chroma source",
+      "source_id": "edwards-magee-test",
+      "chunks_removed": 1309,
+      "collection_total_before": 10690,
+      "collection_total_after": 9381,
+      "reason": "Full duplicate ingest of edwards-magee.pdf: 1309 text chunks identical to edwards-magee apart from the injected metadata header line, i.e. 12% of the store double-weighting one book in every unfiltered retrieval. Never present in manifest.yaml or in this file's \"ingested\" map, so it was orphaned test residue.",
+      "reversible_via": "~/Projects/sandbox002-edwards-magee-test-export-20260925.pkl (ids/documents/embeddings/metadatas) and a full store copy at ~/Projects/sandbox002-chroma-backup-20260925/",
+      "verified": [
+        "edwards-magee unchanged at 1312 chunks; no other source count changed",
+        "agent.structure_fidelity --pin passes, incl. edwards-magee pins 301/434/449"
+      ]
+    }
+  ]
 }
