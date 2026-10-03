@@ -957,6 +957,123 @@ async def trader_definitions(term: str = "", granularity: str = "", notes: str =
     return {"ok": True, "definitions": store.get_definitions()}
 
 
+
+@mcp.tool()
+async def trader_sync(review: bool = True) -> dict:
+    """Sync MT4 outbox folders into the trader journal now (orders, SL/TP
+    revisions, marks, episodes) and score newly closed tickets. No orders."""
+    from agent.trader_sync import sync_all
+
+    result = await sync_all(_trader_store(), review=review)
+    return {"ok": True, **result}
+
+
+@mcp.tool()
+async def trader_link(instrument: str, timeframe: str, ticket: int = 0) -> dict:
+    """Link the objects currently SELECTED on the MT4 chart to a ticket.
+
+    Select the lines in MT4 first (click, Ctrl+click for more). Without
+    ``ticket`` the single open order on that symbol is used. The objects'
+    geometry is frozen into the journal; the review is re-scored on next sync.
+    """
+    from app import trader_journal
+
+    try:
+        return trader_journal.link_selected(
+            _trader_store(), instrument, timeframe, ticket or None
+        )
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def trader_record(ticket: int) -> dict:
+    """Full journal record for a ticket: order, SL/TP revisions, linked
+    objects (frozen geometry), episode, code-owned review, and analyses."""
+    from app import trader_journal
+
+    try:
+        return {"ok": True, **trader_journal.record(_trader_store(), ticket)}
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def trader_add_analysis(
+    kind: str,
+    body_md: str,
+    instrument: str,
+    timeframe: str = "",
+    ticket: int = 0,
+    refs: list[str] | None = None,
+    levels: list[dict] | None = None,
+    drawn_prefix: str = "",
+    author: str = "claude",
+    model: str = "",
+) -> dict:
+    """Store an analysis in the trader journal (verbatim markdown).
+
+    ``kind``: pre_trade | in_trade | post_trade | chart_read. ``ticket`` 0
+    leaves it unattached; a pre_trade analysis auto-attaches to the next ticket
+    on the symbol opened within 24h. ``levels`` are bridge objects (same schema
+    as ``mt4_upsert_objects``) redrawn on replay. Never changes review scores
+    and is not ingested into the knowledge base.
+    """
+    from app import trader_journal
+
+    try:
+        row = trader_journal.add_analysis(
+            _trader_store(),
+            instrument=instrument,
+            kind=kind,
+            body_md=body_md,
+            timeframe=timeframe,
+            ticket=ticket or None,
+            author=author,
+            model=model,
+            refs=refs,
+            levels=levels,
+            drawn_prefix=drawn_prefix,
+        )
+    except (trader_journal.TraderJournalError, mt4_bridge.Mt4BridgeError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "analysis": row}
+
+
+@mcp.tool()
+async def trader_analyses(ticket: int = 0, instrument: str = "", limit: int = 50) -> dict:
+    """List stored analyses for a ticket or a symbol (oldest first)."""
+    store = _trader_store()
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    rows = store.list_analyses(ticket=ticket or None, symbol=symbol, limit=limit)
+    return {"ok": True, "analyses": rows}
+
+
+@mcp.tool()
+async def mt4_replay_trade(
+    ticket: int, timeframe: str = "", with_analyses: bool = True
+) -> dict:
+    """Draw a journaled trade on the live MT4 chart for its symbol: linked
+    objects, entry/exit arrows, planned vs revised SL/TP, and stored analysis
+    levels, under ``sbox.replay.<ticket>.``. Display only; no orders."""
+    from app import trader_journal
+
+    try:
+        return trader_journal.replay(
+            _trader_store(), ticket, timeframe=timeframe, with_analyses=with_analyses
+        )
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def mt4_clear_replay(instrument: str, ticket: int = 0, timeframe: str = "") -> dict:
+    """Remove replay overlays (one ticket, or all ``sbox.replay.``) from the
+    live chart. Never touches your own objects."""
+    from app import trader_journal
+
+    return trader_journal.clear_replay(instrument, ticket or None, timeframe)
+
 if __name__ == "__main__":
     logger.info(
         "Starting oanda-research MCP server (env=%s, account_set=%s)",

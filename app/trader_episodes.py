@@ -144,18 +144,50 @@ def assemble_episode(
     }
 
 
-def sync_episodes(store: TraderStore, symbol: str, timeframe: str) -> list[str]:
-    """Create/update episodes for orders on this chart."""
+def sync_episodes(
+    store: TraderStore,
+    symbol: str,
+    timeframe: str,
+    *,
+    owned_tickets: set[int] | None = None,
+) -> list[str]:
+    """Create/update episodes for orders on this chart.
+
+    ``owned_tickets`` were opened on this chart (EA ``order_open`` event), so
+    the episode takes this chart's timeframe even if another folder saw it first.
+    """
     snap = store.latest_snapshot(symbol, timeframe)
     objects = freeze_objects(snap)
     created: list[str] = []
     for order in store.list_orders(symbol=symbol, include_closed=True):
-        at = int(order.get("open_time") or 0)
-        frozen_snap = store.latest_snapshot(symbol, timeframe, at_ts=at) or snap
-        frozen_objs = freeze_objects(frozen_snap) or objects
-        links = bind_objects(order, frozen_objs)
-        store.replace_links(int(order["ticket"]), links)
-        ep = assemble_episode(order, timeframe, frozen_snap, links)
+        ticket = int(order["ticket"])
+        manual = store.manual_links_for(ticket)
+        if manual:
+            # The trader chose these marks; the heuristic never overrides them.
+            ep = assemble_episode(order, timeframe, None, manual)
+            ep["snapshot_id"] = None
+        else:
+            at = int(order.get("open_time") or 0)
+            frozen_snap = store.latest_snapshot(symbol, timeframe, at_ts=at) or snap
+            frozen_objs = freeze_objects(frozen_snap) or objects
+            links = bind_objects(order, frozen_objs)
+            store.replace_links(ticket, links)
+            ep = assemble_episode(order, timeframe, frozen_snap, links)
+        existing = store.get_episode(ep["id"])
+        owned = ticket in (owned_tickets or set())
+        if existing and owned and existing.get("timeframe") != timeframe:
+            store.delete_review(ep["id"])  # re-score on the owning chart's bars
+        if existing and existing.get("timeframe") and not owned:
+            # Several chart folders carry the same account history; the
+            # episode keeps the timeframe of the chart that first saw it.
+            ep["timeframe"] = existing["timeframe"]
+            ep["brief"] = ep["brief"].replace(
+                f" {timeframe} ", f" {existing['timeframe']} ", 1
+            )
+        review = store.get_review(ep["id"])
+        if review and review.get("brief"):
+            # Re-syncs rebuild the brief; keep the review summary on it.
+            ep["brief"] = f"{ep['brief']} | {review['brief']}"
         store.upsert_episode(ep)
         created.append(ep["id"])
     return created

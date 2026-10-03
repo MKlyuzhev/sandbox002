@@ -30,6 +30,7 @@ REGIME_PREFIX = "sbox.regime."
 REGIME_WALK_PREFIX = "sbox.regime.walk."
 TICKET_PREFIX = "sbox.ticket."
 TICKET_WALK_PREFIX = "sbox.ticket.walk."
+REPLAY_PREFIX = "sbox.replay."
 WALK_SHOW_RANGES = "ranges"
 WALK_SHOW_MARKERS = "markers"
 WALK_SHOW_BOTH = "both"
@@ -64,7 +65,7 @@ TICKET_LABEL_X = 8
 TICKET_LABEL_Y = 170
 
 OBJECT_TYPES = frozenset(
-    {"trend", "hline", "vline", "text", "arrow", "rectangle", "label"}
+    {"trend", "hline", "vline", "text", "arrow", "rectangle", "label", "channel", "fibo"}
 )
 STYLE_NAMES = frozenset({"solid", "dash", "dot", "dashdot"})
 
@@ -423,16 +424,22 @@ def _normalize_object(obj: dict[str, Any], prefix: str) -> dict[str, Any]:
         "ray": bool(obj.get("ray", False)),
         "window": int(obj.get("window") or 0),
     }
-    for key in ("t1", "t2", "x", "y", "arrow_code"):
+    for key in ("t1", "t2", "t3", "x", "y", "arrow_code"):
         if obj.get(key) is not None:
             out[key] = int(obj[key])
-    for key in ("p1", "p2"):
+    for key in ("p1", "p2", "p3"):
         if obj.get(key) is not None:
             out[key] = float(obj[key])
     if obj.get("text") is not None:
         out["text"] = str(obj["text"])
     if otype in {"trend", "rectangle"} and ("t1" not in out or "p1" not in out):
         raise Mt4BridgeError(f"{otype} requires t1 and p1")
+    if otype == "fibo" and not all(k in out for k in ("t1", "p1", "t2", "p2")):
+        raise Mt4BridgeError("fibo requires t1, p1, t2 and p2")
+    if otype == "channel" and not all(
+        k in out for k in ("t1", "p1", "t2", "p2", "t3", "p3")
+    ):
+        raise Mt4BridgeError("channel requires t1, p1, t2, p2, t3 and p3")
     if otype == "hline" and "p1" not in out:
         raise Mt4BridgeError("hline requires p1")
     if otype == "vline" and "t1" not in out:
@@ -1275,6 +1282,244 @@ def apply_ticket(
     if broker_t is not None:
         result["at_time"] = broker_t
         result["time_label"] = time_label
+    return result
+
+
+# --- Trade replay (journal record -> chart) --------------------------------
+
+_CAPTURED_STYLE = {0: "solid", 1: "dash", 2: "dot", 3: "dashdot", 4: "dashdot"}
+# EA capture types the bridge can redraw 1:1.
+_REPLAYABLE_TYPES = {"trend", "hline", "vline", "text", "arrow", "rectangle", "channel", "fibo"}
+
+
+def mt4_color_hex(value: Any, default: str = "white") -> str:
+    """MT4 colour int (0x00BBGGRR) or name → ``#rrggbb`` / name for ``ParseColor``."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    try:
+        c = int(value)
+    except (TypeError, ValueError):
+        return default
+    if c < 0 or c > 0xFFFFFF:  # clrNONE / CLR_NONE
+        return default
+    r, g, b = c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _safe_name(name: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in name)[:48]
+
+
+def captured_to_bridge(
+    obj: dict[str, Any], prefix: str
+) -> dict[str, Any] | None:
+    """Convert an EA-captured chart object (chart.json) into an upsert object.
+
+    Times are already broker time. Returns None for types the EA cannot draw.
+    """
+    otype = str(obj.get("type") or "")
+    if otype not in _REPLAYABLE_TYPES:
+        return None
+    style = obj.get("style")
+    out: dict[str, Any] = {
+        "name": f"{prefix}{_safe_name(str(obj.get('name') or otype))}",
+        "type": otype,
+        "color": mt4_color_hex(obj.get("color")),
+        "style": _CAPTURED_STYLE.get(int(style), "solid")
+        if isinstance(style, (int, float))
+        else (str(style) if style in STYLE_NAMES else "solid"),
+        "width": int(obj.get("width") or 1),
+        "ray": bool(obj.get("ray", False)),
+    }
+    for key in ("t1", "t2", "t3", "p1", "p2", "p3", "arrow_code"):
+        if obj.get(key) not in (None, 0, 0.0):
+            out[key] = obj[key]
+    if otype != "channel":
+        out.pop("t3", None)
+        out.pop("p3", None)
+    text = obj.get("text")
+    if text:
+        out["text"] = str(text)
+    return out
+
+
+def replay_objects(
+    order: dict[str, Any],
+    linked: list[dict[str, Any]],
+    *,
+    revisions: list[dict[str, Any]] | None = None,
+    levels: list[list[dict[str, Any]]] | None = None,
+    prefix: str = REPLAY_PREFIX,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Objects that redraw a journaled trade: linked marks, entry/exit arrows,
+    planned vs revised SL/TP over the life of the trade, and stored analysis
+    levels. All times are broker time (as captured). Returns (objects, skipped).
+    """
+    ticket = int(order["ticket"])
+    base = f"{prefix}{ticket}."
+    out: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for obj in linked:
+        conv = captured_to_bridge(obj, f"{base}m.")
+        if conv is None:
+            skipped.append(f"{obj.get('name')} ({obj.get('type')})")
+        else:
+            out.append(conv)
+
+    short = str(order.get("type") or "").startswith("sell")
+    t_open = int(order.get("open_time") or 0)
+    t_close = int(order.get("close_time") or 0)
+    entry = float(order.get("open_price") or 0)
+    exit_px = float(order.get("close_price") or 0)
+    t_end = t_close or int(order.get("time_current") or 0) or t_open + 3600
+    if t_open and entry:
+        out.append(
+            {
+                "name": f"{base}entry",
+                "type": "arrow",
+                "t1": t_open,
+                "p1": entry,
+                "arrow_code": 242 if short else 241,
+                "color": "red" if short else "blue",
+                "width": 2,
+            }
+        )
+    if t_close and exit_px:
+        win = float(order.get("profit") or 0) >= 0
+        out.append(
+            {
+                "name": f"{base}exit",
+                "type": "arrow",
+                "t1": t_close,
+                "p1": exit_px,
+                "arrow_code": 252 if win else 251,
+                "color": "green" if win else "red",
+                "width": 2,
+            }
+        )
+        out.append(
+            {
+                "name": f"{base}path",
+                "type": "trend",
+                "t1": t_open,
+                "p1": entry,
+                "t2": t_close,
+                "p2": exit_px,
+                "color": "grey",
+                "style": "dot",
+            }
+        )
+
+    # SL/TP: planned level dashed from open until the first change, then
+    # each revision solid until the next one (or the close).
+    steps: list[tuple[int, float | None, float | None]] = []
+    if order.get("sl_open") or order.get("tp_open"):
+        steps.append((t_open, order.get("sl_open"), order.get("tp_open")))
+    for rev in revisions or []:
+        steps.append((max(int(rev["ts"]), t_open), rev.get("sl"), rev.get("tp")))
+    if not steps and (order.get("sl") or order.get("tp")):
+        steps.append((t_open, order.get("sl"), order.get("tp")))
+    steps.sort(key=lambda s: s[0])
+    for i, (ts, sl, tp) in enumerate(steps):
+        t_next = steps[i + 1][0] if i + 1 < len(steps) else t_end
+        if t_next <= ts:
+            continue
+        planned = i == 0
+        for kind, price, colour in (("sl", sl, "red"), ("tp", tp, "green")):
+            if not price:
+                continue
+            out.append(
+                {
+                    "name": f"{base}{kind}{i}",
+                    "type": "trend",
+                    "t1": ts,
+                    "p1": float(price),
+                    "t2": t_next,
+                    "p2": float(price),
+                    "color": colour,
+                    "style": "dash" if planned else "solid",
+                }
+            )
+
+    if t_open and entry:
+        pnl = order.get("profit")
+        label = f"#{ticket} {'SHORT' if short else 'LONG'} {order.get('lots') or ''}"
+        if pnl is not None and t_close:
+            label += f" P&L {float(pnl):+.2f}"
+        out.append(
+            {
+                "name": f"{base}label",
+                "type": "text",
+                "t1": t_open,
+                "p1": entry,
+                "text": label,
+                "color": "white",
+            }
+        )
+
+    for i, group in enumerate(levels or []):
+        for j, obj in enumerate(group):
+            item = dict(obj)
+            short_name = str(obj.get("name") or j).rsplit(".", 1)[-1]
+            item["name"] = f"{base}a{i}.{_safe_name(short_name)}"
+            out.append(item)
+    return out, skipped
+
+
+def live_chart_for(symbol: str, timeframe: str | None = None) -> dict[str, Any]:
+    """Pick the live EA chart for a symbol (any timeframe unless given)."""
+    want = map_symbol(symbol)
+    live = [
+        c
+        for c in _scan_charts()
+        if c.get("ea_ok") and str(c.get("symbol") or "").upper() == want
+    ]
+    if timeframe:
+        tf = map_timeframe(timeframe)[0]
+        live = [c for c in live if str(c.get("timeframe")) == tf]
+    if not live:
+        raise Mt4BridgeError(
+            f"No live SandboxChartBridge chart for {want}"
+            + (f" {timeframe}" if timeframe else "")
+            + "; attach the EA to a chart of that symbol."
+        )
+    if len(live) > 1 and not timeframe:
+        tfs = ", ".join(str(c.get("timeframe")) for c in live)
+        raise Mt4BridgeError(f"Several live {want} charts ({tfs}); pass timeframe.")
+    return live[0]
+
+
+def apply_replay(
+    order: dict[str, Any],
+    linked: list[dict[str, Any]],
+    *,
+    revisions: list[dict[str, Any]] | None = None,
+    levels: list[list[dict[str, Any]]] | None = None,
+    timeframe: str | None = None,
+) -> dict[str, Any]:
+    """Draw a journaled trade on the live chart for its symbol. Display only."""
+    symbol = str(order.get("symbol") or "")
+    try:
+        chart = live_chart_for(symbol, timeframe)
+    except Mt4BridgeError as exc:
+        return {"ok": False, "error": str(exc)}
+    prefix = f"{REPLAY_PREFIX}{int(order['ticket'])}."
+    objects, skipped = replay_objects(
+        order, linked, revisions=revisions, levels=levels, prefix=REPLAY_PREFIX
+    )
+    try:
+        result = upsert_objects(
+            symbol,
+            str(chart["timeframe"]),
+            objects,
+            prefix=prefix,
+            clear_prefix_first=True,
+        )
+    except Mt4BridgeError as exc:
+        return {"ok": False, "error": str(exc)}
+    result.pop("status", None)
+    result["skipped"] = skipped
+    result["timeframe"] = chart["timeframe"]
     return result
 
 

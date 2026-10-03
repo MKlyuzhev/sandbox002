@@ -94,7 +94,45 @@ CREATE TABLE IF NOT EXISTS events (
     seq INTEGER,
     UNIQUE (symbol, timeframe, seq)
 );
+CREATE TABLE IF NOT EXISTS order_revisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    sl REAL,
+    tp REAL,
+    source TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket INTEGER,
+    symbol TEXT NOT NULL,
+    timeframe TEXT,
+    kind TEXT NOT NULL,
+    author TEXT NOT NULL,
+    model TEXT,
+    created_ts INTEGER NOT NULL,
+    body_md TEXT NOT NULL,
+    refs_json TEXT,
+    levels_json TEXT,
+    drawn_prefix TEXT,
+    attach_reason TEXT
+);
 """
+
+ANALYSIS_KINDS = ("pre_trade", "in_trade", "post_trade", "chart_read")
+ANALYSIS_AUTHORS = ("claude", "user")
+# A pre-trade analysis written up to this long before a ticket opens is
+# attached to it automatically (same symbol, not already attached).
+ANALYSIS_ATTACH_WINDOW_SEC = 24 * 3600
+
+_LINK_EXTRAS = (("object_json", "TEXT"), ("source", "TEXT"), ("linked_ts", "INTEGER"))
+_ORDER_EXTRAS = (("utc_offset", "INTEGER"),)
+
+
+def _same(a: float | None, b: float | None) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    return abs(float(a) - float(b)) < 1e-9
 
 
 def _now_ts() -> int:
@@ -106,7 +144,23 @@ def _connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, extras in (("links", _LINK_EXTRAS), ("orders", _ORDER_EXTRAS)):
+        cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, typ in extras:
+            if name not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {typ}")
+
+
+def _analysis_row(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    data["refs"] = json.loads(data.pop("refs_json") or "[]")
+    data["levels"] = json.loads(data.pop("levels_json") or "[]")
+    return data
 
 
 class TraderStore:
@@ -154,26 +208,37 @@ class TraderStore:
             return None
         return dict(row)
 
-    def upsert_order(self, order: dict[str, Any], *, status: str) -> None:
+    def upsert_order(
+        self, order: dict[str, Any], *, status: str, utc_offset: int | None = None
+    ) -> bool:
+        """Insert or update a ticket. Returns True when the ticket is new.
+
+        ``sl_open``/``tp_open`` and ``utc_offset`` (broker − UTC seconds) are
+        kept from the first sighting.
+        """
         ticket = int(order["ticket"])
         with _connect(self.path) as conn:
             existing = conn.execute(
-                "SELECT sl_open, tp_open FROM orders WHERE ticket=?", (ticket,)
+                "SELECT sl_open, tp_open, utc_offset FROM orders WHERE ticket=?",
+                (ticket,),
             ).fetchone()
             sl_open = existing["sl_open"] if existing else order.get("sl")
             tp_open = existing["tp_open"] if existing else order.get("tp")
+            if existing and existing["utc_offset"] is not None:
+                utc_offset = existing["utc_offset"]
             conn.execute(
                 """
                 INSERT INTO orders (
                     ticket, symbol, type, lots, open_price, open_time,
                     sl, tp, magic, comment, close_price, close_time,
-                    profit, swap, commission, sl_open, tp_open, status
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    profit, swap, commission, sl_open, tp_open, status, utc_offset
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(ticket) DO UPDATE SET
                     sl=excluded.sl, tp=excluded.tp, lots=excluded.lots,
                     close_price=excluded.close_price, close_time=excluded.close_time,
                     profit=excluded.profit, swap=excluded.swap,
-                    commission=excluded.commission, status=excluded.status
+                    commission=excluded.commission, status=excluded.status,
+                    utc_offset=excluded.utc_offset
                 """,
                 (
                     ticket,
@@ -194,7 +259,18 @@ class TraderStore:
                     sl_open,
                     tp_open,
                     status,
+                    utc_offset,
                 ),
+            )
+            conn.commit()
+        return existing is None
+
+    def set_open_levels(self, ticket: int, sl_open: float | None, tp_open: float | None) -> None:
+        """Correct the planned SL/TP (e.g. seeded from a known first value)."""
+        with _connect(self.path) as conn:
+            conn.execute(
+                "UPDATE orders SET sl_open=?, tp_open=? WHERE ticket=?",
+                (sl_open, tp_open, ticket),
             )
             conn.commit()
 
@@ -224,24 +300,116 @@ class TraderStore:
         return [dict(r) for r in rows]
 
     def replace_links(self, ticket: int, links: list[dict[str, Any]]) -> None:
+        """Replace heuristic (``auto``) links. Manual links are never touched."""
+        now = _now_ts()
         with _connect(self.path) as conn:
-            conn.execute("DELETE FROM links WHERE ticket=?", (ticket,))
+            conn.execute(
+                "DELETE FROM links WHERE ticket=? AND COALESCE(source,'auto')='auto'",
+                (ticket,),
+            )
             for link in links:
+                obj = link.get("object")
                 conn.execute(
-                    "INSERT INTO links (ticket, object_name, role, reason) VALUES (?,?,?,?)",
+                    """
+                    INSERT INTO links
+                    (ticket, object_name, role, reason, object_json, source, linked_ts)
+                    VALUES (?,?,?,?,?,'auto',?)
+                    """,
                     (
                         ticket,
                         link.get("object_name"),
                         link.get("role"),
                         link.get("reason"),
+                        json.dumps(obj, default=str) if obj else None,
+                        now,
                     ),
                 )
+            conn.commit()
+
+    def set_manual_links(self, ticket: int, objects: list[dict[str, Any]]) -> None:
+        """Link exactly these objects (frozen geometry) to a ticket.
+
+        Replaces every link for the ticket, auto and manual, and drops the
+        review so the next sync re-scores against the linked set.
+        """
+        now = _now_ts()
+        with _connect(self.path) as conn:
+            conn.execute("DELETE FROM links WHERE ticket=?", (ticket,))
+            for obj in objects:
+                conn.execute(
+                    """
+                    INSERT INTO links
+                    (ticket, object_name, role, reason, object_json, source, linked_ts)
+                    VALUES (?,?,?,'selected',?, 'manual', ?)
+                    """,
+                    (
+                        ticket,
+                        obj.get("name"),
+                        obj.get("role") or "unknown",
+                        json.dumps(obj, default=str),
+                        now,
+                    ),
+                )
+            conn.execute(
+                "DELETE FROM reviews WHERE episode_id IN "
+                "(SELECT id FROM episodes WHERE ticket=?)",
+                (ticket,),
+            )
             conn.commit()
 
     def links_for(self, ticket: int) -> list[dict[str, Any]]:
         with _connect(self.path) as conn:
             rows = conn.execute(
-                "SELECT * FROM links WHERE ticket=?", (ticket,)
+                "SELECT * FROM links WHERE ticket=? ORDER BY id", (ticket,)
+            ).fetchall()
+        out = []
+        for row in rows:
+            data = dict(row)
+            raw = data.pop("object_json", None)
+            data["object"] = json.loads(raw) if raw else None
+            data["source"] = data.get("source") or "auto"
+            out.append(data)
+        return out
+
+    def manual_links_for(self, ticket: int) -> list[dict[str, Any]]:
+        return [link for link in self.links_for(ticket) if link["source"] == "manual"]
+
+    def add_revision(
+        self, ticket: int, ts: int, sl: float | None, tp: float | None, source: str
+    ) -> bool:
+        """Append an SL/TP revision (``ts`` in broker time).
+
+        Skipped when the revision in force at ``ts`` already has these values,
+        or when the identical row exists (events.jsonl is re-read every sync).
+        """
+        with _connect(self.path) as conn:
+            prev = conn.execute(
+                """
+                SELECT sl, tp FROM order_revisions
+                WHERE ticket=? AND ts<=? ORDER BY ts DESC, id DESC LIMIT 1
+                """,
+                (ticket, ts),
+            ).fetchone()
+            if prev and _same(prev["sl"], sl) and _same(prev["tp"], tp):
+                return False
+            dup = conn.execute(
+                "SELECT 1 FROM order_revisions WHERE ticket=? AND ts=? AND sl IS ? AND tp IS ?",
+                (ticket, ts, sl, tp),
+            ).fetchone()
+            if dup:
+                return False
+            conn.execute(
+                "INSERT INTO order_revisions (ticket, ts, sl, tp, source) VALUES (?,?,?,?,?)",
+                (ticket, ts, sl, tp, source),
+            )
+            conn.commit()
+        return True
+
+    def revisions_for(self, ticket: int) -> list[dict[str, Any]]:
+        with _connect(self.path) as conn:
+            rows = conn.execute(
+                "SELECT * FROM order_revisions WHERE ticket=? ORDER BY ts, id",
+                (ticket,),
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -254,6 +422,7 @@ class TraderStore:
                     snapshot_id, objects_json, brief
                 ) VALUES (?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET
+                    timeframe=excluded.timeframe,
                     close_time=excluded.close_time,
                     objects_json=excluded.objects_json,
                     brief=excluded.brief,
@@ -453,3 +622,144 @@ class TraderStore:
                 except sqlite3.Error:
                     continue
             conn.commit()
+
+    def delete_review(self, episode_id: str) -> None:
+        with _connect(self.path) as conn:
+            conn.execute("DELETE FROM reviews WHERE episode_id=?", (episode_id,))
+            conn.commit()
+
+    def add_analysis(
+        self,
+        *,
+        symbol: str,
+        kind: str,
+        body_md: str,
+        author: str = "claude",
+        timeframe: str = "",
+        ticket: int | None = None,
+        model: str = "",
+        refs: list[str] | None = None,
+        levels: list[dict[str, Any]] | None = None,
+        drawn_prefix: str = "",
+        created_ts: int | None = None,
+    ) -> dict[str, Any]:
+        """Store an analysis verbatim. It never changes code-owned review scores."""
+        if kind not in ANALYSIS_KINDS:
+            raise ValueError(f"kind must be one of {ANALYSIS_KINDS}")
+        if author not in ANALYSIS_AUTHORS:
+            raise ValueError(f"author must be one of {ANALYSIS_AUTHORS}")
+        if not (body_md or "").strip():
+            raise ValueError("body_md is empty")
+        with _connect(self.path) as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO analyses (
+                    ticket, symbol, timeframe, kind, author, model, created_ts,
+                    body_md, refs_json, levels_json, drawn_prefix, attach_reason
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    ticket,
+                    symbol,
+                    timeframe,
+                    kind,
+                    author,
+                    model or None,
+                    created_ts or _now_ts(),
+                    body_md,
+                    json.dumps(refs or []),
+                    json.dumps(levels or [], default=str),
+                    drawn_prefix or None,
+                    "explicit" if ticket else None,
+                ),
+            )
+            conn.commit()
+            analysis_id = int(cur.lastrowid)
+        found = self.get_analysis(analysis_id)
+        assert found is not None
+        return found
+
+    def get_analysis(self, analysis_id: int) -> dict[str, Any] | None:
+        with _connect(self.path) as conn:
+            row = conn.execute(
+                "SELECT * FROM analyses WHERE id=?", (analysis_id,)
+            ).fetchone()
+        return _analysis_row(row) if row else None
+
+    def attach_analysis(self, analysis_id: int, ticket: int, reason: str = "explicit") -> None:
+        with _connect(self.path) as conn:
+            conn.execute(
+                "UPDATE analyses SET ticket=?, attach_reason=? WHERE id=?",
+                (ticket, reason, analysis_id),
+            )
+            conn.commit()
+
+    def attach_recent_analyses(self, ticket: int, symbol: str, open_ts: int) -> list[int]:
+        """Attach unattached pre-trade analyses written shortly before a new ticket.
+
+        ``open_ts`` must be on the same clock as ``created_ts`` (UTC).
+        """
+        with _connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id FROM analyses
+                WHERE ticket IS NULL AND symbol=? AND kind='pre_trade'
+                  AND created_ts BETWEEN ? AND ?
+                """,
+                (symbol, open_ts - ANALYSIS_ATTACH_WINDOW_SEC, open_ts),
+            ).fetchall()
+            ids = [int(r["id"]) for r in rows]
+            for aid in ids:
+                conn.execute(
+                    "UPDATE analyses SET ticket=?, attach_reason='auto_window' WHERE id=?",
+                    (ticket, aid),
+                )
+            conn.commit()
+        return ids
+
+    def list_analyses(
+        self,
+        *,
+        ticket: int | None = None,
+        symbol: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM analyses"
+        clauses: list[str] = []
+        args: list[Any] = []
+        if ticket is not None:
+            clauses.append("ticket=?")
+            args.append(ticket)
+        if symbol:
+            clauses.append("symbol=?")
+            args.append(symbol)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY created_ts, id LIMIT ?"
+        args.append(max(1, min(int(limit), 500)))
+        with _connect(self.path) as conn:
+            rows = conn.execute(sql, args).fetchall()
+        return [_analysis_row(r) for r in rows]
+
+    def get_record(self, ticket: int) -> dict[str, Any] | None:
+        """Everything journaled for one ticket."""
+        order = self.get_order(ticket)
+        if order is None:
+            return None
+        with _connect(self.path) as conn:
+            ep_row = conn.execute(
+                "SELECT * FROM episodes WHERE ticket=? ORDER BY rowid DESC LIMIT 1",
+                (ticket,),
+            ).fetchone()
+        episode = dict(ep_row) if ep_row else None
+        review = self.get_review(episode["id"]) if episode else None
+        if episode is not None:
+            episode.pop("objects_json", None)
+        return {
+            "order": order,
+            "revisions": self.revisions_for(ticket),
+            "links": self.links_for(ticket),
+            "episode": episode,
+            "review": review,
+            "analyses": self.list_analyses(ticket=ticket, limit=500),
+        }
