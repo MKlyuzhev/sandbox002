@@ -4,7 +4,8 @@ Capture MT4 chart marks, orders, and results; score closed trades against
 **the trader's own marks**; retrieve books at **equal rank**. Lien engines are
 opt-in. Research only; this path does not place, modify, or close orders.
 
-Related: [Agent planner](AGENT_PLANNER.md), [Agent orchestrator](AGENT_ORCHESTRATOR.md).
+Related: [Agent planner](AGENT_PLANNER.md), [Agent orchestrator](AGENT_ORCHESTRATOR.md),
+[Multi-timeframe channel analysis](MTF_CHANNEL_ANALYSIS.md) (the W1 grid read).
 
 ---
 
