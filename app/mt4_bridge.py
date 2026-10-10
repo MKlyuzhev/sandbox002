@@ -410,7 +410,16 @@ def _normalize_object(obj: dict[str, Any], prefix: str) -> dict[str, Any]:
     name = str(obj.get("name") or "").strip()
     if not name:
         raise Mt4BridgeError("object is missing 'name'")
-    if prefix and not name.startswith(prefix):
+    # Editable objects are the trader's own drawings: selectable, listed,
+    # captured into chart.json, and never replaced once on the chart. They
+    # keep their name, since capture skips anything under ``sbox.``.
+    editable = bool(obj.get("editable", False))
+    if editable:
+        if name.startswith(DEFAULT_PREFIX):
+            raise Mt4BridgeError(
+                f"editable object '{name}' must not start with '{DEFAULT_PREFIX}'"
+            )
+    elif prefix and not name.startswith(prefix):
         name = f"{prefix}{name}"
     style = str(obj.get("style") or "solid").strip().lower()
     if style not in STYLE_NAMES:
@@ -424,6 +433,8 @@ def _normalize_object(obj: dict[str, Any], prefix: str) -> dict[str, Any]:
         "ray": bool(obj.get("ray", False)),
         "window": int(obj.get("window") or 0),
     }
+    if editable:
+        out["editable"] = True
     for key in ("t1", "t2", "t3", "x", "y", "arrow_code"):
         if obj.get(key) is not None:
             out[key] = int(obj[key])
