@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -15,11 +16,37 @@ from fastapi.staticfiles import StaticFiles
 from agent.journal import Journal
 from agent.paper_walk import summarize_equity
 from agent.schema import RunRecord
-from app import mt4_bridge, ollama_client
+from app import mt4_bridge, ollama_client, trader_journal
+from app.trader_store import TraderStore
 from dashboard import gpu as gpu_mod
 from dashboard.jobs import JobError, JobManager, JobSpec, build_argv, job_schema
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+TRADER_SYNC_SEC = 5.0
+
+logger = logging.getLogger("dashboard")
+
+
+async def _trader_sync_loop(app: FastAPI) -> None:
+    """Keep the trader journal current while an EA is live (SL/TP revisions
+    are only visible to a poller)."""
+    from agent.trader_sync import sync_all
+
+    while True:
+        try:
+            if mt4_bridge.status().get("ea_ok"):
+                await sync_all(_trader_store_app(app), review=True)
+        except Exception:  # keep polling; one bad outbox file must not stop it
+            logger.exception("trader sync failed")
+        await asyncio.sleep(TRADER_SYNC_SEC)
+
+
+def _trader_store_app(app: FastAPI) -> TraderStore:
+    store = getattr(app.state, "trader_store", None)
+    if store is None:
+        store = TraderStore()
+        app.state.trader_store = store
+    return store
 
 
 @asynccontextmanager
@@ -28,7 +55,11 @@ async def lifespan(app: FastAPI):
         app.state.journal = Journal()
     if not getattr(app.state, "jobs", None):
         app.state.jobs = JobManager()
-    yield
+    sync_task = asyncio.create_task(_trader_sync_loop(app))
+    try:
+        yield
+    finally:
+        sync_task.cancel()
 
 
 app = FastAPI(
@@ -165,6 +196,64 @@ async def get_run(run_id: str, request: Request) -> dict:
     fill = _journal(request).get_fill(run_id)
     payload["fill"] = None if fill is None else fill.model_dump(mode="json")
     return payload
+
+
+def _trader(request: Request) -> TraderStore:
+    return _trader_store_app(request.app)
+
+
+def _journal_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+@app.get("/api/trader/trades")
+async def trader_trades(request: Request, symbol: str | None = None) -> dict:
+    sym = mt4_bridge.map_symbol(symbol) if symbol else None
+    return {"trades": trader_journal.trade_summaries(_trader(request), sym)}
+
+
+@app.get("/api/trader/trades/{ticket}")
+async def trader_trade(ticket: int, request: Request) -> dict:
+    try:
+        return trader_journal.record(_trader(request), ticket)
+    except trader_journal.TraderJournalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/trader/trades/{ticket}/link")
+async def trader_link(ticket: int, request: Request) -> dict:
+    store = _trader(request)
+    order = store.get_order(ticket)
+    if order is None:
+        raise HTTPException(status_code=404, detail=f"ticket {ticket} not found")
+    try:
+        chart = mt4_bridge.live_chart_for(str(order["symbol"]))
+        return trader_journal.link_selected(
+            store, str(order["symbol"]), str(chart["timeframe"]), ticket
+        )
+    except (trader_journal.TraderJournalError, mt4_bridge.Mt4BridgeError) as exc:
+        raise _journal_error(exc) from exc
+
+
+@app.post("/api/trader/trades/{ticket}/draw")
+async def trader_draw(ticket: int, request: Request, analyses: bool = True) -> dict:
+    try:
+        result = trader_journal.replay(_trader(request), ticket, with_analyses=analyses)
+    except trader_journal.TraderJournalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not result.get("ok"):
+        raise HTTPException(status_code=409, detail=result.get("error") or "draw failed")
+    return result
+
+
+@app.post("/api/trader/replay/clear")
+async def trader_clear(
+    request: Request, symbol: str, ticket: int | None = None
+) -> dict:
+    result = trader_journal.clear_replay(symbol, ticket)
+    if not result.get("ok"):
+        raise HTTPException(status_code=409, detail=result.get("error") or "clear failed")
+    return result
 
 
 @app.get("/api/jobs/schema")

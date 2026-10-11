@@ -280,6 +280,7 @@
       btn.classList.add("active");
       $("tab-" + btn.dataset.tab).classList.add("active");
       if (btn.dataset.tab === "journal") loadJournal();
+      if (btn.dataset.tab === "trades") loadTrades();
     });
   });
 
@@ -336,6 +337,121 @@
       tb.innerHTML = "<tr><td colspan=\"12\">journal load failed</td></tr>";
     }
   }
+
+  let selectedTrade = null;
+
+  function esc(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function fmtUnix(ts) {
+    if (!ts) return "—";
+    return new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 16);
+  }
+
+  async function jpost(path) {
+    const res = await fetch(path, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || (path + " " + res.status));
+    return body;
+  }
+
+  function tradeMsg(text, bad) {
+    const el = $("trade-msg");
+    el.textContent = text || "";
+    el.className = "hint" + (bad ? " bad" : "");
+  }
+
+  async function showTrade(ticket) {
+    selectedTrade = ticket;
+    $("trade-actions").hidden = false;
+    const rec = await jget("/api/trader/trades/" + ticket);
+    const o = rec.order || {};
+    const revs = (rec.revisions || []).map((r) =>
+      fmtUnix(r.ts) + "  SL " + (r.sl ?? "—") + "  TP " + (r.tp ?? "—") + "  (" + r.source + ")"
+    );
+    const links = (rec.links || []).map((l) =>
+      l.object_name + " — " + (l.object ? l.object.type : "?") + ", " + l.source + " (" + (l.reason || "") + ")"
+    );
+    const analyses = (rec.analyses || []).map((a) =>
+      "<div class=\"analysis\"><h4>#" + a.id + " " + esc(a.kind) + " — " + esc(a.author) +
+      " — " + fmtUnix(a.created_ts) + " UTC" +
+      (a.levels && a.levels.length ? " — " + a.levels.length + " levels" : "") +
+      "</h4><pre>" + esc(a.body_md) + "</pre></div>"
+    ).join("");
+    $("trade-detail").innerHTML =
+      "<h3>#" + o.ticket + " " + esc(o.symbol) + " " + esc(o.type) + " " + (o.lots ?? "") + "</h3>" +
+      "<pre>open  " + fmtUnix(o.open_time) + " (broker)  @ " + o.open_price +
+      "\nclose " + fmtUnix(o.close_time) + " (broker)  @ " + (o.close_price ?? "—") +
+      "\nplanned SL " + (o.sl_open ?? "—") + "  TP " + (o.tp_open ?? "—") +
+      "\nfinal   SL " + (o.sl ?? "—") + "  TP " + (o.tp ?? "—") +
+      "\nP&L " + (o.profit ?? "—") + "   status " + esc(o.status) + "</pre>" +
+      "<h3>SL/TP revisions</h3><pre>" + (revs.join("\n") || "none recorded") + "</pre>" +
+      "<h3>Linked objects</h3><pre>" + esc(links.join("\n") || "none — select lines in MT4, then Link") + "</pre>" +
+      pane("Review (code-scored)", rec.review) +
+      "<h3>Analyses</h3>" + (analyses || "<pre>none</pre>");
+  }
+
+  async function loadTrades() {
+    const tb = document.querySelector("#trades-table tbody");
+    if (!tb) return;
+    try {
+      const data = await jget("/api/trader/trades");
+      tb.innerHTML = "";
+      (data.trades || []).forEach((t) => {
+        const tr = document.createElement("tr");
+        if (t.ticket === selectedTrade) tr.className = "sel";
+        const scores = [t.model_fit, t.entry_quality, t.exit_quality]
+          .map((x) => (x == null ? "—" : fmtN(x, 2))).join(" / ");
+        tr.innerHTML =
+          "<td>" + t.ticket + "</td>" +
+          "<td>" + esc(t.symbol) + " " + esc(t.timeframe || "") + "</td>" +
+          "<td>" + esc(t.side) + "</td>" +
+          "<td>" + fmtUnix(t.open_time) + "</td>" +
+          "<td>" + (t.open_price ?? "") + "</td>" +
+          "<td>" + (t.close_price ?? "") + "</td>" +
+          "<td>" + fmtN(t.profit, 2) + "</td>" +
+          "<td>" + (t.linked || "") + "</td>" +
+          "<td>" + (t.analyses || "") + "</td>" +
+          "<td>" + scores + "</td>";
+        tr.addEventListener("click", () => { showTrade(t.ticket); loadTrades(); });
+        tb.appendChild(tr);
+      });
+    } catch (err) {
+      tb.innerHTML = "<tr><td colspan=\"10\">trades load failed</td></tr>";
+    }
+  }
+
+  $("btn-trade-link").addEventListener("click", async () => {
+    if (!selectedTrade) return;
+    try {
+      const r = await jpost("/api/trader/trades/" + selectedTrade + "/link");
+      tradeMsg("Linked: " + (r.linked || []).join(", "));
+      showTrade(selectedTrade);
+      loadTrades();
+    } catch (err) { tradeMsg(err.message, true); }
+  });
+
+  $("btn-trade-draw").addEventListener("click", async () => {
+    if (!selectedTrade) return;
+    const lv = $("chk-trade-levels").checked ? "true" : "false";
+    try {
+      const r = await jpost("/api/trader/trades/" + selectedTrade + "/draw?analyses=" + lv);
+      tradeMsg("Drawn " + r.objects_written + " objects on " + r.timeframe +
+        (r.skipped && r.skipped.length ? "; skipped: " + r.skipped.join(", ") : ""));
+    } catch (err) { tradeMsg(err.message, true); }
+  });
+
+  $("btn-trade-clear").addEventListener("click", async () => {
+    if (!selectedTrade) return;
+    const rec = await jget("/api/trader/trades/" + selectedTrade);
+    try {
+      await jpost("/api/trader/replay/clear?symbol=" + encodeURIComponent(rec.order.symbol) +
+        "&ticket=" + selectedTrade);
+      tradeMsg("Replay cleared.");
+    } catch (err) { tradeMsg(err.message, true); }
+  });
 
   function bar(pct) {
     const n = Math.max(0, Math.min(100, Number(pct) || 0));

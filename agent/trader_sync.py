@@ -13,7 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from app import trader_episodes, trader_outbox, trader_review
+from app import mt4_bridge, trader_episodes, trader_outbox, trader_review
 from app.trader_store import DEFAULT_DB_PATH, TraderStore
 
 FetchBarsFn = Callable[[str, str, int, int], Any]
@@ -32,17 +32,53 @@ async def _default_fetch_bars(
         )
 
     gran = trader_outbox.oanda_granularity(granularity)
+    now = int(datetime.now(timezone.utc).timestamp())
     payload = await oanda_client.get_candles(
         instrument,
         granularity=gran,
+        count=None,  # from+to window; count would make OANDA reject it
         from_time=_rfc(max(0, from_ts - 3600)),
-        to_time=_rfc(to_ts + 3600 * 24),
+        to_time=_rfc(min(to_ts + 3600 * 24, now)),  # OANDA rejects future 'to'
         price="M",
     )
     return oanda_client.candles_to_bars(payload, prefer="mid")
 
 
-def sync_chart_dir(store: TraderStore, chart_dir: Path) -> dict[str, Any]:
+ORDER_EVENT_KINDS = ("order_open", "order_modify", "order_close")
+
+
+def _heartbeat(chart_dir: Path) -> dict[str, Any] | None:
+    return mt4_bridge._load_heartbeat(chart_dir / mt4_bridge.HEARTBEAT_NAME)
+
+
+def _heartbeat_mtime(chart_dir: Path) -> float:
+    try:
+        return (chart_dir / mt4_bridge.HEARTBEAT_NAME).stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _float_or_none(value: Any) -> float | None:
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
+def to_broker_time(bar: dict[str, Any], offset: int) -> dict[str, Any]:
+    """Shift a UTC OANDA bar onto the broker clock used by orders and marks."""
+    out = dict(bar)
+    ts = trader_review._unix(bar.get("time"))
+    out["time"] = ts + offset if ts else bar.get("time")
+    return out
+
+
+def sync_chart_dir(
+    store: TraderStore, chart_dir: Path, *, live: bool | None = None
+) -> dict[str, Any]:
+    """Upsert one chart folder. ``live`` (fresh heartbeat) gates SL/TP polling:
+    a stale folder's orders.json must not add revisions."""
     chart = trader_outbox.load_chart(chart_dir)
     symbol = str(chart.get("symbol") or chart_dir.name.split("_")[0])
     timeframe = str(chart.get("timeframe") or "")
@@ -58,21 +94,60 @@ def sync_chart_dir(store: TraderStore, chart_dir: Path) -> dict[str, Any]:
     snap_id = store.upsert_snapshot(symbol, timeframe, ts, objects)
     events = trader_outbox.load_events(chart_dir / "events.jsonl")
     store.append_events(symbol, timeframe, events)
+    hb = _heartbeat(chart_dir)
+    offset = mt4_bridge.offset_from_heartbeat(hb) if hb else None
+    if live is None:
+        age = mt4_bridge.heartbeat_age_sec(chart_dir / mt4_bridge.HEARTBEAT_NAME)
+        live = age is not None and age <= mt4_bridge.HEARTBEAT_STALE_SEC
 
-    live = trader_outbox.load_orders(chart_dir, history=False)
-    for order in live.get("orders") or []:
-        store.upsert_order(order, status="open")
+    order_events = sorted(
+        (e for e in events if e.get("kind") in ORDER_EVENT_KINDS and e.get("ticket")),
+        key=lambda e: (int(e.get("ts") or 0), int(e.get("seq") or 0)),
+    )
+    opened_here = {int(e["ticket"]) for e in order_events if e["kind"] == "order_open"}
+
+    live_orders = trader_outbox.load_orders(chart_dir, history=False)
     hist = trader_outbox.load_orders(chart_dir, history=True)
-    for order in hist.get("orders") or []:
-        store.upsert_order(order, status="closed")
+    new_tickets: list[int] = []
+    for order, status in [(o, "open") for o in live_orders.get("orders") or []] + [
+        (o, "closed") for o in hist.get("orders") or []
+    ]:
+        if store.upsert_order(order, status=status, utc_offset=offset):
+            new_tickets.append(int(order["ticket"]))
+        if live and status == "open":
+            store.add_revision(
+                int(order["ticket"]),
+                ts or int(order.get("open_time") or 0),
+                _float_or_none(order.get("sl")),
+                _float_or_none(order.get("tp")),
+                "poll",
+            )
 
-    ids = trader_episodes.sync_episodes(store, symbol, timeframe)
+    for ev in order_events:
+        ticket = int(ev["ticket"])
+        if store.get_order(ticket) is None:
+            continue
+        sl, tp = _float_or_none(ev.get("sl")), _float_or_none(ev.get("tp"))
+        if ev["kind"] == "order_open":
+            store.set_open_levels(ticket, sl, tp)
+        store.add_revision(ticket, int(ev.get("ts") or 0), sl, tp, "event")
+
+    for ticket in new_tickets:
+        order = store.get_order(ticket) or {}
+        open_utc = int(order.get("open_time") or 0) - int(order.get("utc_offset") or 0)
+        store.attach_recent_analyses(ticket, symbol, open_utc)
+
+    ids = trader_episodes.sync_episodes(
+        store, symbol, timeframe, owned_tickets=opened_here
+    )
     return {
         "symbol": symbol,
         "timeframe": timeframe,
         "snapshot_id": snap_id,
         "episodes": ids,
         "objects": len(objects),
+        "live": live,
+        "new_tickets": new_tickets,
     }
 
 
@@ -91,11 +166,14 @@ async def review_pending(
         if not order:
             continue
         objects = trader_episodes.freeze_objects(ep)
+        # Orders and marks are in broker time; OANDA bars are UTC.
+        offset = int(order.get("utc_offset") or 0)
         bars = (bars_by_episode or {}).get(ep["id"])
+        fetch_error: str | None = None
         if bars is None:
             instrument = trader_outbox.oanda_instrument(str(ep["symbol"]))
-            open_ts = int(ep.get("open_time") or 0)
-            close_ts = int(ep.get("close_time") or open_ts)
+            open_ts = int(ep.get("open_time") or 0) - offset
+            close_ts = (int(ep.get("close_time") or 0) - offset) if ep.get("close_time") else open_ts
             try:
                 bars = await fetcher(
                     instrument,
@@ -103,9 +181,13 @@ async def review_pending(
                     open_ts,
                     close_ts + 3600 * 24,
                 )
-            except Exception:
+            except Exception as exc:  # score without bars, but say why
                 bars = []
+                fetch_error = f"{type(exc).__name__}: {exc}"
+            bars = [to_broker_time(b, offset) for b in bars]
         review = trader_review.review_trade(order=order, objects=objects, bars=bars)
+        if fetch_error:
+            review["diagnostics"]["bars_error"] = fetch_error
         review["episode_id"] = ep["id"]
         store.upsert_review(review)
         brief = f"{ep.get('brief') or ''} | {review['brief']}"
@@ -124,7 +206,9 @@ async def sync_all(
     review: bool = True,
 ) -> dict[str, Any]:
     charts = []
-    for path in trader_outbox.iter_chart_dirs(files_dir):
+    # Oldest outbox first: every chart folder carries the account's orders,
+    # and the most recently written one must win.
+    for path in sorted(trader_outbox.iter_chart_dirs(files_dir), key=_heartbeat_mtime):
         charts.append(sync_chart_dir(store, path))
     reviewed: list[str] = []
     if review:

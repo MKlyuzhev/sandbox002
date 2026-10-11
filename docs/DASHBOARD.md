@@ -36,7 +36,7 @@ reachability and resident tags, GPU memory/util, optional MT4 heartbeat age.
 
 ## 2. First slice (implemented)
 
-Tabs: **Terminal** | **Journal** | **GPU**.
+Tabs: **Terminal** | **Journal** | **Trades** | **GPU**.
 
 ### Terminal (command runner)
 
@@ -75,6 +75,24 @@ Detail panes: walk equity (when `walk_id` is set), regime, proposal, fill
 exit, policy, tool_trace. Source: `Journal.list_runs` / `get_run` / `get_fill`
 / `GET /api/journal/walks/{walk_id}`. Equity figures are simulated (compound
 `pnl = equity * risk_fraction * R`); not broker P&L.
+
+### Trades (MT4 trader journal)
+
+Your MT4 tickets from `data/journal/trader.sqlite`: side, entry/exit, P&L,
+number of linked objects and analyses, and code-scored review
+(model fit / entry / exit). Clicking a ticket shows the planned vs final
+SL/TP, the SL/TP revision timeline, linked objects, the review, and stored
+analyses. Buttons:
+
+- **Link selected in MT4**: select the lines on the chart first (click,
+  Ctrl+click for more). Their geometry is frozen onto the ticket.
+- **Draw on MT4**: replays the ticket on the live chart for its symbol under
+  `sbox.replay.<ticket>.` (optionally with the analyses' levels).
+- **Clear replay**: removes that ticket's replay objects.
+
+While the dashboard runs, a background task syncs the MT4 outbox into the
+trader journal every 5 s whenever an EA heartbeat is live. See
+[Trader knowledge](TRADER_KNOWLEDGE.md) §3a. No orders.
 
 ### GPU / host
 

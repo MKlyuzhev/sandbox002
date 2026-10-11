@@ -754,6 +754,175 @@ async def entry_lien(
     )
 
 
+async def _mtf_bars(instrument: str, timeframe: str = "W1") -> dict:
+    from app import mtf_channel
+
+    return await mtf_channel.load_bars(instrument, timeframe)
+
+
+def _mtf_chart_objects(instrument: str, timeframe: str = "W1") -> list[dict]:
+    from app import trader_outbox
+
+    ok, reason = mt4_bridge.check_chart(instrument, timeframe)
+    if not ok:
+        raise mt4_bridge.Mt4BridgeError(reason)
+    return trader_outbox.load_chart(mt4_bridge.chart_dir(instrument, timeframe)).get("objects") or []
+
+
+def _mtf_fetch_info(data: dict) -> dict:
+    out = {"oanda_bars_added": data["oanda_bars_added"]}
+    if "oanda_weeks_added" in data:
+        out["oanda_weeks_added"] = data["oanda_weeks_added"]
+    return out
+
+
+@mcp.tool()
+async def mtf_channel_propose(instrument: str, timeframe: str = "W1") -> dict:
+    """Propose trend channels for the MTF grid (docs/MTF_CHANNEL_ANALYSIS.md).
+
+    ``timeframe``: ``W1`` (step 1, 20-year origin), ``D1`` (step 2) or ``H1``
+    (step 3). D1 channels follow the movements inside the W1 channel, H1
+    channels those inside the current D1 leg's channel: legs cut by reversals
+    of one parent air band (20% of the parent's width), with a proposal for
+    the ``previous`` (last completed) and ``current`` leg, each run on that
+    leg's bars. Code picks the trend origin and anchored rail, then ranks
+    candidate widths for the opposite rail (swings sitting on it, closes
+    beyond it). Candidate 0 is the default; ``extreme`` is the no-overshoot
+    width. Choosing among them is the trader's call: report the candidates, do
+    not invent anchors. Read-only (.hst + OANDA bid bars).
+    """
+    from app import mtf_channel
+
+    try:
+        tf = mtf_channel.get_tf(timeframe)
+        data = await _mtf_bars(instrument, tf.name)
+        if tf.origin == "legs":
+            proposal = await mtf_channel.leg_proposals_for(instrument, tf, data["bars"])
+        else:
+            proposal = mtf_channel.propose_channel(data["bars"], tf)
+    except (mtf_channel.ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "instrument": instrument, "timeframe": tf.name, **proposal,
+            **_mtf_fetch_info(data), "note": data["note"]}
+
+
+@mcp.tool()
+async def mt4_draw_mtf_grid(
+    instrument: str,
+    candidate: int = 0,
+    timeframe: str = "W1",
+    leg: str = "both",
+    previous_candidate: int = 0,
+) -> dict:
+    """Draw a proposed grid (channel, center, two dotted air lines) on MT4.
+
+    ``timeframe`` is ``W1``, ``D1`` or ``H1``. Needs SandboxChartBridge on the
+    instrument's chart of that timeframe. Lines are the trader's editable
+    objects (``Channel <SYM> W1``, ``Trendline <SYM> W1 <role>``); a line
+    already on the chart is left as is and listed in ``already_present``
+    (delete it in MT4 to redraw). On D1 and H1, ``leg`` is ``current``,
+    ``previous`` or ``both`` (default); names carry the leg (``Channel <SYM>
+    D1 leg <start date>``), the current leg is blue (D1) or orange (H1) and
+    the previous grey;
+    ``candidate`` is for the current leg, ``previous_candidate`` for the
+    previous one. No orders.
+    """
+    from app import mtf_channel
+
+    try:
+        tf = mtf_channel.get_tf(timeframe)
+    except mtf_channel.ChannelError as exc:
+        return {"ok": False, "error": str(exc)}
+    ok, reason = mt4_bridge.check_chart(instrument, tf.name)
+    if not ok:
+        return {"ok": False, "error": reason}
+    try:
+        data = await _mtf_bars(instrument, tf.name)
+        if tf.origin != "legs":
+            proposal = mtf_channel.propose_channel(data["bars"], tf)
+            grid = mtf_channel.grid_from_proposal(data["bars"], proposal, candidate, tf)
+            draws = [(grid, proposal["candidates"][candidate])]
+        else:
+            if leg not in ("both", "current", "previous"):
+                return {"ok": False, "error": "leg must be 'both', 'current' or 'previous'"}
+            proposals = await mtf_channel.leg_proposals_for(instrument, tf, data["bars"])
+            draws = []
+            for name, cand in (("previous", previous_candidate), ("current", candidate)):
+                if leg in ("both", name):
+                    grid = mtf_channel.grid_from_leg(data["bars"], proposals, name, cand)
+                    draws.append((grid, {"leg": name, **proposals[name]["leg"],
+                                         **proposals[name]["candidates"][cand]}))
+    except (mtf_channel.ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    results = []
+    for grid, cand in draws:
+        result = mtf_channel.draw_grid(instrument, grid)
+        if result.get("ok"):
+            names = result["drawn"] + result["already_present"]
+            result["captured"] = mtf_channel.wait_for_capture(instrument, names, timeframe=tf.name)
+            result["candidate"] = cand
+        results.append(result)
+    if len(results) == 1:
+        return results[0]
+    return {"ok": all(r.get("ok") for r in results), "grids": results}
+
+
+@mcp.tool()
+async def mtf_channel_read(
+    instrument: str,
+    source: str = "chart",
+    candidate: int = 0,
+    channel_name: str = "",
+    timeframe: str = "W1",
+    leg: str = "current",
+) -> dict:
+    """The channel read (MTF steps W1, D1, H1): zones, air visits, rail tests, levels.
+
+    ``source="chart"`` (default) measures the trader's own grid from the live
+    chart of ``timeframe`` (roles from line style/position or ``role=``
+    tooltips); this is the read to report. ``source="proposed"`` measures
+    proposal ``candidate`` instead. Bar closes only; the in-progress bar is
+    excluded. On D1 and H1, ``leg`` (``current`` or ``previous``) picks the
+    leg's grid (``Channel <SYM> <TF> leg <start date>``; the current leg falls
+    back to the chart's only channel), and the read adds ``leg`` and the
+    contexts above it: ``w1_context`` (the trader's W1 grid, else W1
+    candidate 0) and, on H1, ``d1_context`` (the current D1 leg's grid). Report the JSON: counts, not probabilities. Research only.
+    """
+    from app import mtf_channel
+
+    try:
+        tf = mtf_channel.get_tf(timeframe)
+        data = await _mtf_bars(instrument, tf.name)
+        bars = data["bars"]
+        if source not in ("chart", "proposed"):
+            return {"ok": False, "error": "source must be 'chart' or 'proposed'"}
+        legs = None
+        if tf.origin == "legs":
+            legs = await mtf_channel.leg_proposals_for(instrument, tf, bars)
+            if leg not in ("current", "previous"):
+                return {"ok": False, "error": "leg must be 'current' or 'previous'"}
+        if source == "chart":
+            objects = _mtf_chart_objects(instrument, tf.name)
+            if legs:
+                grid = mtf_channel.leg_grid_from_chart(bars, objects, instrument, legs, leg, channel_name)
+            else:
+                grid = mtf_channel.grid_from_chart(bars, objects, channel_name, tf)
+        elif legs:
+            grid = mtf_channel.grid_from_leg(bars, legs, leg, candidate)
+        else:
+            proposal = mtf_channel.propose_channel(bars, tf)
+            grid = mtf_channel.grid_from_proposal(bars, proposal, candidate, tf)
+        read = mtf_channel.read_grid(bars, grid, instrument=instrument)
+        if legs:
+            read = {"leg": legs[leg]["leg"], **read}
+    except (mtf_channel.ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    out = {"ok": True, "instrument": instrument, **read, **_mtf_fetch_info(data),
+           "fetch_note": data["note"]}
+    out.update(await mtf_channel.contexts(instrument, tf))
+    return out
+
+
 @mcp.tool()
 async def mt4_draw_regime(
     instrument: str,
@@ -956,6 +1125,123 @@ async def trader_definitions(term: str = "", granularity: str = "", notes: str =
         return {"ok": True, "definition": row, "definitions": store.get_definitions()}
     return {"ok": True, "definitions": store.get_definitions()}
 
+
+
+@mcp.tool()
+async def trader_sync(review: bool = True) -> dict:
+    """Sync MT4 outbox folders into the trader journal now (orders, SL/TP
+    revisions, marks, episodes) and score newly closed tickets. No orders."""
+    from agent.trader_sync import sync_all
+
+    result = await sync_all(_trader_store(), review=review)
+    return {"ok": True, **result}
+
+
+@mcp.tool()
+async def trader_link(instrument: str, timeframe: str, ticket: int = 0) -> dict:
+    """Link the objects currently SELECTED on the MT4 chart to a ticket.
+
+    Select the lines in MT4 first (click, Ctrl+click for more). Without
+    ``ticket`` the single open order on that symbol is used. The objects'
+    geometry is frozen into the journal; the review is re-scored on next sync.
+    """
+    from app import trader_journal
+
+    try:
+        return trader_journal.link_selected(
+            _trader_store(), instrument, timeframe, ticket or None
+        )
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def trader_record(ticket: int) -> dict:
+    """Full journal record for a ticket: order, SL/TP revisions, linked
+    objects (frozen geometry), episode, code-owned review, and analyses."""
+    from app import trader_journal
+
+    try:
+        return {"ok": True, **trader_journal.record(_trader_store(), ticket)}
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def trader_add_analysis(
+    kind: str,
+    body_md: str,
+    instrument: str,
+    timeframe: str = "",
+    ticket: int = 0,
+    refs: list[str] | None = None,
+    levels: list[dict] | None = None,
+    drawn_prefix: str = "",
+    author: str = "claude",
+    model: str = "",
+) -> dict:
+    """Store an analysis in the trader journal (verbatim markdown).
+
+    ``kind``: pre_trade | in_trade | post_trade | chart_read. ``ticket`` 0
+    leaves it unattached; a pre_trade analysis auto-attaches to the next ticket
+    on the symbol opened within 24h. ``levels`` are bridge objects (same schema
+    as ``mt4_upsert_objects``) redrawn on replay. Never changes review scores
+    and is not ingested into the knowledge base.
+    """
+    from app import trader_journal
+
+    try:
+        row = trader_journal.add_analysis(
+            _trader_store(),
+            instrument=instrument,
+            kind=kind,
+            body_md=body_md,
+            timeframe=timeframe,
+            ticket=ticket or None,
+            author=author,
+            model=model,
+            refs=refs,
+            levels=levels,
+            drawn_prefix=drawn_prefix,
+        )
+    except (trader_journal.TraderJournalError, mt4_bridge.Mt4BridgeError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "analysis": row}
+
+
+@mcp.tool()
+async def trader_analyses(ticket: int = 0, instrument: str = "", limit: int = 50) -> dict:
+    """List stored analyses for a ticket or a symbol (oldest first)."""
+    store = _trader_store()
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    rows = store.list_analyses(ticket=ticket or None, symbol=symbol, limit=limit)
+    return {"ok": True, "analyses": rows}
+
+
+@mcp.tool()
+async def mt4_replay_trade(
+    ticket: int, timeframe: str = "", with_analyses: bool = True
+) -> dict:
+    """Draw a journaled trade on the live MT4 chart for its symbol: linked
+    objects, entry/exit arrows, planned vs revised SL/TP, and stored analysis
+    levels, under ``sbox.replay.<ticket>.``. Display only; no orders."""
+    from app import trader_journal
+
+    try:
+        return trader_journal.replay(
+            _trader_store(), ticket, timeframe=timeframe, with_analyses=with_analyses
+        )
+    except trader_journal.TraderJournalError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+async def mt4_clear_replay(instrument: str, ticket: int = 0, timeframe: str = "") -> dict:
+    """Remove replay overlays (one ticket, or all ``sbox.replay.``) from the
+    live chart. Never touches your own objects."""
+    from app import trader_journal
+
+    return trader_journal.clear_replay(instrument, ticket or None, timeframe)
 
 if __name__ == "__main__":
     logger.info(

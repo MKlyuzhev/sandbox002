@@ -4,7 +4,8 @@ Capture MT4 chart marks, orders, and results; score closed trades against
 **the trader's own marks**; retrieve books at **equal rank**. Lien engines are
 opt-in. Research only; this path does not place, modify, or close orders.
 
-Related: [Agent planner](AGENT_PLANNER.md), [Agent orchestrator](AGENT_ORCHESTRATOR.md).
+Related: [Agent planner](AGENT_PLANNER.md), [Agent orchestrator](AGENT_ORCHESTRATOR.md),
+[Multi-timeframe channel analysis](MTF_CHANNEL_ANALYSIS.md) (the W1 grid read).
 
 ---
 
@@ -23,11 +24,13 @@ placed, and how well was the exit executed.
 
 ## 2. Attach and export
 
-1. Compile and attach `SandboxChartBridge.mq4` **v1.06+** to each chart (same
+1. Compile and attach `SandboxChartBridge.mq4` **v1.07+** to each chart (same
    symbol/timeframe as the chart). AutoTrading can stay off.
 2. Files appear under `MQL4/Files/sandbox002/<SYMBOL>_<TF>/`:
-   - `chart.json` — user objects (skips `sbox.*`, `TA_PANEL_*`, `TARGET_LINE_*`, UI chrome)
-   - `events.jsonl` — object create/change/delete and order-fingerprint changes
+   - `chart.json` — user objects (skips `sbox.*`, `TA_PANEL_*`, `TARGET_LINE_*`, UI chrome),
+     each with `selected: true|false` (v1.07)
+   - `events.jsonl` — object create/change/delete, order-fingerprint changes, and
+     (v1.07) `order_open` / `order_modify` / `order_close` with `sl`, `tp`, `price`
    - `orders.json` / `history.json` — open and closed tickets
 3. Do **not** rely on `TA_Object_Exporter` auto-rename (`type_tf_stamp` wipes
    meaning). Optional: put role tags in the object **tooltip** or text:
@@ -62,8 +65,42 @@ From the sandbox002 repo root:
 - **ingest** deletes and rewrites Chroma source `trader-mt4` from episode briefs
   **and accepted rules only**. Equal rank with every other book (no boost).
 
-SQLite: `data/journal/trader.sqlite`. Definitions (e.g. macro trend = W1) live
+SQLite: `data/journal/trader.sqlite`. Order, revision, and mark times are
+**broker time** (as MT4 reports them); each order stores `utc_offset` from the
+EA heartbeat at first sighting, and reviews convert to UTC before fetching
+OANDA bars. Analysis `created_ts` is UTC. Definitions (e.g. macro trend = W1) live
 in the `definitions` table / MCP `trader_definitions`.
+
+### 3a. Journal record: link, analyses, replay
+
+- **Continuous sync.** The dashboard syncs every 5 s while an EA is live;
+  `trader_sync` (MCP) or `python -m agent.trader_sync` runs one pass. SL/TP
+  changes become `order_revisions` rows, from EA `order_*` events and from
+  polling the live chart's `orders.json` (stale chart folders never add
+  revisions). Several chart folders carry the same account history: they are
+  synced oldest first, so the most recently written one wins.
+- **Link your marks.** Select the lines on the MT4 chart, then `trader_link`
+  (MCP) or **Link selected in MT4** (dashboard). The selected objects' geometry
+  is frozen onto the ticket as `manual` links; the heuristic binder never
+  overrides them, the episode takes the linking chart's timeframe, and the
+  review is re-scored against just those marks on the next sync. Without
+  manual links the review uses the whole chart snapshot.
+- **Analyses.** `trader_add_analysis` stores a markdown analysis
+  (`pre_trade` | `in_trade` | `post_trade` | `chart_read`, author `claude` or
+  `user`) with optional `levels` (bridge objects, the same schema as
+  `mt4_upsert_objects`). A `pre_trade` analysis with no ticket attaches to the
+  next ticket on that symbol opened within 24 h. Analyses never change review
+  scores and are **not** ingested into Chroma.
+- **Replay.** `mt4_replay_trade` / **Draw on MT4** draws, on the live chart
+  for the ticket's symbol (any timeframe) under `sbox.replay.<ticket>.`:
+  - linked objects in their original colours;
+  - entry and exit arrows, with a dotted line joining them;
+  - SL/TP over the life of the trade: planned (dashed) until the first
+    change, then each revision (solid);
+  - the analyses' levels.
+
+  `mt4_clear_replay` removes them. Types the EA can't draw (regression,
+  std-dev channel, fibo fan/arc, triangle, ellipse) are reported as `skipped`.
 
 ---
 
@@ -94,6 +131,11 @@ Reload the MCP server after pull. None of these place orders.
 | `trader_review` | Three scores + diagnostics |
 | `trader_rules` | Default `status=accepted` |
 | `trader_definitions` | Get or set operational terms |
+| `trader_sync` | Sync outbox → journal now (and score new closes) |
+| `trader_link` | Link objects **selected** on the MT4 chart to a ticket |
+| `trader_record` | Order, SL/TP revisions, linked objects, review, analyses |
+| `trader_add_analysis` / `trader_analyses` | Store / list analyses (with drawable `levels`) |
+| `mt4_replay_trade` / `mt4_clear_replay` | Draw / clear a journaled trade on the live chart |
 
 Default retrieve: `search_knowledge` **without** `source`. Use `source="trader-mt4"`
 only when asking what *you* did. Use `source="lien-fx"` only for an explicit

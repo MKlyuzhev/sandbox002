@@ -18,6 +18,7 @@
   <nav class="tabs">
     <button type="button" data-tab="terminal" class="active">Terminal</button>
     <button type="button" data-tab="journal">Journal</button>
+    <button type="button" data-tab="trades">Trades</button>
     <button type="button" data-tab="gpu">GPU / host</button>
   </nav>
   <main>
@@ -61,6 +62,39 @@
           </table>
         </div>
         <div id="run-detail" class="detail">Select a run.</div>
+      </div>
+    </section>
+    <section id="tab-trades" class="tab">
+      <div class="journal-layout">
+        <div class="journal-table-wrap">
+          <table id="trades-table">
+            <thead>
+              <tr>
+                <th>ticket</th>
+                <th>symbol</th>
+                <th>side</th>
+                <th>open (broker)</th>
+                <th>entry</th>
+                <th>exit</th>
+                <th>P&amp;L</th>
+                <th>linked</th>
+                <th>notes</th>
+                <th>fit / entry / exit</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="detail">
+          <div class="job-actions" id="trade-actions" hidden>
+            <button type="button" id="btn-trade-link" title="Select the lines on the MT4 chart first">Link selected in MT4</button>
+            <button type="button" id="btn-trade-draw">Draw on MT4</button>
+            <label class="hint"><input type="checkbox" id="chk-trade-levels" checked> analysis levels</label>
+            <button type="button" id="btn-trade-clear">Clear replay</button>
+          </div>
+          <p class="hint" id="trade-msg"></p>
+          <div id="trade-detail">Select a trade.</div>
+        </div>
       </div>
     </section>
     <section id="tab-gpu" class="tab">

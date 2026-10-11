@@ -143,6 +143,37 @@ class TestInbox(unittest.TestCase):
         self.assertIsNone(st["heartbeat"])
         self.assertEqual(st["charts"], [])
 
+    def test_upsert_editable_keeps_name(self) -> None:
+        self._write_heartbeat("GBPUSD", 60)
+        line = {
+            "type": "trend",
+            "t1": 1717200000,
+            "p1": 1.27,
+            "t2": 1717286400,
+            "p2": 1.268,
+        }
+        result = mt4_bridge.upsert_objects(
+            "GBP_USD",
+            "H1",
+            [
+                {**line, "name": "Center W1", "editable": True},
+                {**line, "name": "overlay"},
+            ],
+            prefix="sbox.mtf.",
+        )
+        self.assertTrue(result["ok"], result)
+        cmd = json.loads(self._cmd_path("GBP_USD", "H1").read_text(encoding="utf-8"))
+        self.assertEqual(cmd["objects"][0]["name"], "Center W1")
+        self.assertTrue(cmd["objects"][0]["editable"])
+        self.assertEqual(cmd["objects"][1]["name"], "sbox.mtf.overlay")
+        self.assertNotIn("editable", cmd["objects"][1])
+        with self.assertRaises(mt4_bridge.Mt4BridgeError):
+            mt4_bridge.upsert_objects(
+                "GBP_USD",
+                "H1",
+                [{**line, "name": "sbox.mtf.center", "editable": True}],
+            )
+
     def test_upsert_writes_cmd_when_chart_matches(self) -> None:
         self._write_heartbeat("GBPUSD", 60)
         result = mt4_bridge.upsert_objects(
