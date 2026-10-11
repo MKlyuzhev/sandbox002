@@ -171,42 +171,62 @@ close above in August that failed). Context for lower timeframes:
 
 ---
 
-## 6. Step 2: D1 grid
+## 6. Step 2: D1 grids
 
-The D1 grid is the same five lines (20% air, solid center, dotted air
-boundaries) on the daily chart, measured by **daily close**. It follows the
-recent trend, and its read is reported against the W1 grid.
+D1 channels capture the **movements inside the W1 channel**. The daily path
+is cut into legs: a leg runs from one extreme to the next, and a reversal of
+one W1 air band (20% of the W1 width) ends it. Each leg gets the same
+five-line grid (20% air, solid center, dotted air boundaries), measured by
+**daily close**, and the read is reported against the W1 grid.
 
-| | W1 | D1 |
+Two D1 grids are kept: the **previous** (last completed) leg and the
+**current** leg in progress. Each is `propose_channel` run on that leg's bars
+only, so its origin is the leg's start.
+
+USD/JPY, W1 width 44.0 → legs cut at 8.8 (`w1_position`: 0 = W1 lower rail,
+1 = upper rail):
+
+| Leg | From | To | W1 position |
+|---|---|---|---|
+| up | 2024-09-16 139.58 | 2025-01-10 158.88 | 0.58 → 1.00 |
+| down | 2025-01-10 158.88 | 2025-04-22 139.89 | 1.00 → 0.55 |
+| up (previous) | 2025-04-22 139.89 | 2026-07-23 163.99 | 0.55 → 1.01 |
+| down (current) | 2026-07-23 163.99 | in progress, low so far 152.89 | 1.01 → 0.75 |
+
+Every leg since 2022 has run between about the W1 center and the upper rail.
+
+| | W1 | D1 (per leg) |
 |---|---|---|
-| Trend origin | first extreme of the last 20 years (1,040 bars) | first extreme of the last year (260 bars) |
-| Minimum history | 156 bars | 120 bars |
+| Trend origin | first extreme of the last 20 years (1,040 bars) | the leg's start |
+| Minimum bars | 156 | 20 |
 | Trend rail: shortest hull edge | 52 bars | 20 bars |
 | Swing: extreme of +/- | 13 bars | 5 bars |
 | Visit gap / touch gap | 2 / 3 bars | 2 / 3 bars |
 | Touch tolerance | 0.3% of price | 0.3% of price |
 
 Other rules are the same as on W1 (a candidate width needs two swings on it and
-at most 10% of closes beyond; the widest swing is always listed). Read keys use
-the bar unit: `days`, `lines_next_day`, `pips_per_day`.
+at most 10% of closes beyond; the widest swing is always listed). A young
+current leg may have too few swings for a rail; the proposal then says so.
+Read keys use the bar unit: `days`, `lines_next_day`, `pips_per_day`.
 
 - **Bars:** `history/<server>/<SYMBOL>1440.hst` plus newer OANDA bid daily
   candles. OANDA's day opens 17:00 New York = 00:00 broker, so no stamp shift;
   weekend-stamped candles are dropped, as the export folds them away.
-- **Objects:** `Channel <SYM> D1`, `Trendline <SYM> D1 <role>`. When a chart
-  has more than one channel (a W1 grid stays on the window when it is switched
-  to D1), the read takes the `role=channel`-tagged one, else the one named for
-  the timeframe, else asks for `channel_name`.
-- **W1 context:** `mtf_channel_read(timeframe="D1")` (and the CLI's
-  `--tf D1 --read ...`) adds `w1_context`: the W1 zone, lines for next week's
-  close, and levels, from the trader's W1 grid in the last W1 `chart.json`
-  capture, else W1 candidate 0 (`source` says which).
-- **Small samples:** a year of daily closes gives a few air visits. Treat them
-  as counts.
+- **W1 grid:** the trader's, from the last W1 `chart.json` capture, else W1
+  candidate 0. It sets the leg size and `w1_context`.
+- **Objects:** `Channel <SYM> D1 leg <start date>` and `Trendline <SYM> D1 leg
+  <start date> <role>`; the current leg blue, the previous grey. Names are by
+  leg, so a new leg never overwrites an old grid; delete old ones in MT4. The
+  read finds a leg's grid by name; for the current leg with no such channel it
+  falls back to the chart's only channel (a hand-drawn one).
+- **W1 context:** the D1 read adds `leg` (start, end or extreme so far, W1
+  positions) and `w1_context`: the W1 zone, lines for next week's close, and
+  levels.
+- **Small samples:** a leg gives a few air visits. Treat them as counts.
 
-Loop: W1 read → `mtf_channel_read(timeframe="D1")` → if no channel,
-`mtf_channel_propose(timeframe="D1")` → `mt4_draw_mtf_grid(candidate,
-timeframe="D1")` → the trader re-anchors → `mtf_channel_read(timeframe="D1")`.
+Loop: W1 read → `mtf_channel_propose(timeframe="D1")` (legs + both proposals)
+→ `mt4_draw_mtf_grid(timeframe="D1")` (both legs) → the trader re-anchors →
+`mtf_channel_read(timeframe="D1", leg="current"|"previous")`.
 
 ---
 

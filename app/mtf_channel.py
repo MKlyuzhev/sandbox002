@@ -13,6 +13,8 @@ it does not pick anchors or compute zones in prose.
 - ``read_grid`` measures zones, air visits and rail tests by bar close.
 - ``grid_objects`` gives the five lines as editable bridge objects.
 - ``w1_context`` is the W1 read a lower-timeframe read is reported against.
+- ``legs`` / ``leg_proposals``: D1 channels follow the movements inside the
+  W1 channel, one per leg (a reversal of one W1 air band ends a leg).
 
 Lines are evaluated by **bar index**, the way MT4 draws them. Research only;
 nothing here places, modifies, or closes orders.
@@ -66,15 +68,22 @@ class TF:
     visit_gap: int
     touch_gap: int
     touch_tol: float
+    origin: str = "extreme"  # "w1_legs": one channel per leg inside the W1 channel
+    color: str = "#FFFF00"
 
 
 TFS = {
     "W1": TF("W1", 10080, "W", WEEK, W1_STAMP_SHIFT, "week", 52, LOOKBACK_WEEKS, 3 * 52, 52,
              PIVOT_WEEKS, VISIT_GAP, TOUCH_GAP, TOUCH_TOL),
-    # 1 year of daily bars to find the origin; OANDA's 17:00 NY day opens 00:00 broker
-    "D1": TF("D1", 1440, "D", DAY, 0, "day", 260, 260, 120, 20, 5, 2, 3, TOUCH_TOL),
+    # one channel per W1 leg (``leg_proposals``); ``lookback`` only applies to
+    # ``propose_channel`` called on all bars. OANDA's 17:00 NY day opens 00:00 broker.
+    "D1": TF("D1", 1440, "D", DAY, 0, "day", 260, 260, 20, 20, 5, 2, 3, TOUCH_TOL,
+             "w1_legs", "#00BFFF"),
 }
 W1 = TFS["W1"]
+D1 = TFS["D1"]
+LEG_REVERSAL = AIR  # of the W1 width: a reversal this large ends a leg
+PREVIOUS_LEG_COLOR = "#A0A0A0"
 
 
 def get_tf(timeframe: str | TF) -> TF:
@@ -295,6 +304,8 @@ class Grid:
     source: str
     warnings: list[str]
     tf: TF = W1
+    label: str = ""  # object-name suffix, e.g. "leg 2025-04-22"
+    color: str = ""
 
     @property
     def direction(self) -> str:
@@ -748,10 +759,11 @@ def read_grid(
 # ---------------------------------------------------------------- draw
 
 
-def grid_objects(grid: Grid, instrument: str, color: str = "#FFFF00") -> list[dict[str, Any]]:
+def grid_objects(grid: Grid, instrument: str, color: str = "") -> list[dict[str, Any]]:
     """Editable bridge objects: one channel plus three trendlines."""
     sym = mt4_bridge.map_symbol(instrument)
-    tf = grid.tf.name
+    tf = f"{grid.tf.name} {grid.label}" if grid.label else grid.tf.name
+    color = color or grid.color or grid.tf.color
     a = grid.anchors
     objs: list[dict[str, Any]] = [
         {
@@ -819,30 +831,208 @@ def wait_for_capture(
 # ---------------------------------------------------------------- W1 context
 
 
+async def w1_grid(
+    instrument: str, *, fetch: bool = True, channel_name: str = ""
+) -> tuple[list[dict], Grid]:
+    """W1 bars and the trader's W1 grid from the last W1 ``chart.json`` capture
+    (live or not), else proposal candidate 0; ``grid.source`` says which."""
+    from app import trader_outbox
+
+    bars = (await load_bars(instrument, W1, fetch=fetch))["bars"]
+    live, reason = mt4_bridge.check_chart(instrument, "W1")
+    objects = trader_outbox.load_chart(mt4_bridge.chart_dir(instrument, "W1")).get("objects") or []
+    try:
+        grid = grid_from_chart(bars, objects, channel_name)
+        if not live:
+            grid.warnings.append(f"W1 chart not live, using its last capture: {reason}")
+    except ChannelError as exc:
+        grid = grid_from_proposal(bars, propose_channel(bars))
+        grid.source = f"proposal candidate 0 (no W1 chart grid: {exc})"
+    return bars, grid
+
+
 async def w1_context(
     instrument: str, *, fetch: bool = True, channel_name: str = ""
 ) -> dict[str, Any]:
     """The W1 read a lower-timeframe grid is reported against.
 
-    Uses the trader's W1 grid from the last W1 ``chart.json`` capture (live or
-    not), else proposal candidate 0, and says which in ``source``. Errors come
-    back as ``{"error": ...}`` so the lower-timeframe read still stands.
+    Errors come back as ``{"error": ...}`` so the lower-timeframe read still
+    stands.
     """
-    from app import trader_outbox
-
     try:
-        bars = (await load_bars(instrument, W1, fetch=fetch))["bars"]
-        live, reason = mt4_bridge.check_chart(instrument, "W1")
-        objects = trader_outbox.load_chart(mt4_bridge.chart_dir(instrument, "W1")).get("objects") or []
-        try:
-            grid = grid_from_chart(bars, objects, channel_name)
-            if not live:
-                grid.warnings.append(f"W1 chart not live, using its last capture: {reason}")
-        except ChannelError as exc:
-            grid = grid_from_proposal(bars, propose_channel(bars))
-            grid.source = f"proposal candidate 0 (no W1 chart grid: {exc})"
+        bars, grid = await w1_grid(instrument, fetch=fetch, channel_name=channel_name)
         r = read_grid(bars, grid, instrument=instrument)
     except (ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
         return {"error": str(exc)}
     return {k: r[k] for k in ("source", "warnings", "trend", "last_close", "zone",
                               "lines_next_week", "levels")}
+
+
+# ---------------------------------------------------------------- D1 legs
+
+
+def w1_width(grid: Grid) -> float:
+    return abs(grid.lines["upper"].p1 - grid.lines["lower"].p1)
+
+
+def legs(bars: list[dict], threshold: float) -> list[dict[str, Any]]:
+    """Zigzag on highs/lows: a leg ends at an extreme price then reverses from
+    by ``threshold``. The last leg is in progress (``end`` is None) and runs
+    from the last confirmed extreme; ``extreme_so_far`` is its unconfirmed end.
+    Indexes are into the completed bars.
+    """
+    done = [b for b in bars if b.get("complete", True)]
+    if not done:
+        return []
+    pivots: list[tuple[int, str]] = []
+    hi = lo = 0
+    dirn = 0  # 1 up leg running, -1 down leg running, 0 not yet known
+    for i, b in enumerate(done):
+        if dirn == 0:
+            hi = i if b["high"] > done[hi]["high"] else hi
+            lo = i if b["low"] < done[lo]["low"] else lo
+            if done[hi]["high"] - done[lo]["low"] >= threshold:
+                if hi < lo:
+                    pivots.append((hi, "high"))
+                    dirn = -1
+                else:
+                    pivots.append((lo, "low"))
+                    dirn = 1
+        elif dirn == 1:
+            hi = i if b["high"] > done[hi]["high"] else hi
+            if done[hi]["high"] - b["low"] >= threshold:
+                pivots.append((hi, "high"))
+                dirn, lo = -1, i
+        else:
+            lo = i if b["low"] < done[lo]["low"] else lo
+            if b["high"] - done[lo]["low"] >= threshold:
+                pivots.append((lo, "low"))
+                dirn, hi = 1, i
+    out: list[dict[str, Any]] = []
+    for k, (i, kind) in enumerate(pivots):
+        j = pivots[k + 1][0] if k + 1 < len(pivots) else None
+        price = done[i]["high"] if kind == "high" else done[i]["low"]
+        leg: dict[str, Any] = {
+            "direction": "down" if kind == "high" else "up",
+            "start_index": i, "start_time": done[i]["time"], "start_price": price,
+            "end_index": j, "end_time": None, "end_price": None,
+        }
+        if j is not None:
+            leg["end_time"] = done[j]["time"]
+            leg["end_price"] = done[j]["low"] if kind == "high" else done[j]["high"]
+        else:
+            x = lo if kind == "high" else hi
+            leg["extreme_so_far"] = {
+                "time": done[x]["time"],
+                "price": done[x]["low"] if kind == "high" else done[x]["high"],
+            }
+        out.append(leg)
+    return out
+
+
+def leg_label(leg: dict[str, Any], tf: TF = D1) -> str:
+    return f"leg {_date(leg['start_time'], tf)}"
+
+
+def _leg_summary(leg: dict[str, Any], w1_bars: list[dict], grid: Grid, tf: TF) -> dict[str, Any]:
+    index = BarIndex(w1_bars)
+    w = w1_width(grid)
+
+    def pos(t: int, price: float) -> float:
+        return round((price - grid.lines["lower"].at(index.index(t))) / w, 2)
+
+    out = {
+        "direction": leg["direction"],
+        "label": leg_label(leg, tf),
+        "start": {"date": _date(leg["start_time"], tf), "price": leg["start_price"],
+                  "w1_position": pos(leg["start_time"], leg["start_price"])},
+        "end": None,
+    }
+    if leg["end_time"] is not None:
+        out["end"] = {"date": _date(leg["end_time"], tf), "price": leg["end_price"],
+                      "w1_position": pos(leg["end_time"], leg["end_price"])}
+        out["bars"] = leg["end_index"] - leg["start_index"] + 1
+    else:
+        x = leg["extreme_so_far"]
+        out["extreme_so_far"] = {"date": _date(x["time"], tf), "price": x["price"],
+                                 "w1_position": pos(x["time"], x["price"])}
+    return out
+
+
+def leg_proposals(
+    bars: list[dict], w1_bars: list[dict], grid: Grid, tf: str | TF = D1, history: int = 4
+) -> dict[str, Any]:
+    """Channels for the last completed leg and the leg in progress.
+
+    Legs are cut by reversals of ``LEG_REVERSAL`` of the W1 width (one W1 air
+    band). Each leg's channel is ``propose_channel`` on that leg's bars only,
+    so its origin is the leg's start. ``w1_position`` is 0 at the W1 lower
+    rail and 1 at the upper rail.
+    """
+    tf = get_tf(tf)
+    done = [b for b in bars if b.get("complete", True)]
+    threshold = LEG_REVERSAL * w1_width(grid)
+    lg = legs(done, threshold)
+    if len(lg) < 2:
+        raise ChannelError(f"fewer than two {tf.name} legs of {threshold:.5g} or more")
+    out: dict[str, Any] = {
+        "timeframe": tf.name,
+        "leg_reversal": round(threshold, 6),
+        "w1_grid": grid.source,
+        "legs": [_leg_summary(x, w1_bars, grid, tf) for x in lg[-history:]],
+    }
+    for name, leg in (("previous", lg[-2]), ("current", lg[-1])):
+        end = leg["end_index"] if leg["end_index"] is not None else len(done) - 1
+        seg = done[leg["start_index"] : end + 1]
+        summary = _leg_summary(leg, w1_bars, grid, tf)
+        try:
+            out[name] = {"leg": summary, **propose_channel(seg, tf, lookback=len(seg))}
+        except ChannelError as exc:
+            out[name] = {"leg": summary, "error": str(exc)}
+    return out
+
+
+def grid_from_leg(
+    bars: list[dict], proposals: dict[str, Any], leg: str = "current", candidate: int = 0
+) -> Grid:
+    if leg not in ("current", "previous"):
+        raise ChannelError("leg must be 'current' or 'previous'")
+    p = proposals[leg]
+    if "error" in p:
+        raise ChannelError(f"{leg} leg: {p['error']}")
+    tf = get_tf(proposals["timeframe"])
+    grid = grid_from_proposal(bars, p, candidate, tf)
+    grid.source = f"{leg} leg ({p['leg']['label']}) candidate {candidate}"
+    grid.label = p["leg"]["label"]
+    grid.color = tf.color if leg == "current" else PREVIOUS_LEG_COLOR
+    return grid
+
+
+async def d1_leg_proposals(
+    instrument: str, d1_bars: list[dict], *, fetch: bool = True, w1_channel_name: str = ""
+) -> dict[str, Any]:
+    w1_bars, grid = await w1_grid(instrument, fetch=fetch, channel_name=w1_channel_name)
+    return leg_proposals(d1_bars, w1_bars, grid, D1)
+
+
+def leg_channel_name(instrument: str, proposals: dict[str, Any], leg: str = "current") -> str:
+    return f"Channel {mt4_bridge.map_symbol(instrument)} {proposals['timeframe']} {proposals[leg]['leg']['label']}"
+
+
+def leg_grid_from_chart(
+    bars: list[dict],
+    objects: list[dict],
+    instrument: str,
+    proposals: dict[str, Any],
+    leg: str = "current",
+    channel_name: str = "",
+) -> Grid:
+    """The trader's grid for a leg: the channel named for it (as drawn by
+    ``grid_objects``). With no such channel the current leg falls back to the
+    chart's only channel, so a hand-drawn one is read too."""
+    name = channel_name or leg_channel_name(instrument, proposals, leg)
+    if not channel_name and name not in {o.get("name") for o in objects if o.get("type") == "channel"}:
+        if leg != "current":
+            raise ChannelError(f"no {name!r} on the chart; draw it with mt4_draw_mtf_grid")
+        name = ""
+    return grid_from_chart(bars, objects, name, get_tf(proposals["timeframe"]))

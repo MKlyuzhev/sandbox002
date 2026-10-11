@@ -108,9 +108,9 @@ Match the play class to the result: `join_trend`, `fade_range`, or
 
 | Tool | When | Notes |
 |------|------|--------|
-| `mtf_channel_read` | The W1 or D1 read for a pair | Default `source=chart`: the trader's own grid from the live chart of that timeframe (roles from style/position or `role=` tooltips). Returns trend, line values for the next bar's close, zone + duration, zone shares, air visits, rail tests, past outcomes of the current zone, confirm levels; on D1 also `w1_context` (W1 zone, lines, levels). Report these; counts, not probabilities. |
-| `mtf_channel_propose` | No grid on the chart yet | Ranked candidate channels (anchored rail + widths, touches, % closes beyond; `extreme` = no overshoot). The anchor choice is the trader's: list candidates, do not pick anchors in prose. |
-| `mt4_draw_mtf_grid` | Put a candidate on the chart | Editable objects on the chart of that timeframe (`Channel <SYM> <TF>`, `Trendline <SYM> <TF> <role>`). Existing lines are left alone (`already_present`); the trader re-anchors by dragging, then `mtf_channel_read` measures their version. |
+| `mtf_channel_read` | The W1 or D1 read for a pair | Default `source=chart`: the trader's own grid from the live chart of that timeframe (roles from style/position or `role=` tooltips). Returns trend, line values for the next bar's close, zone + duration, zone shares, air visits, rail tests, past outcomes of the current zone, confirm levels; on D1 `leg=current\|previous` picks the leg's grid and the read adds `leg` and `w1_context` (W1 zone, lines, levels). Report these; counts, not probabilities. |
+| `mtf_channel_propose` | No grid on the chart yet | Ranked candidate channels (anchored rail + widths, touches, % closes beyond; `extreme` = no overshoot). On D1: the legs inside the W1 channel (cut by reversals of one W1 air band) and proposals for the `previous` and `current` leg. The anchor choice is the trader's: list candidates, do not pick anchors in prose. |
+| `mt4_draw_mtf_grid` | Put a candidate on the chart | Editable objects on the chart of that timeframe (`Channel <SYM> <TF>`, `Trendline <SYM> <TF> <role>`). On D1 `leg=both` (default) draws the previous (grey) and current (blue) leg, named `... D1 leg <start date> ...`. Existing lines are left alone (`already_present`); the trader re-anchors by dragging, then `mtf_channel_read` measures their version. |
 
 Loop (per timeframe, W1 first): `mtf_channel_read` → if it errors with no channel object, `mtf_channel_propose` → `mt4_draw_mtf_grid(candidate)` → `mtf_channel_read`.
 

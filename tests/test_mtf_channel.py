@@ -161,7 +161,7 @@ class TestD1(unittest.TestCase):
 
     def test_too_few_bars(self) -> None:
         with self.assertRaises(mtf_channel.ChannelError):
-            mtf_channel.propose_channel(_d1_channel_bars(n=60), "D1")
+            mtf_channel.propose_channel(_d1_channel_bars(n=15), "D1")
 
     def test_unknown_timeframe(self) -> None:
         with self.assertRaises(mtf_channel.ChannelError):
@@ -219,6 +219,60 @@ class TestD1(unittest.TestCase):
         self.assertEqual(added, 1)
         self.assertEqual(merged[-1]["time"], 1791417600 + mtf_channel.DAY)
         self.assertEqual(datetime.fromtimestamp(merged[-1]["time"], timezone.utc).weekday(), 4)
+
+
+def _zigzag_bars(points: list[tuple[int, float]]) -> list[dict]:
+    """Weekday daily bars moving in straight lines between (bar, price) points."""
+    closes: list[float] = []
+    for (i0, p0), (i1, p1) in zip(points, points[1:]):
+        closes += [p0 + (p1 - p0) * k / (i1 - i0) for k in range(i1 - i0)]
+    closes.append(points[-1][1])
+    bars = _d1_channel_bars(n=len(closes))
+    for b, c in zip(bars, closes):
+        b.update(open=c, high=c + 0.05, low=c - 0.05, close=c)
+    return bars
+
+
+class TestLegs(unittest.TestCase):
+    def test_legs_cut_on_reversals(self) -> None:
+        bars = _zigzag_bars([(0, 100), (40, 120), (50, 117), (80, 105), (120, 125), (140, 112)])
+        lg = mtf_channel.legs(bars, threshold=10)
+        # the 120 -> 117 dip is smaller than 10: no leg; 125 -> 112 is the leg in progress
+        self.assertEqual([x["direction"] for x in lg], ["up", "down", "up", "down"])
+        self.assertEqual([x["start_index"] for x in lg], [0, 40, 80, 120])
+        self.assertAlmostEqual(lg[1]["start_price"], 120.05)
+        self.assertAlmostEqual(lg[2]["start_price"], 104.95)
+        self.assertIsNone(lg[-1]["end_index"])
+        self.assertAlmostEqual(lg[-1]["extreme_so_far"]["price"], 111.95)
+
+    def test_leg_proposals_use_each_legs_bars(self) -> None:
+        w1 = _channel_bars()
+        w1_grid = mtf_channel.grid_from_proposal(w1, mtf_channel.propose_channel(w1))
+        width = mtf_channel.w1_width(w1_grid)
+        self.assertAlmostEqual(width, 20.4, delta=0.05)  # leg reversal = 4.08
+        # D1: up channel (slope 0.05, width 3) for 300 bars, then a channel down
+        up = _d1_channel_bars(n=300, slope=0.05, width=3.0)
+        top = max(range(300), key=lambda i: up[i]["high"])
+        down = _d1_channel_bars(n=200, slope=0.04, width=3.0, up=False)
+        shift = up[top]["high"] - max(b["high"] for b in down[:30])
+        bars = up[: top + 1]
+        for b in down:
+            t = mtf_channel.BarIndex(bars, mtf_channel.DAY).time(len(bars))
+            bars.append(dict(b, time=t, open=b["open"] + shift, high=b["high"] + shift,
+                             low=b["low"] + shift, close=b["close"] + shift))
+        r = mtf_channel.leg_proposals(bars, w1, w1_grid)
+        self.assertEqual(r["previous"]["direction"], "up")
+        self.assertEqual(r["current"]["direction"], "down")
+        self.assertEqual(r["current"]["leg"]["start"]["date"], r["current"]["origin"]["date"])
+        grid = mtf_channel.grid_from_leg(bars, r, "previous")
+        objs = mtf_channel.grid_objects(grid, "USD_JPY")
+        self.assertEqual(objs[0]["name"], f"Channel USDJPY D1 {r['previous']['leg']['label']}")
+        self.assertEqual(objs[0]["color"], mtf_channel.PREVIOUS_LEG_COLOR)
+        self.assertEqual(mtf_channel.leg_channel_name("USD_JPY", r, "previous"), objs[0]["name"])
+
+    def test_leg_must_be_known(self) -> None:
+        with self.assertRaises(mtf_channel.ChannelError):
+            mtf_channel.grid_from_leg([], {}, "next")
 
 
 class TestW1Context(unittest.TestCase):
