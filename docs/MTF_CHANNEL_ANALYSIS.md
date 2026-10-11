@@ -1,4 +1,4 @@
-# Multi-timeframe channel analysis: step 1 (W1 grid)
+# Multi-timeframe channel analysis: W1 and D1 grids
 
 The trader's multi-timeframe read starts on the weekly chart with a five-line
 grid: the long-term trend channel, its center line, and two "air" boundaries.
@@ -117,11 +117,11 @@ visits over 20 years, so treat every percentage as a tendency.
 **Code:** `app/mtf_channel.py` does all of the above (`read_grid`), reads the
 trader's grid from `chart.json` (`grid_from_chart`), and proposes channels
 when there is none (`propose_channel`). MCP tools `mtf_channel_read`,
-`mtf_channel_propose`, `mt4_draw_mtf_grid`; CLI
-`scripts/mtf_channel.py`. The GBP/USD example below is its regression test
+`mtf_channel_propose`, `mt4_draw_mtf_grid` (all take `timeframe`, default
+`W1`); CLI `scripts/mtf_channel.py [--tf D1]`. The GBP/USD example below is its regression test
 (`tests/test_mtf_channel.py`).
 
-Proposal rules: the trend starts at the 20-year extreme that came first (low:
+Proposal rules (W1; D1 in section 6): the trend starts at the 20-year extreme that came first (low:
 up, high: down). The anchored rail is the hull edge of lows (up) or highs
 (down) since then with the most touch episodes. Each swing's distance from
 that rail is a candidate width; a candidate needs two swings on it and no more
@@ -171,7 +171,46 @@ close above in August that failed). Context for lower timeframes:
 
 ---
 
-## 6. Next steps
+## 6. Step 2: D1 grid
 
-Step 1 gives the W1 context only. The steps for the lower timeframes are not
-documented yet.
+The D1 grid is the same five lines (20% air, solid center, dotted air
+boundaries) on the daily chart, measured by **daily close**. It follows the
+recent trend, and its read is reported against the W1 grid.
+
+| | W1 | D1 |
+|---|---|---|
+| Trend origin | first extreme of the last 20 years (1,040 bars) | first extreme of the last year (260 bars) |
+| Minimum history | 156 bars | 120 bars |
+| Trend rail: shortest hull edge | 52 bars | 20 bars |
+| Swing: extreme of +/- | 13 bars | 5 bars |
+| Visit gap / touch gap | 2 / 3 bars | 2 / 3 bars |
+| Touch tolerance | 0.3% of price | 0.3% of price |
+
+Other rules are the same as on W1 (a candidate width needs two swings on it and
+at most 10% of closes beyond; the widest swing is always listed). Read keys use
+the bar unit: `days`, `lines_next_day`, `pips_per_day`.
+
+- **Bars:** `history/<server>/<SYMBOL>1440.hst` plus newer OANDA bid daily
+  candles. OANDA's day opens 17:00 New York = 00:00 broker, so no stamp shift;
+  weekend-stamped candles are dropped, as the export folds them away.
+- **Objects:** `Channel <SYM> D1`, `Trendline <SYM> D1 <role>`. When a chart
+  has more than one channel (a W1 grid stays on the window when it is switched
+  to D1), the read takes the `role=channel`-tagged one, else the one named for
+  the timeframe, else asks for `channel_name`.
+- **W1 context:** `mtf_channel_read(timeframe="D1")` (and the CLI's
+  `--tf D1 --read ...`) adds `w1_context`: the W1 zone, lines for next week's
+  close, and levels, from the trader's W1 grid in the last W1 `chart.json`
+  capture, else W1 candidate 0 (`source` says which).
+- **Small samples:** a year of daily closes gives a few air visits. Treat them
+  as counts.
+
+Loop: W1 read → `mtf_channel_read(timeframe="D1")` → if no channel,
+`mtf_channel_propose(timeframe="D1")` → `mt4_draw_mtf_grid(candidate,
+timeframe="D1")` → the trader re-anchors → `mtf_channel_read(timeframe="D1")`.
+
+---
+
+## 7. Next steps
+
+What the trader reads from D1 inside the W1 context, and the H4/H1 steps, are
+not documented yet. A new timeframe is a row in `mtf_channel.TFS`.

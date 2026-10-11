@@ -7,13 +7,16 @@ import json
 import math
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 from app import mt4_bridge, mtf_channel, oanda_mcp
 from app.config import settings
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gbpusd_w1_grid.json"
 START = 946771200  # 2000-01-02, a Sunday
+D1_START = 946857600  # 2000-01-03, a Monday
 
 
 def _bars_from_rows(rows: list[list[float]]) -> list[dict]:
@@ -33,6 +36,21 @@ def _channel_bars(n: int = 900, slope: float = 0.05, width: float = 20.0, up: bo
             {"time": START + i * mtf_channel.WEEK, "open": close, "high": close + 0.2,
              "low": close - 0.2, "close": close, "complete": True}
         )
+    return bars
+
+
+def _d1_channel_bars(n: int = 400, slope: float = 0.05, width: float = 5.0, up: bool = True) -> list[dict]:
+    """Weekday-only daily bars swinging rail to rail (period 60 bars)."""
+    bars = []
+    t = D1_START
+    for i in range(n):
+        base = 100 + slope * i if up else 200 - slope * i
+        close = base + width * (0.5 + 0.5 * math.sin(2 * math.pi * i / 60))
+        bars.append({"time": t, "open": close, "high": close + 0.05, "low": close - 0.05,
+                     "close": close, "complete": True})
+        t += mtf_channel.DAY
+        while datetime.fromtimestamp(t, timezone.utc).weekday() >= 5:
+            t += mtf_channel.DAY
     return bars
 
 
@@ -122,6 +140,112 @@ class TestProposal(unittest.TestCase):
             mtf_channel.propose_channel(_channel_bars(n=100))
 
 
+class TestD1(unittest.TestCase):
+    def test_up_channel(self) -> None:
+        p = mtf_channel.propose_channel(_d1_channel_bars(), "D1")
+        self.assertEqual(p["timeframe"], "D1")
+        self.assertEqual(p["direction"], "up")
+        self.assertAlmostEqual(p["slope_per_day"], 0.05, places=6)
+        self.assertAlmostEqual(p["candidates"][0]["width"], 5.1, delta=0.05)
+
+    def test_down_channel(self) -> None:
+        p = mtf_channel.propose_channel(_d1_channel_bars(up=False), "D1")
+        self.assertEqual(p["direction"], "down")
+        self.assertEqual(p["rail"]["side"], "upper")
+        self.assertAlmostEqual(p["candidates"][0]["width"], 5.1, delta=0.05)
+
+    def test_origin_is_within_one_year(self) -> None:
+        bars = _d1_channel_bars(n=800)
+        p = mtf_channel.propose_channel(bars, "D1")
+        self.assertGreaterEqual(p["origin"]["time"], bars[-260]["time"])
+
+    def test_too_few_bars(self) -> None:
+        with self.assertRaises(mtf_channel.ChannelError):
+            mtf_channel.propose_channel(_d1_channel_bars(n=60), "D1")
+
+    def test_unknown_timeframe(self) -> None:
+        with self.assertRaises(mtf_channel.ChannelError):
+            mtf_channel.get_tf("H7")
+
+    def test_read_keys_and_live_day(self) -> None:
+        bars = _d1_channel_bars()
+        grid = mtf_channel.grid_from_proposal(bars, mtf_channel.propose_channel(bars, "D1"), 0, "D1")
+        live = dict(bars[-1], time=bars[-1]["time"] + mtf_channel.DAY, close=999.0, complete=False)
+        r = mtf_channel.read_grid(bars + [live], grid)
+        self.assertEqual(r["timeframe"], "D1")
+        self.assertEqual(r["last_close"]["close"], bars[-1]["close"])
+        self.assertIn("lines_next_day", r)
+        self.assertIn("days", r)
+        self.assertIn("pips_per_day", r["trend"])
+        self.assertNotIn("weeks", r)
+
+    def test_objects_round_trip_through_chart(self) -> None:
+        bars = _d1_channel_bars()
+        grid = mtf_channel.grid_from_proposal(bars, mtf_channel.propose_channel(bars, "D1"), 0, "D1")
+        objs = mtf_channel.grid_objects(grid, "USD_JPY")
+        self.assertEqual(objs[0]["name"], "Channel USDJPY D1")
+        self.assertEqual(objs[2]["name"], "Trendline USDJPY D1 center")
+        back = mtf_channel.grid_from_chart(bars, objs, tf="D1")
+        self.assertEqual(back.warnings, [])
+        last = len(bars) - 1
+        for role in mtf_channel.ROLES:
+            self.assertAlmostEqual(back.lines[role].at(last), grid.lines[role].at(last), places=6)
+
+    def test_picks_own_channel_when_w1_grid_is_also_on_the_chart(self) -> None:
+        bars = _d1_channel_bars()
+        grid = mtf_channel.grid_from_proposal(bars, mtf_channel.propose_channel(bars, "D1"), 0, "D1")
+        d1 = mtf_channel.grid_objects(grid, "USD_JPY")
+        w1 = [dict(o, name=o["name"].replace(" D1", " W1"), p1=o["p1"] + 30, p2=o["p2"] + 30,
+                   **({"p3": o["p3"] + 30} if "p3" in o else {})) for o in d1]
+        back = mtf_channel.grid_from_chart(bars, w1 + d1, tf="D1")
+        self.assertEqual(back.names["upper"], "Channel USDJPY D1")
+        self.assertEqual(back.names["center"], "Trendline USDJPY D1 center")
+
+    def test_bar_index_skips_weekends_past_the_end(self) -> None:
+        bars = _d1_channel_bars(n=5)  # Mon 2000-01-03 .. Fri 2000-01-07
+        index = mtf_channel.BarIndex(bars, mtf_channel.DAY)
+        monday = bars[-1]["time"] + 3 * mtf_channel.DAY
+        self.assertEqual(index.index(monday), 5)
+        self.assertEqual(index.time(5), monday)
+
+    def test_merge_oanda_days(self) -> None:
+        # OANDA day opening Thu 2026-10-08 21:00 UTC (17:00 NY) = Fri 00:00 broker, no shift.
+        bars = [{"time": 1791417600, "open": 1, "high": 1, "low": 1, "close": 1, "complete": True}]
+        fri = {"time": "2026-10-08T21:00:00.000000000Z", "complete": True,
+               "bid": {"o": "153.0", "h": "153.5", "l": "152.8", "c": "153.2"}}
+        sat = {"time": "2026-10-09T21:00:00.000000000Z", "complete": True,
+               "bid": {"o": "153.2", "h": "153.2", "l": "153.2", "c": "153.2"}}
+        merged, added = mtf_channel.merge_oanda_bars(bars, [fri, sat], "D1")
+        self.assertEqual(added, 1)
+        self.assertEqual(merged[-1]["time"], 1791417600 + mtf_channel.DAY)
+        self.assertEqual(datetime.fromtimestamp(merged[-1]["time"], timezone.utc).weekday(), 4)
+
+
+class TestW1Context(unittest.TestCase):
+    def setUp(self) -> None:
+        self._prev = settings.mt4_files_dir
+        self._tmp = tempfile.TemporaryDirectory()
+        settings.mt4_files_dir = self._tmp.name
+
+    def tearDown(self) -> None:
+        settings.mt4_files_dir = self._prev
+        self._tmp.cleanup()
+
+    def test_falls_back_to_proposal_without_w1_grid(self) -> None:
+        async def fake_load(_instrument, _tf, **_kw):
+            return {"bars": _channel_bars()}
+
+        with mock.patch.object(mtf_channel, "load_bars", fake_load):
+            ctx = asyncio.run(mtf_channel.w1_context("USD_JPY"))
+        self.assertTrue(ctx["source"].startswith("proposal candidate 0"))
+        self.assertIn("lines_next_week", ctx)
+        self.assertIn(ctx["zone"]["now"], mtf_channel.ZONES)
+
+    def test_error_is_returned_not_raised(self) -> None:
+        ctx = asyncio.run(mtf_channel.w1_context("USD_JPY", fetch=False))
+        self.assertIn("error", ctx)
+
+
 class TestBars(unittest.TestCase):
     def test_merge_oanda_weeks_stamps_sunday(self) -> None:
         # OANDA week opening Fri 2026-10-02 21:00 UTC = Sat 00:00 server; MT4 stamps Sunday.
@@ -155,6 +279,20 @@ class TestMcpTools(unittest.TestCase):
         out = asyncio.run(oanda_mcp.mt4_draw_mtf_grid("USD_JPY"))
         self.assertFalse(out["ok"])
         self.assertIn("SandboxChartBridge", out["error"])
+
+    def test_draw_refuses_without_live_d1_chart(self) -> None:
+        out = asyncio.run(oanda_mcp.mt4_draw_mtf_grid("USD_JPY", timeframe="D1"))
+        self.assertFalse(out["ok"])
+        self.assertIn("SandboxChartBridge", out["error"])
+
+    def test_tools_reject_unknown_timeframe(self) -> None:
+        for out in (
+            asyncio.run(oanda_mcp.mt4_draw_mtf_grid("USD_JPY", timeframe="H7")),
+            asyncio.run(oanda_mcp.mtf_channel_propose("USD_JPY", timeframe="H7")),
+            asyncio.run(oanda_mcp.mtf_channel_read("USD_JPY", timeframe="H7")),
+        ):
+            self.assertFalse(out["ok"])
+            self.assertIn("timeframe", out["error"])
 
     def test_read_rejects_unknown_source(self) -> None:
         self.assertEqual(mt4_bridge.map_symbol("USD_JPY"), "USDJPY")
