@@ -104,6 +104,16 @@ stochastics, or MACD in the model — they are already in code.
 Match the play class to the result: `join_trend`, `fade_range`, or
 `breakout_watch`. If `trend_waning` is true, **do not aggress**.
 
+**W1 channel grid (MTF step 1, [MTF_CHANNEL_ANALYSIS.md](MTF_CHANNEL_ANALYSIS.md)):**
+
+| Tool | When | Notes |
+|------|------|--------|
+| `mtf_channel_read` | The W1 read for a pair | Default `source=chart`: the trader's own grid from the live W1 chart (roles from style/position or `role=` tooltips). Returns trend, line values for next week's close, zone + duration, zone shares, air visits, rail tests, past outcomes of the current zone, confirm levels. Report these; counts, not probabilities. |
+| `mtf_channel_propose` | No grid on the chart yet | Ranked candidate channels (anchored rail + widths, touches, % closes beyond; `extreme` = no overshoot). The anchor choice is the trader's: list candidates, do not pick anchors in prose. |
+| `mt4_draw_mtf_grid` | Put a candidate on the chart | Editable objects on the W1 chart (`Channel <SYM> W1`, `Trendline <SYM> W1 <role>`). Existing lines are left alone (`already_present`); the trader re-anchors by dragging, then `mtf_channel_read` measures their version. |
+
+Loop: `mtf_channel_read` → if it errors with no channel object, `mtf_channel_propose` → `mt4_draw_mtf_grid(candidate)` → `mtf_channel_read`.
+
 Optional chart overlay (matching symbol/timeframe): `mt4_draw_regime` (prefix
 `sbox.regime.`). Oscillators stay in JSON; the overlay is bands, MA stack,
 10-bar high/low, **channel rails** (trendline + parallel, or the 10-bar box),
@@ -179,6 +189,7 @@ context. They do not size a ticket and do not replace `run_graph`.
 | `python -m agent.walk_lien --chapter N` | `run_walk kind=lien` |
 | `python -m agent.executor --once` | Drain `pending_exec` → `filled_sim` (stub) |
 | `python -m agent.tester_backtest` | MT4 tester; **no MCP** |
+| `python scripts/mtf_channel.py <PAIR> [--draw] [--read chart\|proposed]` | `mtf_channel_propose` / `mt4_draw_mtf_grid` / `mtf_channel_read` |
 | `python -m agent.fidelity` | Claim pins; **no MCP** |
 
 ---

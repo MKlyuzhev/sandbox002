@@ -754,6 +754,101 @@ async def entry_lien(
     )
 
 
+async def _mtf_bars(instrument: str) -> dict:
+    from app import mtf_channel
+
+    return await mtf_channel.load_w1_bars(instrument)
+
+
+def _mtf_chart_objects(instrument: str) -> list[dict]:
+    from app import trader_outbox
+
+    ok, reason = mt4_bridge.check_chart(instrument, "W1")
+    if not ok:
+        raise mt4_bridge.Mt4BridgeError(reason)
+    return trader_outbox.load_chart(mt4_bridge.chart_dir(instrument, "W1")).get("objects") or []
+
+
+@mcp.tool()
+async def mtf_channel_propose(instrument: str) -> dict:
+    """Propose W1 trend channels for the MTF grid (docs/MTF_CHANNEL_ANALYSIS.md).
+
+    Code picks the trend origin and anchored rail, then ranks candidate widths
+    for the opposite rail (swings sitting on it, closes beyond it). Candidate
+    0 is the default; ``extreme`` is the no-overshoot width. Choosing among
+    them is the trader's call: report the candidates, do not invent anchors.
+    Read-only (.hst + OANDA bid weeks).
+    """
+    from app import mtf_channel
+
+    try:
+        data = await _mtf_bars(instrument)
+        proposal = mtf_channel.propose_channel(data["bars"])
+    except (mtf_channel.ChannelError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "instrument": instrument, **proposal,
+            "oanda_weeks_added": data["oanda_weeks_added"], "note": data["note"]}
+
+
+@mcp.tool()
+async def mt4_draw_mtf_grid(instrument: str, candidate: int = 0) -> dict:
+    """Draw a proposed W1 grid (channel, center, two dotted air lines) on MT4.
+
+    Needs SandboxChartBridge on the instrument's W1 chart. Lines are the
+    trader's editable objects (``Channel <SYM> W1``, ``Trendline <SYM> W1
+    <role>``); a line already on the chart is left as is and listed in
+    ``already_present`` (delete it in MT4 to redraw). No orders.
+    """
+    from app import mtf_channel
+
+    ok, reason = mt4_bridge.check_chart(instrument, "W1")
+    if not ok:
+        return {"ok": False, "error": reason}
+    try:
+        data = await _mtf_bars(instrument)
+        proposal = mtf_channel.propose_channel(data["bars"])
+        grid = mtf_channel.grid_from_proposal(data["bars"], proposal, candidate)
+    except (mtf_channel.ChannelError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    result = mtf_channel.draw_grid(instrument, grid)
+    if result.get("ok"):
+        names = result["drawn"] + result["already_present"]
+        result["captured"] = mtf_channel.wait_for_capture(instrument, names)
+        result["candidate"] = proposal["candidates"][candidate]
+    return result
+
+
+@mcp.tool()
+async def mtf_channel_read(
+    instrument: str, source: str = "chart", candidate: int = 0, channel_name: str = ""
+) -> dict:
+    """The W1 channel read (MTF step 1): zones, air visits, rail tests, levels.
+
+    ``source="chart"`` (default) measures the trader's own grid from the live
+    W1 chart (roles from line style/position or ``role=`` tooltips); this is
+    the read to report. ``source="proposed"`` measures proposal ``candidate``
+    instead. Weekly closes only; the in-progress week is excluded. Report the
+    JSON: counts, not probabilities. Research only.
+    """
+    from app import mtf_channel
+
+    try:
+        data = await _mtf_bars(instrument)
+        bars = data["bars"]
+        if source == "chart":
+            grid = mtf_channel.grid_from_chart(bars, _mtf_chart_objects(instrument), channel_name)
+        elif source == "proposed":
+            proposal = mtf_channel.propose_channel(bars)
+            grid = mtf_channel.grid_from_proposal(bars, proposal, candidate)
+        else:
+            return {"ok": False, "error": "source must be 'chart' or 'proposed'"}
+        read = mtf_channel.read_grid(bars, grid, instrument=instrument)
+    except (mtf_channel.ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "instrument": instrument, **read,
+            "oanda_weeks_added": data["oanda_weeks_added"], "fetch_note": data["note"]}
+
+
 @mcp.tool()
 async def mt4_draw_regime(
     instrument: str,

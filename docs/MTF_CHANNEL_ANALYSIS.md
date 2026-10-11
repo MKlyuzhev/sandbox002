@@ -114,6 +114,21 @@ tracks.
 These are counts, not probabilities. A W1 channel gives a handful of air
 visits over 20 years, so treat every percentage as a tendency.
 
+**Code:** `app/mtf_channel.py` does all of the above (`read_grid`), reads the
+trader's grid from `chart.json` (`grid_from_chart`), and proposes channels
+when there is none (`propose_channel`). MCP tools `mtf_channel_read`,
+`mtf_channel_propose`, `mt4_draw_mtf_grid`; CLI
+`scripts/mtf_channel.py`. The GBP/USD example below is its regression test
+(`tests/test_mtf_channel.py`).
+
+Proposal rules: the trend starts at the 20-year extreme that came first (low:
+up, high: down). The anchored rail is the hull edge of lows (up) or highs
+(down) since then with the most touch episodes. Each swing's distance from
+that rail is a candidate width; a candidate needs two swings on it and no more
+than 10% of weekly closes beyond it, and nearby widths count as one. The
+widest swing (nothing beyond) is always listed. Picking among candidates, and
+re-anchoring, is the trader's call.
+
 ---
 
 ## 5. Example: GBP/USD W1, 2026-10-03

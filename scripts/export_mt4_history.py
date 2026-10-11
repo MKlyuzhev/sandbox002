@@ -32,42 +32,17 @@ import argparse
 import gzip
 import os
 import shutil
-import struct
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import mt4_bridge  # noqa: E402
+from app.mt4_hst import HEADER, RECORD, W1_STAMP_SHIFT, broker_ts, read_hst  # noqa: E402
 
 PERIODS = {"W": 10080, "D": 1440, "H4": 240, "H1": 60, "M30": 30, "M15": 15, "M5": 5}
-NY = ZoneInfo("America/New_York")
-HEADER = struct.Struct("<i64s12siiii52s")
-RECORD = struct.Struct("<qddddqiq")  # time, open, high, low, close, tick vol, spread, real vol
-
-
-def broker_ts(utc_rfc3339: str) -> int:
-    utc = datetime.strptime(utc_rfc3339[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-    local = utc.astimezone(NY).replace(tzinfo=None) + timedelta(hours=7)
-    return int(local.replace(tzinfo=timezone.utc).timestamp())
-
-
-def read_hst(path: Path) -> tuple[int, dict[int, tuple]]:
-    """Digits and {time: record} from a v401 file (empty if missing)."""
-    if not path.exists():
-        return 0, {}
-    data = path.read_bytes()
-    version, _c, _s, _p, digits, *_ = HEADER.unpack_from(data, 0)
-    if version != 401:
-        raise SystemExit(f"{path.name}: unsupported .hst version {version}")
-    bars = {}
-    for off in range(HEADER.size, len(data) - RECORD.size + 1, RECORD.size):
-        rec = RECORD.unpack_from(data, off)
-        bars[rec[0]] = rec
-    return digits, bars
 
 
 def read_oanda(path: Path, period: int, digits: int) -> dict[int, tuple]:
@@ -79,7 +54,7 @@ def read_oanda(path: Path, period: int, digits: int) -> dict[int, tuple]:
             t, vol, o, h, l, c, _bo, _bh, _bl, bc, _ao, _ah, _al, ac = line.rstrip().split(",")
             ts = broker_ts(t)
             if period == 10080:
-                ts += 86400  # OANDA week opens Sat 00:00 server time; MT4 W1 bars are stamped Sunday
+                ts += W1_STAMP_SHIFT
             spread = max(0, round((float(ac) - float(bc)) / point))
             bars[ts] = (ts, float(o), float(h), float(l), float(c), int(vol), spread, 0)
     return bars
