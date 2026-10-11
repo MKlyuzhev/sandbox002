@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Channel grid (MTF step 1 on W1, step 2 on D1): propose, draw on MT4, and read.
+"""Channel grid (MTF steps W1, D1, H1): propose, draw on MT4, and read.
 
 Same code as the MCP tools ``mtf_channel_propose`` / ``mt4_draw_mtf_grid`` /
 ``mtf_channel_read``. See docs/MTF_CHANNEL_ANALYSIS.md. Research only.
@@ -12,6 +12,7 @@ Examples:
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1             # D1 legs + proposals
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1 --draw      # previous + current leg
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1 --read chart --leg previous
+    .venv/bin/python scripts/mtf_channel.py USD_JPY --tf H1 --read chart  # + D1 and W1 context
 """
 
 from __future__ import annotations
@@ -33,8 +34,8 @@ async def run(args: argparse.Namespace) -> dict:
     data = await mtf_channel.load_bars(args.instrument, tf, fetch=not args.no_fetch)
     bars = data["bars"]
     legs = None
-    if tf.origin == "w1_legs":
-        legs = await mtf_channel.d1_leg_proposals(args.instrument, bars, fetch=not args.no_fetch)
+    if tf.origin == "legs":
+        legs = await mtf_channel.leg_proposals_for(args.instrument, tf, bars, fetch=not args.no_fetch)
         out: dict = {"proposal": legs}
     else:
         proposal = mtf_channel.propose_channel(bars, tf)
@@ -77,8 +78,8 @@ async def run(args: argparse.Namespace) -> dict:
     if args.read and legs:
         leg = "previous" if args.leg == "previous" else "current"
         out["read"] = {"leg": legs[leg]["leg"], **out["read"]}
-    if args.read and tf is not mtf_channel.W1:
-        out["w1_context"] = await mtf_channel.w1_context(args.instrument, fetch=not args.no_fetch)
+    if args.read:
+        out.update(await mtf_channel.contexts(args.instrument, tf, fetch=not args.no_fetch))
     return out
 
 
@@ -88,8 +89,8 @@ def main() -> int:
     parser.add_argument("--tf", default="W1", choices=sorted(mtf_channel.TFS), help="timeframe (default W1)")
     parser.add_argument("--candidate", type=int, default=0)
     parser.add_argument("--leg", default="both", choices=("both", "current", "previous"),
-                        help="D1: which leg to draw (default both) or read (default current)")
-    parser.add_argument("--previous-candidate", type=int, default=0, help="D1 previous leg's candidate")
+                        help="D1/H1: which leg to draw (default both) or read (default current)")
+    parser.add_argument("--previous-candidate", type=int, default=0, help="D1/H1 previous leg's candidate")
     parser.add_argument("--draw", action="store_true", help="draw the candidate on the live chart of --tf")
     parser.add_argument("--read", choices=("chart", "proposed"))
     parser.add_argument("--channel-name", default="")

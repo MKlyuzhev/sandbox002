@@ -233,6 +233,24 @@ def _zigzag_bars(points: list[tuple[int, float]]) -> list[dict]:
     return bars
 
 
+def _up_then_down(
+    secs: int = mtf_channel.DAY, n_up: int = 300, n_down: int = 200, width: float = 3.0
+) -> list[dict]:
+    """An up channel (slope 0.05/bar) into its top, then a channel down (0.04/bar)."""
+    up = _d1_channel_bars(n=n_up, slope=0.05, width=width)
+    top = max(range(n_up), key=lambda i: up[i]["high"])
+    down = _d1_channel_bars(n=n_down, slope=0.04, width=width, up=False)
+    shift = up[top]["high"] - max(b["high"] for b in down[:30])
+    bars = up[: top + 1] + [
+        dict(b, open=b["open"] + shift, high=b["high"] + shift, low=b["low"] + shift,
+             close=b["close"] + shift) for b in down
+    ]
+    index = mtf_channel.BarIndex(bars[:1], secs)
+    for i, b in enumerate(bars):
+        b["time"] = index.time(i)
+    return bars
+
+
 class TestLegs(unittest.TestCase):
     def test_legs_cut_on_reversals(self) -> None:
         bars = _zigzag_bars([(0, 100), (40, 120), (50, 117), (80, 105), (120, 125), (140, 112)])
@@ -250,16 +268,7 @@ class TestLegs(unittest.TestCase):
         w1_grid = mtf_channel.grid_from_proposal(w1, mtf_channel.propose_channel(w1))
         width = mtf_channel.w1_width(w1_grid)
         self.assertAlmostEqual(width, 20.4, delta=0.05)  # leg reversal = 4.08
-        # D1: up channel (slope 0.05, width 3) for 300 bars, then a channel down
-        up = _d1_channel_bars(n=300, slope=0.05, width=3.0)
-        top = max(range(300), key=lambda i: up[i]["high"])
-        down = _d1_channel_bars(n=200, slope=0.04, width=3.0, up=False)
-        shift = up[top]["high"] - max(b["high"] for b in down[:30])
-        bars = up[: top + 1]
-        for b in down:
-            t = mtf_channel.BarIndex(bars, mtf_channel.DAY).time(len(bars))
-            bars.append(dict(b, time=t, open=b["open"] + shift, high=b["high"] + shift,
-                             low=b["low"] + shift, close=b["close"] + shift))
+        bars = _up_then_down()
         r = mtf_channel.leg_proposals(bars, w1, w1_grid)
         self.assertEqual(r["previous"]["direction"], "up")
         self.assertEqual(r["current"]["direction"], "down")
@@ -273,6 +282,80 @@ class TestLegs(unittest.TestCase):
     def test_leg_must_be_known(self) -> None:
         with self.assertRaises(mtf_channel.ChannelError):
             mtf_channel.grid_from_leg([], {}, "next")
+
+
+class TestH1(unittest.TestCase):
+    def setUp(self) -> None:
+        self._prev = settings.mt4_files_dir
+        self._tmp = tempfile.TemporaryDirectory()
+        settings.mt4_files_dir = self._tmp.name
+
+    def tearDown(self) -> None:
+        settings.mt4_files_dir = self._prev
+        self._tmp.cleanup()
+
+    @staticmethod
+    async def _fake_load(_instrument, tf, **_kw):
+        tf = mtf_channel.get_tf(tf)
+        if tf.name == "W1":
+            return {"bars": _channel_bars()}
+        return {"bars": _up_then_down(width=6.0)}  # D1: legs of >= 4.08 inside W1 width 20.4
+
+    def test_bar_index_skips_weekend_hours(self) -> None:
+        fri_23 = D1_START + 4 * mtf_channel.DAY + 23 * 3600  # Fri 2000-01-07 23:00
+        bars = [{"time": fri_23 - 3600}, {"time": fri_23}]
+        index = mtf_channel.BarIndex(bars, 3600)
+        monday = fri_23 + 3600 + 2 * mtf_channel.DAY
+        self.assertEqual(index.time(2), monday)
+        self.assertEqual(index.index(monday), 2)
+        self.assertEqual(index.index(monday + 3600), 3)
+
+    def test_merge_oanda_hours(self) -> None:
+        bars = [{"time": 1791583200, "open": 1, "high": 1, "low": 1, "close": 1, "complete": True}]
+        fri = {"time": "2026-10-09T20:00:00.000000000Z", "complete": True,  # Fri 23:00 broker
+               "bid": {"o": "158.2", "h": "158.3", "l": "158.1", "c": "158.25"}}
+        sat = {"time": "2026-10-10T12:00:00.000000000Z", "complete": True,  # Sat 15:00 broker
+               "bid": {"o": "158.2", "h": "158.2", "l": "158.2", "c": "158.2"}}
+        merged, added = mtf_channel.merge_oanda_bars(bars, [fri, sat], "H1")
+        self.assertEqual(added, 1)
+        self.assertEqual(merged[-1]["time"], 1791583200 + 3600)
+
+    def test_legs_inside_a_d1_grid(self) -> None:
+        d1 = _d1_channel_bars()
+        d1_grid = mtf_channel.grid_from_proposal(d1, mtf_channel.propose_channel(d1, "D1"), 0, "D1")
+        h1 = _up_then_down(secs=3600, width=0.5)  # parent width 5.1 -> legs cut at 1.02
+        r = mtf_channel.leg_proposals(h1, d1, d1_grid, "H1")
+        self.assertAlmostEqual(r["leg_reversal"], 0.2 * mtf_channel.grid_width(d1_grid), places=6)
+        self.assertIn("d1_grid", r)
+        self.assertIn("d1_position", r["current"]["leg"]["start"])
+        self.assertEqual(r["current"]["direction"], "down")
+        grid = mtf_channel.grid_from_leg(h1, r, "current")
+        objs = mtf_channel.grid_objects(grid, "USD_JPY")
+        self.assertRegex(objs[0]["name"], r"^Channel USDJPY H1 leg \d{4}-\d\d-\d\d \d\d:\d\d$")
+        self.assertEqual(objs[0]["color"], mtf_channel.H1.color)
+        self.assertLessEqual(max(len(o["name"]) for o in objs), 63)
+
+    def test_parent_grid_is_the_current_d1_leg(self) -> None:
+        with mock.patch.object(mtf_channel, "load_bars", self._fake_load):
+            bars, grid = asyncio.run(mtf_channel.parent_grid("USD_JPY", "H1"))
+        self.assertEqual(grid.tf.name, "D1")
+        self.assertTrue(grid.source.startswith("proposal: current leg"))
+        with mock.patch.object(mtf_channel, "load_bars", self._fake_load):
+            d1 = asyncio.run(mtf_channel.leg_proposals_for("USD_JPY", "D1", bars))
+        self.assertEqual(grid.label, d1["current"]["leg"]["label"])
+
+    def test_contexts_chain(self) -> None:
+        with mock.patch.object(mtf_channel, "load_bars", self._fake_load):
+            ctx = asyncio.run(mtf_channel.contexts("USD_JPY", "H1"))
+        self.assertEqual(set(ctx), {"d1_context", "w1_context"})
+        self.assertIn("lines_next_day", ctx["d1_context"])
+        self.assertTrue(ctx["d1_context"]["leg"].startswith("leg "))
+        self.assertIn("lines_next_week", ctx["w1_context"])
+
+    def test_draw_refuses_without_live_h1_chart(self) -> None:
+        out = asyncio.run(oanda_mcp.mt4_draw_mtf_grid("USD_JPY", timeframe="H1"))
+        self.assertFalse(out["ok"])
+        self.assertIn("SandboxChartBridge", out["error"])
 
 
 class TestW1Context(unittest.TestCase):

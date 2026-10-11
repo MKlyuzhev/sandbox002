@@ -780,9 +780,10 @@ def _mtf_fetch_info(data: dict) -> dict:
 async def mtf_channel_propose(instrument: str, timeframe: str = "W1") -> dict:
     """Propose trend channels for the MTF grid (docs/MTF_CHANNEL_ANALYSIS.md).
 
-    ``timeframe``: ``W1`` (step 1, 20-year origin) or ``D1`` (step 2). On D1
-    the channels follow the movements inside the W1 channel: legs cut by
-    reversals of one W1 air band (20% of the W1 width), with a proposal for
+    ``timeframe``: ``W1`` (step 1, 20-year origin), ``D1`` (step 2) or ``H1``
+    (step 3). D1 channels follow the movements inside the W1 channel, H1
+    channels those inside the current D1 leg's channel: legs cut by reversals
+    of one parent air band (20% of the parent's width), with a proposal for
     the ``previous`` (last completed) and ``current`` leg, each run on that
     leg's bars. Code picks the trend origin and anchored rail, then ranks
     candidate widths for the opposite rail (swings sitting on it, closes
@@ -795,8 +796,8 @@ async def mtf_channel_propose(instrument: str, timeframe: str = "W1") -> dict:
     try:
         tf = mtf_channel.get_tf(timeframe)
         data = await _mtf_bars(instrument, tf.name)
-        if tf.origin == "w1_legs":
-            proposal = await mtf_channel.d1_leg_proposals(instrument, data["bars"])
+        if tf.origin == "legs":
+            proposal = await mtf_channel.leg_proposals_for(instrument, tf, data["bars"])
         else:
             proposal = mtf_channel.propose_channel(data["bars"], tf)
     except (mtf_channel.ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
@@ -815,13 +816,14 @@ async def mt4_draw_mtf_grid(
 ) -> dict:
     """Draw a proposed grid (channel, center, two dotted air lines) on MT4.
 
-    ``timeframe`` is ``W1`` or ``D1``. Needs SandboxChartBridge on the
+    ``timeframe`` is ``W1``, ``D1`` or ``H1``. Needs SandboxChartBridge on the
     instrument's chart of that timeframe. Lines are the trader's editable
     objects (``Channel <SYM> W1``, ``Trendline <SYM> W1 <role>``); a line
     already on the chart is left as is and listed in ``already_present``
-    (delete it in MT4 to redraw). On D1, ``leg`` is ``current``, ``previous``
-    or ``both`` (default); names carry the leg (``Channel <SYM> D1 leg
-    <start date>``), the current leg is blue and the previous grey;
+    (delete it in MT4 to redraw). On D1 and H1, ``leg`` is ``current``,
+    ``previous`` or ``both`` (default); names carry the leg (``Channel <SYM>
+    D1 leg <start date>``), the current leg is blue (D1) or orange (H1) and
+    the previous grey;
     ``candidate`` is for the current leg, ``previous_candidate`` for the
     previous one. No orders.
     """
@@ -836,14 +838,14 @@ async def mt4_draw_mtf_grid(
         return {"ok": False, "error": reason}
     try:
         data = await _mtf_bars(instrument, tf.name)
-        if tf.origin != "w1_legs":
+        if tf.origin != "legs":
             proposal = mtf_channel.propose_channel(data["bars"], tf)
             grid = mtf_channel.grid_from_proposal(data["bars"], proposal, candidate, tf)
             draws = [(grid, proposal["candidates"][candidate])]
         else:
             if leg not in ("both", "current", "previous"):
                 return {"ok": False, "error": "leg must be 'both', 'current' or 'previous'"}
-            proposals = await mtf_channel.d1_leg_proposals(instrument, data["bars"])
+            proposals = await mtf_channel.leg_proposals_for(instrument, tf, data["bars"])
             draws = []
             for name, cand in (("previous", previous_candidate), ("current", candidate)):
                 if leg in ("both", name):
@@ -874,17 +876,17 @@ async def mtf_channel_read(
     timeframe: str = "W1",
     leg: str = "current",
 ) -> dict:
-    """The channel read (MTF step 1 on W1, step 2 on D1): zones, air visits, rail tests, levels.
+    """The channel read (MTF steps W1, D1, H1): zones, air visits, rail tests, levels.
 
     ``source="chart"`` (default) measures the trader's own grid from the live
     chart of ``timeframe`` (roles from line style/position or ``role=``
     tooltips); this is the read to report. ``source="proposed"`` measures
     proposal ``candidate`` instead. Bar closes only; the in-progress bar is
-    excluded. On D1, ``leg`` (``current`` or ``previous``) picks the leg's
-    grid (``Channel <SYM> D1 leg <start date>``; the current leg falls back to
-    the chart's only channel), and the read adds ``leg`` and ``w1_context``
-    (the W1 zone, lines and levels from the trader's W1 grid, else W1
-    candidate 0). Report the JSON: counts, not probabilities. Research only.
+    excluded. On D1 and H1, ``leg`` (``current`` or ``previous``) picks the
+    leg's grid (``Channel <SYM> <TF> leg <start date>``; the current leg falls
+    back to the chart's only channel), and the read adds ``leg`` and the
+    contexts above it: ``w1_context`` (the trader's W1 grid, else W1
+    candidate 0) and, on H1, ``d1_context`` (the current D1 leg's grid). Report the JSON: counts, not probabilities. Research only.
     """
     from app import mtf_channel
 
@@ -895,8 +897,8 @@ async def mtf_channel_read(
         if source not in ("chart", "proposed"):
             return {"ok": False, "error": "source must be 'chart' or 'proposed'"}
         legs = None
-        if tf.origin == "w1_legs":
-            legs = await mtf_channel.d1_leg_proposals(instrument, bars)
+        if tf.origin == "legs":
+            legs = await mtf_channel.leg_proposals_for(instrument, tf, bars)
             if leg not in ("current", "previous"):
                 return {"ok": False, "error": "leg must be 'current' or 'previous'"}
         if source == "chart":
@@ -917,8 +919,7 @@ async def mtf_channel_read(
         return {"ok": False, "error": str(exc)}
     out = {"ok": True, "instrument": instrument, **read, **_mtf_fetch_info(data),
            "fetch_note": data["note"]}
-    if tf is not mtf_channel.W1:
-        out["w1_context"] = await mtf_channel.w1_context(instrument)
+    out.update(await mtf_channel.contexts(instrument, tf))
     return out
 
 

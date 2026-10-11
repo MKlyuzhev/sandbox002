@@ -1,4 +1,4 @@
-# Multi-timeframe channel analysis: W1 and D1 grids
+# Multi-timeframe channel analysis: W1, D1 and H1 grids
 
 The trader's multi-timeframe read starts on the weekly chart with a five-line
 grid: the long-term trend channel, its center line, and two "air" boundaries.
@@ -230,7 +230,45 @@ Loop: W1 read → `mtf_channel_propose(timeframe="D1")` (legs + both proposals)
 
 ---
 
-## 7. Next steps
+## 7. Step 3: H1 grids
 
-What the trader reads from D1 inside the W1 context, and the H4/H1 steps, are
-not documented yet. A new timeframe is a row in `mtf_channel.TFS`.
+The same rule one level down: H1 channels capture the **movements inside the
+D1 channel**. The parent is the **current D1 leg's grid**: the trader's
+(`Channel <SYM> D1 leg <start>` in the last D1 `chart.json` capture), else its
+proposal, else the previous D1 leg's when the current one has no channel yet.
+H1 legs are cut by reversals of one D1 air band (20% of that grid's width), and
+the previous and current H1 leg each get a grid proposed on their own bars.
+
+USD/JPY, current D1 leg grid width 8.37 → H1 legs cut at 1.67
+(`d1_position`: 0 = D1 lower rail, 1 = upper rail):
+
+| Leg | From | To | D1 position |
+|---|---|---|---|
+| down | 09-02 04:00 160.39 | 09-08 05:00 152.89 | 0.90 → 0.05 |
+| up | 09-08 05:00 152.89 | 09-24 18:00 159.04 | 0.05 → 0.93 |
+| down (previous) | 09-24 18:00 159.04 | 09-30 05:00 156.38 | 0.93 → 0.67 |
+| up (current) | 09-30 05:00 156.38 | in progress, high so far 158.50 | 0.67 → 0.98 |
+
+H1 constants: as D1 (20-bar minimum and rail span, swings of +/- 5 bars, visit
+gap 2, touch gap 3) except the **touch tolerance, 0.15% of price**: 0.3% would
+be 15-40% of an H1 channel's width (19 "touches" on one EUR/USD leg), while
+0.1% moved USD/JPY's rail to an unrelated 4-yen-wide channel. Times are
+broker time and dates print with the hour (`2026-09-30 05:00`); weekend hours
+are skipped when extrapolating ("next hour" after Friday 23:00 is Monday 00:00).
+
+- **Objects:** `Channel <SYM> H1 leg <start date hour>`, current leg orange,
+  previous grey.
+- **Contexts:** the H1 read adds `d1_context` (the current D1 leg's grid: zone,
+  lines for the next daily close, levels; `source` says chart or proposal) and
+  `w1_context`.
+- `pips_per_year` is the slope times 6,240 hours; it says little on H1.
+
+Loop: as D1 with `timeframe="H1"`, after the W1 and D1 reads. The MT4 window
+must show H1 to draw; D1 and W1 lines stay on it when it is switched.
+
+---
+
+## 8. Next steps
+
+What the trader reads from D1 and H1 inside the W1 context is not documented
+yet. A new timeframe is a row in `mtf_channel.TFS` with its `parent`.

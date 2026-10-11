@@ -1,6 +1,6 @@
 """Channel grid for the multi-timeframe read (docs/MTF_CHANNEL_ANALYSIS.md).
 
-Step 1 is W1, step 2 is D1 (``TFS``). Five parallel lines: the trend channel's two rails, the
+Step 1 is W1, step 2 is D1, step 3 is H1 (``TFS``). Five parallel lines: the trend channel's two rails, the
 center line, and two "air" boundaries ``air`` (20%) of the width in from each
 rail. Everything here is code-owned: the planner calls it and reports the JSON;
 it does not pick anchors or compute zones in prose.
@@ -14,7 +14,8 @@ it does not pick anchors or compute zones in prose.
 - ``grid_objects`` gives the five lines as editable bridge objects.
 - ``w1_context`` is the W1 read a lower-timeframe read is reported against.
 - ``legs`` / ``leg_proposals``: D1 channels follow the movements inside the
-  W1 channel, one per leg (a reversal of one W1 air band ends a leg).
+  W1 channel, H1 channels those inside the D1 channel: one per leg, and a
+  reversal of one parent air band ends a leg.
 
 Lines are evaluated by **bar index**, the way MT4 draws them. Research only;
 nothing here places, modifies, or closes orders.
@@ -68,8 +69,9 @@ class TF:
     visit_gap: int
     touch_gap: int
     touch_tol: float
-    origin: str = "extreme"  # "w1_legs": one channel per leg inside the W1 channel
+    origin: str = "extreme"  # "legs": one channel per leg inside the parent's channel
     color: str = "#FFFF00"
+    parent: str = ""
 
 
 TFS = {
@@ -78,11 +80,15 @@ TFS = {
     # one channel per W1 leg (``leg_proposals``); ``lookback`` only applies to
     # ``propose_channel`` called on all bars. OANDA's 17:00 NY day opens 00:00 broker.
     "D1": TF("D1", 1440, "D", DAY, 0, "day", 260, 260, 20, 20, 5, 2, 3, TOUCH_TOL,
-             "w1_legs", "#00BFFF"),
+             "legs", "#00BFFF", "W1"),
+    # inside the current D1 leg; 0.3% of price would be 15-40% of an H1 channel's width
+    "H1": TF("H1", 60, "H1", 3600, 0, "hour", 6240, 6240, 20, 20, 5, 2, 3, 0.0015,
+             "legs", "#FF8C00", "D1"),
 }
 W1 = TFS["W1"]
 D1 = TFS["D1"]
-LEG_REVERSAL = AIR  # of the W1 width: a reversal this large ends a leg
+H1 = TFS["H1"]
+LEG_REVERSAL = AIR  # of the parent's width: a reversal this large ends a leg
 PREVIOUS_LEG_COLOR = "#A0A0A0"
 
 
@@ -152,7 +158,7 @@ def merge_oanda_bars(
 ) -> tuple[list[dict], int]:
     """Append/replace with OANDA bid candles stamped like MT4 bars.
 
-    D1 skips weekend-stamped candles: the .hst export folds them away.
+    D1 and below skip weekend-stamped candles: the .hst export folds them away.
     """
     tf = get_tf(tf)
     by_time = {b["time"]: dict(b) for b in bars}
@@ -165,7 +171,7 @@ def merge_oanda_bars(
         t = broker_ts(c["time"]) + tf.stamp_shift
         if t < last:
             continue
-        if tf.bar_secs == DAY and datetime.fromtimestamp(t, timezone.utc).weekday() >= 5:
+        if tf.bar_secs <= DAY and datetime.fromtimestamp(t, timezone.utc).weekday() >= 5:
             continue
         if t not in by_time:
             added += 1
@@ -244,7 +250,7 @@ class Line:
 class BarIndex:
     """Bar time ↔ index, extrapolating one bar per ``bar_secs`` past either end.
 
-    D1 extrapolation counts weekdays only, as MT4 has no weekend bars.
+    D1 and below count weekday bars only, as MT4 has no weekend bars.
     """
 
     def __init__(self, bars: list[dict], bar_secs: int = WEEK) -> None:
@@ -252,17 +258,17 @@ class BarIndex:
         self.bar_secs = bar_secs
 
     def _bars_between(self, t0: int, t1: int) -> float:
-        if self.bar_secs != DAY:
+        if self.bar_secs > DAY:
             return (t1 - t0) / self.bar_secs
         sign = 1 if t1 >= t0 else -1
         a, b = sorted((t0, t1))
-        days = 0
-        d = a + DAY
-        while d <= b:
-            if datetime.fromtimestamp(d, timezone.utc).weekday() < 5:
-                days += 1
-            d += DAY
-        return sign * days
+        count = 0
+        t = a + self.bar_secs
+        while t <= b:
+            if datetime.fromtimestamp(t, timezone.utc).weekday() < 5:
+                count += 1
+            t += self.bar_secs
+        return sign * count
 
     def index(self, t: int) -> float:
         times = self.times
@@ -274,9 +280,9 @@ class BarIndex:
         return float(k)
 
     def _step(self, t: int, k: int) -> int:
-        if self.bar_secs != DAY:
+        if self.bar_secs > DAY:
             return t + k * self.bar_secs
-        step = DAY if k > 0 else -DAY
+        step = self.bar_secs if k > 0 else -self.bar_secs
         for _ in range(abs(k)):
             t += step
             while datetime.fromtimestamp(t, timezone.utc).weekday() >= 5:
@@ -871,8 +877,11 @@ async def w1_context(
 # ---------------------------------------------------------------- D1 legs
 
 
-def w1_width(grid: Grid) -> float:
+def grid_width(grid: Grid) -> float:
     return abs(grid.lines["upper"].p1 - grid.lines["lower"].p1)
+
+
+w1_width = grid_width
 
 
 def legs(bars: list[dict], threshold: float) -> list[dict[str, Any]]:
@@ -934,9 +943,12 @@ def leg_label(leg: dict[str, Any], tf: TF = D1) -> str:
     return f"leg {_date(leg['start_time'], tf)}"
 
 
-def _leg_summary(leg: dict[str, Any], w1_bars: list[dict], grid: Grid, tf: TF) -> dict[str, Any]:
-    index = BarIndex(w1_bars)
-    w = w1_width(grid)
+def _leg_summary(
+    leg: dict[str, Any], parent_bars: list[dict], grid: Grid, tf: TF
+) -> dict[str, Any]:
+    index = BarIndex(parent_bars, grid.tf.bar_secs)
+    w = grid_width(grid)
+    key = f"{grid.tf.name.lower()}_position"
 
     def pos(t: int, price: float) -> float:
         return round((price - grid.lines["lower"].at(index.index(t))) / w, 2)
@@ -945,46 +957,47 @@ def _leg_summary(leg: dict[str, Any], w1_bars: list[dict], grid: Grid, tf: TF) -
         "direction": leg["direction"],
         "label": leg_label(leg, tf),
         "start": {"date": _date(leg["start_time"], tf), "price": leg["start_price"],
-                  "w1_position": pos(leg["start_time"], leg["start_price"])},
+                  key: pos(leg["start_time"], leg["start_price"])},
         "end": None,
     }
     if leg["end_time"] is not None:
         out["end"] = {"date": _date(leg["end_time"], tf), "price": leg["end_price"],
-                      "w1_position": pos(leg["end_time"], leg["end_price"])}
+                      key: pos(leg["end_time"], leg["end_price"])}
         out["bars"] = leg["end_index"] - leg["start_index"] + 1
     else:
         x = leg["extreme_so_far"]
         out["extreme_so_far"] = {"date": _date(x["time"], tf), "price": x["price"],
-                                 "w1_position": pos(x["time"], x["price"])}
+                                 key: pos(x["time"], x["price"])}
     return out
 
 
 def leg_proposals(
-    bars: list[dict], w1_bars: list[dict], grid: Grid, tf: str | TF = D1, history: int = 4
+    bars: list[dict], parent_bars: list[dict], grid: Grid, tf: str | TF = D1, history: int = 4
 ) -> dict[str, Any]:
     """Channels for the last completed leg and the leg in progress.
 
-    Legs are cut by reversals of ``LEG_REVERSAL`` of the W1 width (one W1 air
-    band). Each leg's channel is ``propose_channel`` on that leg's bars only,
-    so its origin is the leg's start. ``w1_position`` is 0 at the W1 lower
-    rail and 1 at the upper rail.
+    ``grid`` is the parent's (W1 for D1, the current D1 leg for H1). Legs are
+    cut by reversals of ``LEG_REVERSAL`` of its width (one parent air band).
+    Each leg's channel is ``propose_channel`` on that leg's bars only, so its
+    origin is the leg's start. ``<parent>_position`` is 0 at the parent's
+    lower rail and 1 at its upper rail.
     """
     tf = get_tf(tf)
     done = [b for b in bars if b.get("complete", True)]
-    threshold = LEG_REVERSAL * w1_width(grid)
+    threshold = LEG_REVERSAL * grid_width(grid)
     lg = legs(done, threshold)
     if len(lg) < 2:
         raise ChannelError(f"fewer than two {tf.name} legs of {threshold:.5g} or more")
     out: dict[str, Any] = {
         "timeframe": tf.name,
         "leg_reversal": round(threshold, 6),
-        "w1_grid": grid.source,
-        "legs": [_leg_summary(x, w1_bars, grid, tf) for x in lg[-history:]],
+        f"{grid.tf.name.lower()}_grid": grid.source,
+        "legs": [_leg_summary(x, parent_bars, grid, tf) for x in lg[-history:]],
     }
     for name, leg in (("previous", lg[-2]), ("current", lg[-1])):
         end = leg["end_index"] if leg["end_index"] is not None else len(done) - 1
         seg = done[leg["start_index"] : end + 1]
-        summary = _leg_summary(leg, w1_bars, grid, tf)
+        summary = _leg_summary(leg, parent_bars, grid, tf)
         try:
             out[name] = {"leg": summary, **propose_channel(seg, tf, lookback=len(seg))}
         except ChannelError as exc:
@@ -1008,11 +1021,70 @@ def grid_from_leg(
     return grid
 
 
-async def d1_leg_proposals(
-    instrument: str, d1_bars: list[dict], *, fetch: bool = True, w1_channel_name: str = ""
+async def parent_grid(
+    instrument: str, tf: str | TF, *, fetch: bool = True
+) -> tuple[list[dict], Grid]:
+    """Parent bars and the grid ``tf``'s legs are cut inside.
+
+    W1: the trader's W1 grid (``w1_grid``). A legs timeframe (D1 for H1): its
+    current leg's grid from the last ``chart.json`` capture of that timeframe
+    (by name), else the current leg's proposal, else the previous leg's when
+    the current one is too young for a channel. ``grid.source`` says which.
+    """
+    from app import trader_outbox
+
+    parent = get_tf(get_tf(tf).parent)
+    if parent.origin != "legs":
+        return await w1_grid(instrument, fetch=fetch)
+    bars = (await load_bars(instrument, parent, fetch=fetch))["bars"]
+    proposals = await leg_proposals_for(instrument, parent, bars, fetch=fetch)
+    objects = trader_outbox.load_chart(mt4_bridge.chart_dir(instrument, parent.name)).get("objects") or []
+    name = leg_channel_name(instrument, proposals, "current")
+    if name in {o.get("name") for o in objects if o.get("type") == "channel"}:
+        grid = grid_from_chart(bars, objects, name, parent)
+        grid.source = f"chart: {name}"
+        grid.label = proposals["current"]["leg"]["label"]
+    else:
+        leg = "current" if "error" not in proposals["current"] else "previous"
+        grid = grid_from_leg(bars, proposals, leg)
+        grid.source = f"proposal: {grid.source}"
+    return bars, grid
+
+
+async def leg_proposals_for(
+    instrument: str, tf: str | TF, bars: list[dict], *, fetch: bool = True
 ) -> dict[str, Any]:
-    w1_bars, grid = await w1_grid(instrument, fetch=fetch, channel_name=w1_channel_name)
-    return leg_proposals(d1_bars, w1_bars, grid, D1)
+    """``leg_proposals`` for ``tf`` (D1, H1) inside its parent's grid."""
+    tf = get_tf(tf)
+    parent_bars, grid = await parent_grid(instrument, tf, fetch=fetch)
+    return leg_proposals(bars, parent_bars, grid, tf)
+
+
+async def d1_leg_proposals(instrument: str, d1_bars: list[dict], *, fetch: bool = True) -> dict[str, Any]:
+    return await leg_proposals_for(instrument, D1, d1_bars, fetch=fetch)
+
+
+async def contexts(instrument: str, tf: str | TF, *, fetch: bool = True) -> dict[str, Any]:
+    """The reads of every timeframe above ``tf``: ``d1_context`` (the current
+    D1 leg's grid) for H1, and ``w1_context``. Errors come back per context."""
+    out: dict[str, Any] = {}
+    tf = get_tf(tf)
+    while tf.parent:
+        parent = get_tf(tf.parent)
+        key = f"{parent.name.lower()}_context"
+        if parent.origin != "legs":
+            out[key] = await w1_context(instrument, fetch=fetch)
+        else:
+            try:
+                bars, grid = await parent_grid(instrument, tf, fetch=fetch)
+                r = read_grid(bars, grid, instrument=instrument)
+                out[key] = {"leg": grid.label, **{k: r[k] for k in (
+                    "source", "warnings", "trend", "last_close", "zone",
+                    f"lines_next_{parent.unit}", "levels")}}
+            except (ChannelError, mt4_bridge.Mt4BridgeError, OSError, ValueError) as exc:
+                out[key] = {"error": str(exc)}
+        tf = parent
+    return out
 
 
 def leg_channel_name(instrument: str, proposals: dict[str, Any], leg: str = "current") -> str:
