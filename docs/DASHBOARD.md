@@ -36,7 +36,7 @@ reachability and resident tags, GPU memory/util, optional MT4 heartbeat age.
 
 ## 2. First slice (implemented)
 
-Tabs: **Terminal** | **Journal** | **Trades** | **GPU**.
+Tabs: **Terminal** | **Journal** | **Trades** | **Plans** | **GPU**.
 
 ### Terminal (command runner)
 
@@ -93,6 +93,29 @@ analyses. Buttons:
 While the dashboard runs, a background task syncs the MT4 outbox into the
 trader journal every 5 s whenever an EA heartbeat is live. See
 [Trader knowledge](TRADER_KNOWLEDGE.md) §3a. No orders.
+
+### Plans (order tickets from the journal)
+
+A plan is a `pre_trade` analysis with an order spec (`order`: type, price,
+SL, TP, expiry, default risk, checks); see [Trader knowledge](TRADER_KNOWLEDGE.md)
+§3a. The tab lists active plans (tick the box for superseded / cancelled).
+Selecting one shows:
+
+- **Order ticket**: the MT4 order as you type it (F9 → Pending Order), with
+  **Copy order**. You place it in MT4; the dashboard has no order endpoint.
+- **Size**: lots for a risk amount in your account currency (remembered in
+  the browser), rounded down to 0.01, with the stop/target pips and R. Pip
+  value comes from OANDA mid prices (the EA does not export the balance).
+- **Price**: live bid/ask and how far price must move to trigger the order.
+- **Checks** (Refresh): each check's grid line at the last completed bar of
+  its timeframe vs that close (`holds` / `FAILED`), from your grids in the
+  last `chart.json` capture, else the proposals.
+- **Draw levels on MT4** (`sbox.plan.<id>.`), **Cancel plan** (journal
+  status only; the MT4 order is untouched), **Link** a ticket by number.
+
+API: `GET /api/trader/plans`, `GET /api/trader/plans/{id}?risk=&ccy=`,
+`GET /api/trader/plans/{id}/checks`, `POST .../draw`, `POST .../status?status=`,
+`POST .../link?ticket=`.
 
 ### GPU / host
 

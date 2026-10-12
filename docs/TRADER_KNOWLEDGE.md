@@ -91,6 +91,18 @@ in the `definitions` table / MCP `trader_definitions`.
   `mt4_upsert_objects`). A `pre_trade` analysis with no ticket attaches to the
   next ticket on that symbol opened within 24 h. Analyses never change review
   scores and are **not** ingested into Chroma.
+- **Plans.** A `pre_trade` analysis with an `order` spec is a plan: `type`
+  (buy_limit | sell_limit | buy_stop | sell_stop), `price`, `sl`, `tp`,
+  `expiry` (broker time), default `risk` {amount, ccy}, and `checks` (a grid
+  line of W1/D1/H1 and `close_below` / `close_above`). SL and TP must sit on the
+  right side of the price. Status: `active`, `superseded` (`supersedes` on a
+  newer plan sets it; superseded analyses never auto-attach), `cancelled`. A
+  new ticket attaches to the active plan whose order it matches (same pending
+  type within 1 pip, or a filled ticket of that side within 5 pips;
+  `attach_reason='order_match'`); plans whose order does not match are not
+  attached by the 24 h window. The dashboard **Plans** tab turns a plan into
+  an order ticket the trader enters in MT4 ([Dashboard](DASHBOARD.md)); nothing
+  sends it.
 - **Replay.** `mt4_replay_trade` / **Draw on MT4** draws, on the live chart
   for the ticket's symbol (any timeframe) under `sbox.replay.<ticket>.`:
   - linked objects in their original colours;
@@ -135,6 +147,7 @@ Reload the MCP server after pull. None of these place orders.
 | `trader_link` | Link objects **selected** on the MT4 chart to a ticket |
 | `trader_record` | Order, SL/TP revisions, linked objects, review, analyses |
 | `trader_add_analysis` / `trader_analyses` | Store / list analyses (with drawable `levels`) |
+| `trader_plans` | Plans (analyses with an `order`), status, attached ticket |
 | `mt4_replay_trade` / `mt4_clear_replay` | Draw / clear a journaled trade on the live chart |
 
 Default retrieve: `search_knowledge` **without** `source`. Use `source="trader-mt4"`

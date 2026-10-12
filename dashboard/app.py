@@ -256,6 +256,89 @@ async def trader_clear(
     return result
 
 
+# ---------------------------------------------------------------- plans
+# Plans are order tickets for the trader to enter in MT4 by hand. There is no
+# endpoint that places, modifies, or closes an order.
+
+
+def _plan_summary(row: dict) -> dict:
+    o = row.get("order") or {}
+    return {
+        "id": row["id"], "symbol": row["symbol"], "timeframe": row.get("timeframe"),
+        "created_ts": row["created_ts"], "status": row.get("status"),
+        "supersedes": row.get("supersedes"), "ticket": row.get("ticket"),
+        "attach_reason": row.get("attach_reason"),
+        "type": o.get("type"), "price": o.get("price"), "sl": o.get("sl"), "tp": o.get("tp"),
+        "expiry": o.get("expiry"),
+        "title": (row.get("body_md") or "").strip().splitlines()[0].lstrip("# ")[:120],
+    }
+
+
+def _plan_or_404(request: Request, plan_id: int) -> dict:
+    try:
+        return trader_journal.plan(_trader(request), plan_id)
+    except trader_journal.TraderJournalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/trader/plans")
+async def trader_plans(request: Request, symbol: str | None = None) -> dict:
+    sym = mt4_bridge.map_symbol(symbol) if symbol else None
+    return {"plans": [_plan_summary(r) for r in _trader(request).list_plans(sym)]}
+
+
+@app.get("/api/trader/plans/{plan_id}")
+async def trader_plan(
+    plan_id: int, request: Request, risk: float | None = None, ccy: str | None = None
+) -> dict:
+    from app import trade_plan
+
+    row = _plan_or_404(request, plan_id)
+    return {"plan": row, "summary": _plan_summary(row),
+            "ticket": await trade_plan.ticket(row, risk, ccy)}
+
+
+@app.get("/api/trader/plans/{plan_id}/checks")
+async def trader_plan_checks(plan_id: int, request: Request) -> dict:
+    from app import trade_plan
+
+    row = _plan_or_404(request, plan_id)
+    instrument = trade_plan.to_instrument(row["symbol"])
+    return {"checks": await trade_plan.run_checks(instrument, row["order"])}
+
+
+@app.post("/api/trader/plans/{plan_id}/draw")
+async def trader_plan_draw(plan_id: int, request: Request) -> dict:
+    _plan_or_404(request, plan_id)
+    try:
+        result = trader_journal.draw_plan(_trader(request), plan_id)
+    except trader_journal.TraderJournalError as exc:
+        raise _journal_error(exc) from exc
+    if not result.get("ok"):
+        raise HTTPException(status_code=409, detail=result.get("error") or "draw failed")
+    return result
+
+
+@app.post("/api/trader/plans/{plan_id}/status")
+async def trader_plan_status(plan_id: int, request: Request, status: str) -> dict:
+    _plan_or_404(request, plan_id)
+    try:
+        row = trader_journal.set_plan_status(_trader(request), plan_id, status)
+    except trader_journal.TraderJournalError as exc:
+        raise _journal_error(exc) from exc
+    return _plan_summary(row)
+
+
+@app.post("/api/trader/plans/{plan_id}/link")
+async def trader_plan_link(plan_id: int, request: Request, ticket: int) -> dict:
+    _plan_or_404(request, plan_id)
+    try:
+        row = trader_journal.link_plan(_trader(request), plan_id, ticket)
+    except trader_journal.TraderJournalError as exc:
+        raise _journal_error(exc) from exc
+    return _plan_summary(row)
+
+
 @app.get("/api/jobs/schema")
 async def jobs_schema() -> dict:
     return job_schema()

@@ -138,3 +138,12 @@ tbody tr:hover, tbody tr.sel { background: #242424; }
 .hint.bad { color: #e5534b; }
 .detail .analysis h4 { margin: 10px 0 4px; font-size: 12px; color: var(--fg); }
 #trade-actions { margin-bottom: 8px; flex-wrap: wrap; }
+
+#plan-actions { margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+#plan-actions input { background: #111; color: var(--fg); border: 1px solid var(--line); padding: 4px 6px; width: 110px; }
+#plan-risk { margin-bottom: 4px; }
+.detail pre.ticket { background: #111; border: 1px solid var(--accent); padding: 8px; font-size: 13px; }
+td.ok { color: var(--ok); }
+td.bad, .st-cancelled { color: var(--err); }
+.st-superseded { color: var(--muted); }
+.st-active { color: var(--ok); }

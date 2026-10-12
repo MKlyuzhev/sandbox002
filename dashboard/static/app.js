@@ -281,6 +281,7 @@
       $("tab-" + btn.dataset.tab).classList.add("active");
       if (btn.dataset.tab === "journal") loadJournal();
       if (btn.dataset.tab === "trades") loadTrades();
+      if (btn.dataset.tab === "plans") loadPlans();
     });
   });
 
@@ -452,6 +453,173 @@
       tradeMsg("Replay cleared.");
     } catch (err) { tradeMsg(err.message, true); }
   });
+
+  // ---------------------------------------------------------------- plans
+  // Order tickets for the trader to enter in MT4; nothing here sends orders.
+
+  let selectedPlan = null;
+  let planText = "";
+  const planChecks = {};  // plan id -> last checks read, kept across re-sizing
+
+  function store(key, value) {
+    try {
+      if (value === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, value);
+    } catch (err) { /* private window: inputs just are not remembered */ }
+    return null;
+  }
+
+  function planMsg(text, bad) {
+    const el = $("plan-msg");
+    el.textContent = text || "";
+    el.className = "hint" + (bad ? " bad" : "");
+  }
+
+  function orderLabel(p) {
+    return esc((p.type || "").replace("_", " ")) + " " + (p.price ?? "");
+  }
+
+  async function loadPlans() {
+    const tb = document.querySelector("#plans-table tbody");
+    if (!tb) return;
+    try {
+      const data = await jget("/api/trader/plans");
+      const all = $("chk-plans-all").checked;
+      tb.innerHTML = "";
+      (data.plans || []).filter((p) => all || p.status === "active").forEach((p) => {
+        const tr = document.createElement("tr");
+        if (p.id === selectedPlan) tr.className = "sel";
+        tr.innerHTML =
+          "<td>" + p.id + "</td>" +
+          "<td>" + esc(p.symbol) + "</td>" +
+          "<td>" + orderLabel(p) + "</td>" +
+          "<td>" + (p.sl ?? "") + " / " + (p.tp ?? "") + "</td>" +
+          "<td class=\"st-" + esc(p.status) + "\">" + esc(p.status) + "</td>" +
+          "<td>" + fmtUnix(p.created_ts) + "</td>" +
+          "<td>" + (p.ticket ?? "") + (p.attach_reason ? " (" + esc(p.attach_reason) + ")" : "") + "</td>";
+        tr.addEventListener("click", () => { showPlan(p.id); });
+        tb.appendChild(tr);
+      });
+      if (!tb.children.length) tb.innerHTML = "<tr><td colspan=\"7\">no plans</td></tr>";
+    } catch (err) {
+      tb.innerHTML = "<tr><td colspan=\"7\">plans load failed</td></tr>";
+    }
+  }
+
+  function sizingText(t) {
+    const s = t.sizing;
+    if (!s) return t.sizing_error ? "sizing: " + t.sizing_error : "enter a risk amount to size it";
+    return "risk " + s.risk_amount + " " + s.account_ccy + "  ->  " + s.lots + " lot" +
+      (s.too_small ? "  (below 0.01: risk too small for this stop)" : "") +
+      "\nstop " + s.stop_pips + " pips, target " + s.target_pips + " pips, R " + s.r_multiple +
+      "\nat " + s.lots + " lot: lose " + s.risk_at_lots + ", win " + s.reward_at_lots + " " + s.account_ccy;
+  }
+
+  async function showPlan(id) {
+    selectedPlan = id;
+    loadPlans();
+    $("plan-risk").hidden = false;
+    $("plan-actions").hidden = false;
+    planMsg("");
+    const amount = $("plan-risk-amount").value;
+    const ccy = $("plan-risk-ccy").value || store("planCcy") || "";
+    const q = new URLSearchParams();
+    if (amount) q.set("risk", amount);
+    if (ccy) q.set("ccy", ccy);
+    $("plan-detail").textContent = "Loading…";
+    try {
+      const r = await jget("/api/trader/plans/" + id + "?" + q.toString());
+      const t = r.ticket;
+      const o = t.order;
+      if (!amount && o.risk) $("plan-risk-amount").value = o.risk.amount;
+      if (!$("plan-risk-ccy").value) $("plan-risk-ccy").value = (t.sizing && t.sizing.account_ccy) || (o.risk && o.risk.ccy) || "USD";
+      planText = t.text;
+      const d = t.price ? t.price.distance_pips : null;
+      const px = t.price
+        ? "bid " + t.price.bid + "  ask " + t.price.ask + "  ->  " +
+          (o.type.startsWith("sell") ? "bid" : "ask") + " must " + (d < 0 ? "fall " : "rise ") +
+          Math.abs(d) + " pips to trigger " + o.price
+        : (t.price_error || "no live price");
+      const checks = planChecks[id]
+        ? checkRows(planChecks[id])
+        : (o.checks || []).map((c) => "<tr><td>" + esc(c.label) + "</td><td>" +
+          esc(c.timeframe + " " + c.leg + " " + c.line) + "</td><td>" + esc(c.rule) +
+          "</td><td colspan=\"3\" class=\"hint\">press Refresh checks</td></tr>").join("");
+      $("plan-detail").innerHTML =
+        "<h3>#" + r.plan.id + " " + esc(r.plan.symbol) + " — " + esc(r.plan.status) +
+        (r.plan.ticket ? " — ticket " + r.plan.ticket : "") + "</h3>" +
+        "<h3>Order ticket</h3><pre class=\"ticket\">" + esc(t.text) + "</pre>" +
+        "<h3>Size</h3><pre>" + esc(sizingText(t)) + "</pre>" +
+        "<h3>Price</h3><pre>" + esc(px) + "</pre>" +
+        "<h3>Checks</h3><table id=\"plan-checks\"><thead><tr><th>check</th><th>line</th><th>rule</th>" +
+        "<th>last close</th><th>line</th><th>ok</th></tr></thead><tbody>" +
+        (checks || "<tr><td colspan=\"6\">none</td></tr>") + "</tbody></table>" +
+        "<h3>Plan</h3><pre>" + esc(r.plan.body_md) + "</pre>";
+    } catch (err) {
+      $("plan-detail").textContent = "plan load failed: " + err.message;
+    }
+  }
+
+  function checkRows(checks) {
+    return checks.map((c) =>
+      "<tr><td>" + esc(c.label) + "</td><td>" + esc(c.timeframe + " " + c.leg + " " + c.line) +
+      "</td><td>" + esc(c.rule) + "</td><td>" + (c.close ?? "") + " " + esc(c.bar || "") +
+      "</td><td>" + (c.line_at_close ?? "") + "</td><td class=\"" +
+      (c.ok === true ? "ok" : c.ok === false ? "bad" : "") + "\">" +
+      (c.ok === true ? "holds" : c.ok === false ? "FAILED" : esc(c.error || "?")) + "</td></tr>"
+    ).join("") || "<tr><td colspan=\"6\">none</td></tr>";
+  }
+
+  async function refreshChecks() {
+    if (!selectedPlan) return;
+    const id = selectedPlan;
+    planMsg("Reading the grids…");
+    try {
+      const r = await jget("/api/trader/plans/" + id + "/checks");
+      planChecks[id] = r.checks || [];
+      if (id !== selectedPlan) return;
+      document.querySelector("#plan-checks tbody").innerHTML = checkRows(planChecks[id]);
+      planMsg("Checks read " + new Date().toISOString().slice(11, 16) + " UTC.");
+    } catch (err) { planMsg(err.message, true); }
+  }
+
+  $("chk-plans-all").addEventListener("change", loadPlans);
+  $("btn-plan-size").addEventListener("click", () => {
+    store("planCcy", $("plan-risk-ccy").value.toUpperCase());
+    if (selectedPlan) showPlan(selectedPlan);
+  });
+  $("btn-plan-checks").addEventListener("click", refreshChecks);
+  $("btn-plan-copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(planText);
+      planMsg("Order copied. Enter it in MT4 (F9).");
+    } catch (err) { planMsg("Copy failed; select the ticket text instead.", true); }
+  });
+  $("btn-plan-draw").addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      const r = await jpost("/api/trader/plans/" + selectedPlan + "/draw");
+      planMsg("Drawn " + r.objects_written + " levels on " + r.timeframe + ".");
+    } catch (err) { planMsg(err.message, true); }
+  });
+  $("btn-plan-cancel").addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await jpost("/api/trader/plans/" + selectedPlan + "/status?status=cancelled");
+      planMsg("Plan cancelled (the MT4 order, if any, is untouched).");
+      showPlan(selectedPlan);
+    } catch (err) { planMsg(err.message, true); }
+  });
+  $("btn-plan-link").addEventListener("click", async () => {
+    const ticket = $("plan-link-ticket").value;
+    if (!selectedPlan || !ticket) return;
+    try {
+      await jpost("/api/trader/plans/" + selectedPlan + "/link?ticket=" + encodeURIComponent(ticket));
+      planMsg("Linked to ticket " + ticket + ".");
+      showPlan(selectedPlan);
+    } catch (err) { planMsg(err.message, true); }
+  });
+  try { $("plan-risk-ccy").value = store("planCcy") || ""; } catch (err) { /* ignore */ }
 
   function bar(pct) {
     const n = Math.max(0, Math.min(100, Number(pct) || 0));

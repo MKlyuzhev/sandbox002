@@ -19,6 +19,7 @@
     <button type="button" data-tab="terminal" class="active">Terminal</button>
     <button type="button" data-tab="journal">Journal</button>
     <button type="button" data-tab="trades">Trades</button>
+    <button type="button" data-tab="plans">Plans</button>
     <button type="button" data-tab="gpu">GPU / host</button>
   </nav>
   <main>
@@ -94,6 +95,45 @@
           </div>
           <p class="hint" id="trade-msg"></p>
           <div id="trade-detail">Select a trade.</div>
+        </div>
+      </div>
+    </section>
+    <section id="tab-plans" class="tab">
+      <div class="journal-layout">
+        <div class="journal-table-wrap">
+          <label class="hint"><input type="checkbox" id="chk-plans-all"> show superseded / cancelled</label>
+          <table id="plans-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>symbol</th>
+                <th>order</th>
+                <th>SL / TP</th>
+                <th>status</th>
+                <th>written (UTC)</th>
+                <th>ticket</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p class="hint">Plans are order tickets you enter in MT4 yourself (F9). The dashboard never sends orders.</p>
+        </div>
+        <div class="detail">
+          <div class="job-form" id="plan-risk" hidden>
+            <label>risk amount <input type="number" id="plan-risk-amount" min="0" step="any"></label>
+            <label>account ccy <input type="text" id="plan-risk-ccy" maxlength="3" size="4"></label>
+            <button type="button" id="btn-plan-size">Size</button>
+          </div>
+          <div class="job-actions" id="plan-actions" hidden>
+            <button type="button" id="btn-plan-copy">Copy order</button>
+            <button type="button" id="btn-plan-checks">Refresh checks</button>
+            <button type="button" id="btn-plan-draw">Draw levels on MT4</button>
+            <button type="button" id="btn-plan-cancel">Cancel plan</button>
+            <label class="hint">ticket <input type="number" id="plan-link-ticket" size="10"></label>
+            <button type="button" id="btn-plan-link">Link</button>
+          </div>
+          <p class="hint" id="plan-msg"></p>
+          <div id="plan-detail">Select a plan.</div>
         </div>
       </div>
     </section>

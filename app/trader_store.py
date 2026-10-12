@@ -127,6 +127,15 @@ ANALYSIS_ATTACH_WINDOW_SEC = 24 * 3600
 
 _LINK_EXTRAS = (("object_json", "TEXT"), ("source", "TEXT"), ("linked_ts", "INTEGER"))
 _ORDER_EXTRAS = (("utc_offset", "INTEGER"),)
+# A plan is a pre_trade analysis with an order spec (``order_json``) for the
+# trader to enter by hand; nothing here sends it.
+_ANALYSIS_EXTRAS = (("order_json", "TEXT"), ("status", "TEXT"), ("supersedes", "INTEGER"))
+PLAN_STATUSES = ("active", "superseded", "cancelled")
+ORDER_TYPES = ("buy_limit", "sell_limit", "buy_stop", "sell_stop")
+# Ticket open price vs plan price: a pending order sits on the plan price; a
+# market ticket (the pending one filled before the first sync) may slip.
+PENDING_MATCH_PIPS = 1.0
+FILLED_MATCH_PIPS = 5.0
 
 
 def _same(a: float | None, b: float | None) -> bool:
@@ -149,7 +158,9 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    for table, extras in (("links", _LINK_EXTRAS), ("orders", _ORDER_EXTRAS)):
+    for table, extras in (
+        ("links", _LINK_EXTRAS), ("orders", _ORDER_EXTRAS), ("analyses", _ANALYSIS_EXTRAS)
+    ):
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         for name, typ in extras:
             if name not in cols:
@@ -160,7 +171,27 @@ def _analysis_row(row: sqlite3.Row) -> dict[str, Any]:
     data = dict(row)
     data["refs"] = json.loads(data.pop("refs_json") or "[]")
     data["levels"] = json.loads(data.pop("levels_json") or "[]")
+    data["order"] = json.loads(data.pop("order_json") or "null")
     return data
+
+
+def _pip(symbol: str) -> float:
+    return 0.01 if "JPY" in symbol.upper() else 0.0001
+
+
+def order_matches(plan_order: dict[str, Any], ticket: dict[str, Any], symbol: str) -> bool:
+    """A ticket is this plan's order: same side, and the plan's pending type at
+    the plan price, or a market ticket of that side filled near it."""
+    ptype = str(plan_order.get("type") or "")
+    ttype = str(ticket.get("type") or "")
+    side = ptype.split("_")[0]
+    try:
+        gap = abs(float(ticket.get("open_price")) - float(plan_order["price"])) / _pip(symbol)
+    except (TypeError, ValueError, KeyError):
+        return False
+    if ttype == ptype:
+        return gap <= PENDING_MATCH_PIPS
+    return ttype == side and gap <= FILLED_MATCH_PIPS
 
 
 class TraderStore:
@@ -642,8 +673,14 @@ class TraderStore:
         levels: list[dict[str, Any]] | None = None,
         drawn_prefix: str = "",
         created_ts: int | None = None,
+        order: dict[str, Any] | None = None,
+        supersedes: int | None = None,
     ) -> dict[str, Any]:
-        """Store an analysis verbatim. It never changes code-owned review scores."""
+        """Store an analysis verbatim. It never changes code-owned review scores.
+
+        ``order`` makes it a plan (validated by ``trader_journal``); ``supersedes``
+        marks an earlier plan superseded.
+        """
         if kind not in ANALYSIS_KINDS:
             raise ValueError(f"kind must be one of {ANALYSIS_KINDS}")
         if author not in ANALYSIS_AUTHORS:
@@ -655,8 +692,9 @@ class TraderStore:
                 """
                 INSERT INTO analyses (
                     ticket, symbol, timeframe, kind, author, model, created_ts,
-                    body_md, refs_json, levels_json, drawn_prefix, attach_reason
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    body_md, refs_json, levels_json, drawn_prefix, attach_reason,
+                    order_json, status, supersedes
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     ticket,
@@ -671,8 +709,15 @@ class TraderStore:
                     json.dumps(levels or [], default=str),
                     drawn_prefix or None,
                     "explicit" if ticket else None,
+                    json.dumps(order) if order else None,
+                    "active" if order else None,
+                    supersedes,
                 ),
             )
+            if supersedes:
+                conn.execute(
+                    "UPDATE analyses SET status='superseded' WHERE id=?", (int(supersedes),)
+                )
             conn.commit()
             analysis_id = int(cur.lastrowid)
         found = self.get_analysis(analysis_id)
@@ -697,25 +742,87 @@ class TraderStore:
     def attach_recent_analyses(self, ticket: int, symbol: str, open_ts: int) -> list[int]:
         """Attach unattached pre-trade analyses written shortly before a new ticket.
 
-        ``open_ts`` must be on the same clock as ``created_ts`` (UTC).
+        ``open_ts`` must be on the same clock as ``created_ts`` (UTC). An active
+        plan whose order matches the ticket attaches as ``order_match`` (any age);
+        if one does, only it is attached. Otherwise plain analyses (no order) in
+        the window attach as ``auto_window``. Superseded or cancelled plans and
+        plans whose order does not match are never auto-attached.
         """
+        order = self.get_order(ticket) or {}
         with _connect(self.path) as conn:
-            rows = conn.execute(
+            plans = conn.execute(
                 """
-                SELECT id FROM analyses
+                SELECT id, order_json FROM analyses
                 WHERE ticket IS NULL AND symbol=? AND kind='pre_trade'
-                  AND created_ts BETWEEN ? AND ?
+                  AND order_json IS NOT NULL AND status='active'
+                ORDER BY created_ts DESC, id DESC
                 """,
-                (symbol, open_ts - ANALYSIS_ATTACH_WINDOW_SEC, open_ts),
+                (symbol,),
             ).fetchall()
-            ids = [int(r["id"]) for r in rows]
+            matched = [
+                int(r["id"]) for r in plans
+                if order and order_matches(json.loads(r["order_json"]), order, symbol)
+            ][:1]
+            if matched:
+                ids, reason = matched, "order_match"
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id FROM analyses
+                    WHERE ticket IS NULL AND symbol=? AND kind='pre_trade'
+                      AND order_json IS NULL AND created_ts BETWEEN ? AND ?
+                      AND COALESCE(status, '') NOT IN ('superseded', 'cancelled')
+                    """,
+                    (symbol, open_ts - ANALYSIS_ATTACH_WINDOW_SEC, open_ts),
+                ).fetchall()
+                ids, reason = [int(r["id"]) for r in rows], "auto_window"
             for aid in ids:
                 conn.execute(
-                    "UPDATE analyses SET ticket=?, attach_reason='auto_window' WHERE id=?",
-                    (ticket, aid),
+                    "UPDATE analyses SET ticket=?, attach_reason=? WHERE id=?",
+                    (ticket, reason, aid),
                 )
             conn.commit()
         return ids
+
+    def set_plan_status(self, analysis_id: int, status: str) -> None:
+        if status not in PLAN_STATUSES:
+            raise ValueError(f"status must be one of {PLAN_STATUSES}")
+        with _connect(self.path) as conn:
+            cur = conn.execute(
+                "UPDATE analyses SET status=? WHERE id=? AND order_json IS NOT NULL",
+                (status, analysis_id),
+            )
+            conn.commit()
+        if cur.rowcount == 0:
+            raise ValueError(f"analysis {analysis_id} is not a plan")
+
+    def set_plan_order(
+        self, analysis_id: int, order: dict[str, Any], supersedes: int | None = None
+    ) -> None:
+        """Give an existing analysis its order spec (backfill); validated by the caller."""
+        with _connect(self.path) as conn:
+            conn.execute(
+                "UPDATE analyses SET order_json=?, status=COALESCE(status, 'active'), "
+                "supersedes=COALESCE(?, supersedes) WHERE id=?",
+                (json.dumps(order), supersedes, analysis_id),
+            )
+            if supersedes:
+                conn.execute(
+                    "UPDATE analyses SET status='superseded' WHERE id=?", (int(supersedes),)
+                )
+            conn.commit()
+
+    def list_plans(self, symbol: str | None = None, limit: int = 200) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM analyses WHERE order_json IS NOT NULL"
+        args: list[Any] = []
+        if symbol:
+            sql += " AND symbol=?"
+            args.append(symbol)
+        sql += " ORDER BY created_ts DESC, id DESC LIMIT ?"
+        args.append(max(1, min(int(limit), 500)))
+        with _connect(self.path) as conn:
+            rows = conn.execute(sql, args).fetchall()
+        return [_analysis_row(r) for r in rows]
 
     def list_analyses(
         self,

@@ -1179,6 +1179,8 @@ async def trader_add_analysis(
     drawn_prefix: str = "",
     author: str = "claude",
     model: str = "",
+    order: dict | None = None,
+    supersedes: int = 0,
 ) -> dict:
     """Store an analysis in the trader journal (verbatim markdown).
 
@@ -1187,6 +1189,15 @@ async def trader_add_analysis(
     on the symbol opened within 24h. ``levels`` are bridge objects (same schema
     as ``mt4_upsert_objects``) redrawn on replay. Never changes review scores
     and is not ingested into the knowledge base.
+
+    ``order`` (pre_trade only) makes it a plan: an order spec the trader enters
+    in MT4 by hand from the dashboard's Plans tab; it is never sent. Keys:
+    ``type`` (buy_limit|sell_limit|buy_stop|sell_stop), ``price``, ``sl``,
+    ``tp``, ``expiry`` (broker 'YYYY-MM-DD HH:MM'), ``risk`` {amount, ccy},
+    ``checks`` [{label, timeframe W1|D1|H1, leg current|previous, line
+    lower|air_lower|center|air_upper|upper, rule close_below|close_above}].
+    ``supersedes`` marks an earlier plan superseded. A plan attaches to the
+    ticket whose type and price match its order.
     """
     from app import trader_journal
 
@@ -1203,10 +1214,20 @@ async def trader_add_analysis(
             refs=refs,
             levels=levels,
             drawn_prefix=drawn_prefix,
+            order=order,
+            supersedes=supersedes or None,
         )
     except (trader_journal.TraderJournalError, mt4_bridge.Mt4BridgeError) as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "analysis": row}
+
+
+@mcp.tool()
+async def trader_plans(instrument: str = "") -> dict:
+    """Plans (pre_trade analyses with an order spec), newest first, with status
+    (active|superseded|cancelled) and the ticket they attached to. Read-only."""
+    symbol = mt4_bridge.map_symbol(instrument) if instrument else None
+    return {"ok": True, "plans": _trader_store().list_plans(symbol)}
 
 
 @mcp.tool()

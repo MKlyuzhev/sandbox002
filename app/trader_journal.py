@@ -131,8 +131,25 @@ def add_analysis(
     refs: list[str] | None = None,
     levels: list[dict[str, Any]] | None = None,
     drawn_prefix: str = "",
+    order: dict[str, Any] | None = None,
+    supersedes: int | None = None,
 ) -> dict[str, Any]:
+    """Store an analysis. With ``order`` it is a plan: an order spec the
+    trader enters in MT4 by hand (``app.trade_plan``); nothing sends it."""
+    from app import trade_plan
+
     symbol = mt4_bridge.map_symbol(instrument)
+    if order is not None:
+        if kind != "pre_trade":
+            raise TraderJournalError("only a pre_trade analysis can carry an order")
+        try:
+            order = trade_plan.validate_order(order)
+        except (trade_plan.PlanError, ValueError) as exc:
+            raise TraderJournalError(str(exc)) from exc
+    if supersedes:
+        old = store.get_analysis(int(supersedes))
+        if old is None or old["symbol"] != symbol:
+            raise TraderJournalError(f"analysis {supersedes} is not a {symbol} analysis")
     if ticket and store.get_order(int(ticket)) is None:
         raise TraderJournalError(f"ticket {ticket} is not in the journal; run trader_sync.")
     for obj in levels or []:
@@ -150,9 +167,56 @@ def add_analysis(
             refs=refs,
             levels=levels,
             drawn_prefix=drawn_prefix,
+            order=order,
+            supersedes=int(supersedes) if supersedes else None,
         )
     except ValueError as exc:
         raise TraderJournalError(str(exc)) from exc
+
+
+def plan(store: TraderStore, analysis_id: int) -> dict[str, Any]:
+    row = store.get_analysis(int(analysis_id))
+    if row is None or not row.get("order"):
+        raise TraderJournalError(f"analysis {analysis_id} is not a plan")
+    return row
+
+
+def set_plan_status(store: TraderStore, analysis_id: int, status: str) -> dict[str, Any]:
+    plan(store, analysis_id)
+    try:
+        store.set_plan_status(int(analysis_id), status)
+    except ValueError as exc:
+        raise TraderJournalError(str(exc)) from exc
+    return plan(store, analysis_id)
+
+
+def link_plan(store: TraderStore, analysis_id: int, ticket: int) -> dict[str, Any]:
+    row = plan(store, analysis_id)
+    order = store.get_order(int(ticket))
+    if order is None:
+        raise TraderJournalError(f"ticket {ticket} is not in the journal; run trader_sync.")
+    if mt4_bridge.map_symbol(str(order.get("symbol") or "")) != row["symbol"]:
+        raise TraderJournalError(f"ticket {ticket} is {order.get('symbol')}, plan is {row['symbol']}")
+    store.attach_analysis(int(analysis_id), int(ticket), "explicit")
+    return plan(store, analysis_id)
+
+
+def draw_plan(store: TraderStore, analysis_id: int) -> dict[str, Any]:
+    """The plan's levels on the live chart for its symbol, under ``sbox.plan.<id>.``."""
+    row = plan(store, analysis_id)
+    if not row.get("levels"):
+        raise TraderJournalError(f"plan {analysis_id} has no levels")
+    try:
+        chart = mt4_bridge.live_chart_for(row["symbol"])
+    except mt4_bridge.Mt4BridgeError as exc:
+        raise TraderJournalError(str(exc)) from exc
+    result = mt4_bridge.upsert_objects(
+        row["symbol"], str(chart["timeframe"]), row["levels"],
+        prefix=f"sbox.plan.{int(analysis_id)}.", clear_prefix_first=True,
+    )
+    result.pop("status", None)
+    result["timeframe"] = chart["timeframe"]
+    return result
 
 
 def trade_summaries(store: TraderStore, symbol: str | None = None) -> list[dict[str, Any]]:
