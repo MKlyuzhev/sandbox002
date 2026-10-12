@@ -104,7 +104,7 @@ stochastics, or MACD in the model — they are already in code.
 Match the play class to the result: `join_trend`, `fade_range`, or
 `breakout_watch`. If `trend_waning` is true, **do not aggress**.
 
-**Channel grid (MTF steps W1 → D1 → H1, [MTF_CHANNEL_ANALYSIS.md](MTF_CHANNEL_ANALYSIS.md)):** all three tools take `timeframe` (`W1` default, `D1`, `H1`). D1 legs sit inside the W1 channel, H1 legs inside the current D1 leg's channel.
+**Channel grid (MTF steps W1 → D1 → H1, [MTF_CHANNEL_ANALYSIS.md](MTF_CHANNEL_ANALYSIS.md)):** all three tools take `timeframe` (`W1` default, `D1`, `H1`). D1 legs sit inside the W1 channel (cut at 20% of its width), H1 legs inside the current D1 leg's channel (cut at 50%: one crossing of it).
 
 | Tool | When | Notes |
 |------|------|--------|

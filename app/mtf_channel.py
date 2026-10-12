@@ -14,8 +14,8 @@ it does not pick anchors or compute zones in prose.
 - ``grid_objects`` gives the five lines as editable bridge objects.
 - ``w1_context`` is the W1 read a lower-timeframe read is reported against.
 - ``legs`` / ``leg_proposals``: D1 channels follow the movements inside the
-  W1 channel, H1 channels those inside the D1 channel: one per leg, and a
-  reversal of one parent air band ends a leg.
+  W1 channel, H1 channels those inside the D1 channel: one per leg, ended by
+  a reversal of ``TF.leg_reversal`` of the parent's width.
 
 Lines are evaluated by **bar index**, the way MT4 draws them. Research only;
 nothing here places, modifies, or closes orders.
@@ -72,6 +72,7 @@ class TF:
     origin: str = "extreme"  # "legs": one channel per leg inside the parent's channel
     color: str = "#FFFF00"
     parent: str = ""
+    leg_reversal: float = AIR  # of the parent's width: a reversal this large ends a leg
 
 
 TFS = {
@@ -81,14 +82,15 @@ TFS = {
     # ``propose_channel`` called on all bars. OANDA's 17:00 NY day opens 00:00 broker.
     "D1": TF("D1", 1440, "D", DAY, 0, "day", 260, 260, 20, 20, 5, 2, 3, TOUCH_TOL,
              "legs", "#00BFFF", "W1"),
-    # inside the current D1 leg; 0.3% of price would be 15-40% of an H1 channel's width
+    # inside the current D1 leg; 0.3% of price would be 15-40% of an H1 channel's width.
+    # A leg is one crossing of the D1 channel: one D1 air band cut legs at small bounces.
     "H1": TF("H1", 60, "H1", 3600, 0, "hour", 6240, 6240, 20, 20, 5, 2, 3, 0.0015,
-             "legs", "#FF8C00", "D1"),
+             "legs", "#FF8C00", "D1", leg_reversal=0.5),
 }
 W1 = TFS["W1"]
 D1 = TFS["D1"]
 H1 = TFS["H1"]
-LEG_REVERSAL = AIR  # of the parent's width: a reversal this large ends a leg
+LEG_REVERSAL = AIR  # D1's leg reversal (``TF.leg_reversal``)
 PREVIOUS_LEG_COLOR = "#A0A0A0"
 
 
@@ -977,14 +979,15 @@ def leg_proposals(
     """Channels for the last completed leg and the leg in progress.
 
     ``grid`` is the parent's (W1 for D1, the current D1 leg for H1). Legs are
-    cut by reversals of ``LEG_REVERSAL`` of its width (one parent air band).
+    cut by reversals of ``tf.leg_reversal`` of its width: one W1 air band for
+    D1, half the D1 channel for H1 (one crossing of it).
     Each leg's channel is ``propose_channel`` on that leg's bars only, so its
     origin is the leg's start. ``<parent>_position`` is 0 at the parent's
     lower rail and 1 at its upper rail.
     """
     tf = get_tf(tf)
     done = [b for b in bars if b.get("complete", True)]
-    threshold = LEG_REVERSAL * grid_width(grid)
+    threshold = tf.leg_reversal * grid_width(grid)
     lg = legs(done, threshold)
     if len(lg) < 2:
         raise ChannelError(f"fewer than two {tf.name} legs of {threshold:.5g} or more")

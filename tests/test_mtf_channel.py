@@ -323,9 +323,10 @@ class TestH1(unittest.TestCase):
     def test_legs_inside_a_d1_grid(self) -> None:
         d1 = _d1_channel_bars()
         d1_grid = mtf_channel.grid_from_proposal(d1, mtf_channel.propose_channel(d1, "D1"), 0, "D1")
-        h1 = _up_then_down(secs=3600, width=0.5)  # parent width 5.1 -> legs cut at 1.02
+        h1 = _up_then_down(secs=3600, width=0.5)  # parent width 5.1 -> legs cut at 2.55
         r = mtf_channel.leg_proposals(h1, d1, d1_grid, "H1")
-        self.assertAlmostEqual(r["leg_reversal"], 0.2 * mtf_channel.grid_width(d1_grid), places=6)
+        self.assertAlmostEqual(r["leg_reversal"], 0.5 * mtf_channel.grid_width(d1_grid), places=6)
+        self.assertEqual(mtf_channel.D1.leg_reversal, 0.2)
         self.assertIn("d1_grid", r)
         self.assertIn("d1_position", r["current"]["leg"]["start"])
         self.assertEqual(r["current"]["direction"], "down")

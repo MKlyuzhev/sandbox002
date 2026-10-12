@@ -232,22 +232,31 @@ Loop: W1 read → `mtf_channel_propose(timeframe="D1")` (legs + both proposals)
 
 ## 7. Step 3: H1 grids
 
-The same rule one level down: H1 channels capture the **movements inside the
+The same idea one level down: H1 channels capture the **movements inside the
 D1 channel**. The parent is the **current D1 leg's grid**: the trader's
 (`Channel <SYM> D1 leg <start>` in the last D1 `chart.json` capture), else its
 proposal, else the previous D1 leg's when the current one has no channel yet.
-H1 legs are cut by reversals of one D1 air band (20% of that grid's width), and
-the previous and current H1 leg each get a grid proposed on their own bars.
+An H1 leg is **one crossing of the D1 channel**: a reversal of half the D1
+width (`TF.leg_reversal = 0.5`) ends it, and the previous and current H1 leg
+each get a grid proposed on their own bars.
 
-USD/JPY, current D1 leg grid width 8.37 → H1 legs cut at 1.67
+The first version cut H1 legs at one D1 air band (20%, as D1 inside W1). A D1
+channel is narrow next to the swings inside it, so 20% cut at day-long bounces
+(EUR/USD legs of 34 and 84 bars; the current channel on a single touch). At
+35% and 50% the legs are the same on USD/JPY and EUR/USD: rail-to-rail
+crossings of the D1 channel, with channels on 7-11 swings.
+
+USD/JPY, current D1 leg grid width 8.37 → H1 legs cut at 4.18
 (`d1_position`: 0 = D1 lower rail, 1 = upper rail):
 
 | Leg | From | To | D1 position |
 |---|---|---|---|
-| down | 09-02 04:00 160.39 | 09-08 05:00 152.89 | 0.90 → 0.05 |
-| up | 09-08 05:00 152.89 | 09-24 18:00 159.04 | 0.05 → 0.93 |
-| down (previous) | 09-24 18:00 159.04 | 09-30 05:00 156.38 | 0.93 → 0.67 |
-| up (current) | 09-30 05:00 156.38 | in progress, high so far 158.50 | 0.67 → 0.98 |
+| up | 08-03 03:00 | 09-02 04:00 160.39 | 0.00 → 0.90 |
+| down (previous) | 09-02 04:00 160.39 | 09-08 05:00 152.89 | 0.90 → 0.05 |
+| up (current) | 09-08 05:00 152.89 | in progress, high so far 159.04 (09-24) | 0.05 → 0.93 |
+
+EUR/USD, D1 width 0.0492 → legs cut at 0.0246: up 06-24 → 08-21 (0.00 → 1.00,
+previous), down from 08-21 1.1711 (current, low so far 1.1160 at 0.04).
 
 H1 constants: as D1 (20-bar minimum and rail span, swings of +/- 5 bars, visit
 gap 2, touch gap 3) except the **touch tolerance, 0.15% of price**: 0.3% would
