@@ -132,6 +132,9 @@ _ORDER_EXTRAS = (("utc_offset", "INTEGER"),)
 _ANALYSIS_EXTRAS = (("order_json", "TEXT"), ("status", "TEXT"), ("supersedes", "INTEGER"))
 PLAN_STATUSES = ("active", "superseded", "cancelled")
 ORDER_TYPES = ("buy_limit", "sell_limit", "buy_stop", "sell_stop")
+# A pending order the trader deleted (or that expired) never filled: it gets no
+# close_time, so it is never scored as a trade.
+ORDER_DONE = ("closed", "deleted")
 # Ticket open price vs plan price: a pending order sits on the plan price; a
 # market ticket (the pending one filled before the first sync) may slip.
 PENDING_MATCH_PIPS = 1.0
@@ -250,9 +253,12 @@ class TraderStore:
         ticket = int(order["ticket"])
         with _connect(self.path) as conn:
             existing = conn.execute(
-                "SELECT sl_open, tp_open, utc_offset FROM orders WHERE ticket=?",
+                "SELECT sl_open, tp_open, utc_offset, status FROM orders WHERE ticket=?",
                 (ticket,),
             ).fetchone()
+            if existing and existing["status"] in ORDER_DONE and status == "open":
+                # A stale chart folder still lists it; a done ticket never reopens.
+                status = existing["status"]
             sl_open = existing["sl_open"] if existing else order.get("sl")
             tp_open = existing["tp_open"] if existing else order.get("tp")
             if existing and existing["utc_offset"] is not None:
@@ -265,6 +271,8 @@ class TraderStore:
                     profit, swap, commission, sl_open, tp_open, status, utc_offset
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(ticket) DO UPDATE SET
+                    type=excluded.type, open_price=excluded.open_price,
+                    open_time=excluded.open_time,
                     sl=excluded.sl, tp=excluded.tp, lots=excluded.lots,
                     close_price=excluded.close_price, close_time=excluded.close_time,
                     profit=excluded.profit, swap=excluded.swap,
@@ -295,6 +303,21 @@ class TraderStore:
             )
             conn.commit()
         return existing is None
+
+    def mark_deleted(self, tickets: list[int]) -> list[int]:
+        """Open pending orders that left the terminal unfilled -> ``deleted``."""
+        done: list[int] = []
+        with _connect(self.path) as conn:
+            for ticket in tickets:
+                cur = conn.execute(
+                    "UPDATE orders SET status='deleted' WHERE ticket=? AND status='open'"
+                    f" AND type IN ({','.join('?' * len(ORDER_TYPES))})",
+                    (int(ticket), *ORDER_TYPES),
+                )
+                if cur.rowcount:
+                    done.append(int(ticket))
+            conn.commit()
+        return done
 
     def set_open_levels(self, ticket: int, sl_open: float | None, tp_open: float | None) -> None:
         """Correct the planned SL/TP (e.g. seeded from a known first value)."""

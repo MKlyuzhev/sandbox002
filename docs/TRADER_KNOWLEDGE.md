@@ -31,7 +31,11 @@ placed, and how well was the exit executed.
      each with `selected: true|false` (v1.07)
    - `events.jsonl` — object create/change/delete, order-fingerprint changes, and
      (v1.07) `order_open` / `order_modify` / `order_close` with `sl`, `tp`, `price`
-   - `orders.json` / `history.json` — open and closed tickets
+   - `orders.json` / `history.json` — open and closed tickets (per symbol). `history.json`
+     skips deleted/expired pending orders, so the sync marks a pending ticket `deleted`
+     (no `close_time`, never reviewed) on its `order_close` event or when a live folder's
+     `orders.json` no longer lists it. A `closed`/`deleted` ticket never reopens from a
+     stale folder; a fill updates the ticket's type, price and time.
 3. Do **not** rely on `TA_Object_Exporter` auto-rename (`type_tf_stamp` wipes
    meaning). Optional: put role tags in the object **tooltip** or text:
 

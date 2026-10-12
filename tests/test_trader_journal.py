@@ -124,6 +124,53 @@ class TestRevisions(unittest.TestCase):
         self.assertEqual([r["sl"] for r in self.box.store.revisions_for(7)], [1.14014, 1.142])
 
 
+class TestDeletedPending(unittest.TestCase):
+    """Deleted pending orders never reach history.json; they must not stay open."""
+
+    def setUp(self) -> None:
+        self.box = _Outbox()
+        self.pending = _order(8, type="sell_limit", open_price=1.145)
+        self.box.write("orders.json", {"orders": [self.pending]})
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+
+    def tearDown(self) -> None:
+        self.box.close()
+
+    def status(self, ticket: int = 8) -> str:
+        return self.box.store.get_order(ticket)["status"]
+
+    def test_close_event_marks_deleted_and_stale_folder_cannot_reopen(self) -> None:
+        self.box.write("orders.json", {"orders": []})
+        self.box.events([{"ts": 1_790_583_000, "kind": "order_close", "ticket": 8, "sl": 1.15, "tp": 1.13, "price": 1.14, "seq": 1}])
+        result = sync_chart_dir(self.box.store, self.box.chart, live=False)
+        self.assertEqual(result["deleted"], [8])
+        self.assertEqual(self.status(), "deleted")
+        self.assertIsNone(self.box.store.get_order(8)["close_time"])  # never scored as a trade
+        self.box.write("orders.json", {"orders": [self.pending]})  # another, stale folder
+        self.box.events([])
+        sync_chart_dir(self.box.store, self.box.chart, live=False)
+        self.assertEqual(self.status(), "deleted")
+
+    def test_absent_from_live_orders_marks_deleted(self) -> None:
+        self.box.write("orders.json", {"orders": []})
+        sync_chart_dir(self.box.store, self.box.chart, live=False)
+        self.assertEqual(self.status(), "open")  # a stale folder proves nothing
+        self.box.write("orders.json", {})  # mid-write read: no list, no verdict
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertEqual(self.status(), "open")
+        self.box.write("orders.json", {"orders": []})
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertEqual(self.status(), "deleted")
+
+    def test_filled_then_closed_is_not_deleted(self) -> None:
+        self.box.write("orders.json", {"orders": [dict(self.pending, type="sell", open_time=1_790_583_500)]})
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertEqual(self.box.store.get_order(8)["type"], "sell")  # the fill updates the ticket
+        self.box.write("orders.json", {"orders": []})
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertEqual(self.status(), "open")  # market closes come from history.json
+
+
 class TestManualLinks(unittest.TestCase):
     def setUp(self) -> None:
         self.box = _Outbox()

@@ -132,6 +132,15 @@ def sync_chart_dir(
             store.set_open_levels(ticket, sl, tp)
         store.add_revision(ticket, int(ev.get("ts") or 0), sl, tp, "event")
 
+    # Deleted or expired pending orders never reach history.json (the EA skips
+    # types above OP_SELL). The EA's order_close event says one left; a live
+    # folder's orders.json (complete for its symbol) says it is gone.
+    listed = {int(o["ticket"]) for o in live_orders.get("orders") or []}
+    gone = {int(e["ticket"]) for e in order_events if e["kind"] == "order_close"}
+    if live and "orders" in live_orders:
+        gone |= {int(o["ticket"]) for o in store.list_orders(symbol=symbol, include_closed=False)}
+    deleted = store.mark_deleted(sorted(gone - listed))
+
     for ticket in new_tickets:
         order = store.get_order(ticket) or {}
         open_utc = int(order.get("open_time") or 0) - int(order.get("utc_offset") or 0)
@@ -148,6 +157,7 @@ def sync_chart_dir(
         "objects": len(objects),
         "live": live,
         "new_tickets": new_tickets,
+        "deleted": deleted,
     }
 
 
