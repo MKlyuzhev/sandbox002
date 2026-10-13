@@ -123,6 +123,40 @@ class TestRevisions(unittest.TestCase):
         sync_chart_dir(self.box.store, self.box.chart, live=True)
         self.assertEqual([r["sl"] for r in self.box.store.revisions_for(7)], [1.14014, 1.142])
 
+    def test_pending_entry_moves_are_revisions(self) -> None:
+        pending = dict(type="buy_limit", open_price=1.114, sl=1.109, tp=1.1225)
+        self.box.write("orders.json", {"orders": [_order(**pending)]})
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        # Only the entry moves (v1.10 order_modify carries it); the poll and
+        # the event of the same change must not double up.
+        pending["open_price"] = 1.113
+        self.box.write("orders.json", {"orders": [_order(**pending)]})
+        self.box.chart_objects([], ts=1_790_583_000)
+        self.box.events([{"ts": 1_790_582_990, "kind": "order_modify", "ticket": 7,
+                          "sl": 1.109, "tp": 1.1225, "price": 1.113, "seq": 1}])
+        for _ in range(2):
+            sync_chart_dir(self.box.store, self.box.chart, live=True)
+        revs = self.box.store.revisions_for(7)
+        self.assertEqual([(r["price"], r["source"]) for r in revs],
+                         [(1.114, "poll"), (1.113, "event")])
+        self.assertEqual(self.box.store.get_order(7)["open_price"], 1.113)
+
+    def test_filled_order_revisions_carry_no_price(self) -> None:
+        self.box.write("orders.json", {"orders": [_order()]})
+        self.box.events([{"ts": 1_790_581_976, "kind": "order_open", "ticket": 7,
+                          "sl": 1.14014, "tp": 1.13235, "price": 1.13863, "seq": 1}])
+        sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertEqual({r["price"] for r in self.box.store.revisions_for(7)}, {None})
+
+    def test_unreadable_chart_json_adds_no_poll_or_snapshot(self) -> None:
+        # The EA rewrites chart.json every tick; a read mid-write is not JSON.
+        self.box.write("orders.json", {"orders": [_order(sl=1.142)]})
+        (self.box.chart / "chart.json").write_text('{"symbol": "EURUSD", "obj', encoding="utf-8")
+        out = sync_chart_dir(self.box.store, self.box.chart, live=True)
+        self.assertIsNone(out["snapshot_id"])
+        self.assertEqual(self.box.store.revisions_for(7), [])
+        self.assertIsNone(self.box.store.latest_snapshot("EURUSD", "H1"))
+
 
 class TestDeletedPending(unittest.TestCase):
     """Deleted pending orders never reach history.json; they must not stay open."""

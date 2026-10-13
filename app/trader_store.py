@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS order_revisions (
     ts INTEGER NOT NULL,
     sl REAL,
     tp REAL,
-    source TEXT NOT NULL
+    source TEXT NOT NULL,
+    price REAL
 );
 CREATE TABLE IF NOT EXISTS analyses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,6 +128,8 @@ ANALYSIS_ATTACH_WINDOW_SEC = 24 * 3600
 
 _LINK_EXTRAS = (("object_json", "TEXT"), ("source", "TEXT"), ("linked_ts", "INTEGER"))
 _ORDER_EXTRAS = (("utc_offset", "INTEGER"),)
+# A pending order's entry price (None: not tracked, e.g. a filled order).
+_REVISION_EXTRAS = (("price", "REAL"),)
 # A plan is a pre_trade analysis with an order spec (``order_json``) for the
 # trader to enter by hand; nothing here sends it.
 _ANALYSIS_EXTRAS = (("order_json", "TEXT"), ("status", "TEXT"), ("supersedes", "INTEGER"))
@@ -162,7 +165,8 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     for table, extras in (
-        ("links", _LINK_EXTRAS), ("orders", _ORDER_EXTRAS), ("analyses", _ANALYSIS_EXTRAS)
+        ("links", _LINK_EXTRAS), ("orders", _ORDER_EXTRAS), ("analyses", _ANALYSIS_EXTRAS),
+        ("order_revisions", _REVISION_EXTRAS),
     ):
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         for name, typ in extras:
@@ -429,32 +433,47 @@ class TraderStore:
         return [link for link in self.links_for(ticket) if link["source"] == "manual"]
 
     def add_revision(
-        self, ticket: int, ts: int, sl: float | None, tp: float | None, source: str
+        self,
+        ticket: int,
+        ts: int,
+        sl: float | None,
+        tp: float | None,
+        source: str,
+        price: float | None = None,
     ) -> bool:
-        """Append an SL/TP revision (``ts`` in broker time).
+        """Append an SL/TP revision (``ts`` in broker time), with the entry
+        ``price`` of a pending order (None when not tracked).
 
         Skipped when the revision in force at ``ts`` already has these values,
         or when the identical row exists (events.jsonl is re-read every sync).
+        A None ``price`` never counts as a change.
         """
         with _connect(self.path) as conn:
             prev = conn.execute(
                 """
-                SELECT sl, tp FROM order_revisions
+                SELECT sl, tp, price FROM order_revisions
                 WHERE ticket=? AND ts<=? ORDER BY ts DESC, id DESC LIMIT 1
                 """,
                 (ticket, ts),
             ).fetchone()
-            if prev and _same(prev["sl"], sl) and _same(prev["tp"], tp):
+            if (
+                prev
+                and _same(prev["sl"], sl)
+                and _same(prev["tp"], tp)
+                and (price is None or _same(prev["price"], price))
+            ):
                 return False
             dup = conn.execute(
-                "SELECT 1 FROM order_revisions WHERE ticket=? AND ts=? AND sl IS ? AND tp IS ?",
-                (ticket, ts, sl, tp),
+                "SELECT 1 FROM order_revisions WHERE ticket=? AND ts=? AND sl IS ? AND tp IS ?"
+                " AND (? IS NULL OR price IS ?)",
+                (ticket, ts, sl, tp, price, price),
             ).fetchone()
             if dup:
                 return False
             conn.execute(
-                "INSERT INTO order_revisions (ticket, ts, sl, tp, source) VALUES (?,?,?,?,?)",
-                (ticket, ts, sl, tp, source),
+                "INSERT INTO order_revisions (ticket, ts, sl, tp, source, price)"
+                " VALUES (?,?,?,?,?,?)",
+                (ticket, ts, sl, tp, source, price),
             )
             conn.commit()
         return True

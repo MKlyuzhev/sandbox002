@@ -14,7 +14,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app import mt4_bridge, trader_episodes, trader_outbox, trader_review
-from app.trader_store import DEFAULT_DB_PATH, TraderStore
+from app.trader_store import DEFAULT_DB_PATH, ORDER_TYPES, TraderStore
 
 FetchBarsFn = Callable[[str, str, int, int], Any]
 
@@ -58,6 +58,15 @@ def _heartbeat_mtime(chart_dir: Path) -> float:
         return 0.0
 
 
+def _pending_price(order: dict[str, Any], price: Any) -> float | None:
+    """The entry price a revision carries: only a pending order's, and never
+    the EA's 0 (pre-v1.10 ``order_modify`` events send no price)."""
+    if order.get("type") not in ORDER_TYPES:
+        return None
+    value = _float_or_none(price)
+    return value if value else None
+
+
 def _float_or_none(value: Any) -> float | None:
     try:
         f = float(value)
@@ -91,7 +100,9 @@ def sync_chart_dir(
             timeframe = parts[1]
     ts = int(chart.get("time_current") or 0)
     objects = list(chart.get("objects") or [])
-    snap_id = store.upsert_snapshot(symbol, timeframe, ts, objects)
+    # No time_current: chart.json was missing or read mid-write. Its empty
+    # object list is not a snapshot, and polls would have no time to carry.
+    snap_id = store.upsert_snapshot(symbol, timeframe, ts, objects) if ts else None
     events = trader_outbox.load_events(chart_dir / "events.jsonl")
     store.append_events(symbol, timeframe, events)
     hb = _heartbeat(chart_dir)
@@ -114,23 +125,31 @@ def sync_chart_dir(
     ]:
         if store.upsert_order(order, status=status, utc_offset=offset):
             new_tickets.append(int(order["ticket"]))
-        if live and status == "open":
-            store.add_revision(
-                int(order["ticket"]),
-                ts or int(order.get("open_time") or 0),
-                _float_or_none(order.get("sl")),
-                _float_or_none(order.get("tp")),
-                "poll",
-            )
 
     for ev in order_events:
         ticket = int(ev["ticket"])
-        if store.get_order(ticket) is None:
+        order = store.get_order(ticket)
+        if order is None:
             continue
         sl, tp = _float_or_none(ev.get("sl")), _float_or_none(ev.get("tp"))
         if ev["kind"] == "order_open":
             store.set_open_levels(ticket, sl, tp)
-        store.add_revision(ticket, int(ev.get("ts") or 0), sl, tp, "event")
+        store.add_revision(
+            ticket, int(ev.get("ts") or 0), sl, tp, "event", _pending_price(order, ev.get("price"))
+        )
+
+    # Polls after events: a change the EA reported is already in force at the
+    # poll's later time, so it is not recorded twice.
+    if live and ts:
+        for order in live_orders.get("orders") or []:
+            store.add_revision(
+                int(order["ticket"]),
+                ts,
+                _float_or_none(order.get("sl")),
+                _float_or_none(order.get("tp")),
+                "poll",
+                _pending_price(order, order.get("open_price")),
+            )
 
     # Deleted or expired pending orders never reach history.json (the EA skips
     # types above OP_SELL). The EA's order_close event says one left; a live

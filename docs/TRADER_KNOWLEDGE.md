@@ -31,6 +31,8 @@ placed, and how well was the exit executed.
      each with `selected: true|false` (v1.07)
    - `events.jsonl` — object create/change/delete, order-fingerprint changes, and
      (v1.07) `order_open` / `order_modify` / `order_close` with `sl`, `tp`, `price`
+     (v1.10: `order_modify` also fires when a pending order's entry moves, and
+     carries the open price; before that it sent `price` 0)
    - `orders.json` / `history.json` — open and closed tickets (per symbol). `history.json`
      skips deleted/expired pending orders, so the sync marks a pending ticket `deleted`
      (no `close_time`, never reviewed) on its `order_close` event or when a live folder's
@@ -79,9 +81,12 @@ in the `definitions` table / MCP `trader_definitions`.
 
 - **Continuous sync.** The dashboard syncs every 5 s while an EA is live;
   `trader_sync` (MCP) or `python -m agent.trader_sync` runs one pass. SL/TP
-  changes become `order_revisions` rows, from EA `order_*` events and from
-  polling the live chart's `orders.json` (stale chart folders never add
-  revisions). Several chart folders carry the same account history: they are
+  changes, and a pending order's entry price (`price`; null once filled),
+  become `order_revisions` rows, from EA `order_*` events and from polling the
+  live chart's `orders.json` (stale chart folders never add revisions; events
+  are applied first, so a reported change is not recorded again by the poll).
+  A `chart.json` caught mid-write is skipped for that pass: no snapshot, no
+  poll. Several chart folders carry the same account history: they are
   synced oldest first, so the most recently written one wins.
 - **Link your marks.** Select the lines on the MT4 chart, then `trader_link`
   (MCP) or **Link selected in MT4** (dashboard). The selected objects' geometry

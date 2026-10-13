@@ -370,7 +370,8 @@
     const rec = await jget("/api/trader/trades/" + ticket);
     const o = rec.order || {};
     const revs = (rec.revisions || []).map((r) =>
-      fmtUnix(r.ts) + "  SL " + (r.sl ?? "—") + "  TP " + (r.tp ?? "—") + "  (" + r.source + ")"
+      fmtUnix(r.ts) + (r.price != null ? "  entry " + r.price : "") +
+      "  SL " + (r.sl ?? "—") + "  TP " + (r.tp ?? "—") + "  (" + r.source + ")"
     );
     const links = (rec.links || []).map((l) =>
       l.object_name + " — " + (l.object ? l.object.type : "?") + ", " + l.source + " (" + (l.reason || "") + ")"
@@ -388,7 +389,7 @@
       "\nplanned SL " + (o.sl_open ?? "—") + "  TP " + (o.tp_open ?? "—") +
       "\nfinal   SL " + (o.sl ?? "—") + "  TP " + (o.tp ?? "—") +
       "\nP&L " + (o.profit ?? "—") + "   status " + esc(o.status) + "</pre>" +
-      "<h3>SL/TP revisions</h3><pre>" + (revs.join("\n") || "none recorded") + "</pre>" +
+      "<h3>Order revisions</h3><pre>" + (revs.join("\n") || "none recorded") + "</pre>" +
       "<h3>Linked objects</h3><pre>" + esc(links.join("\n") || "none — select lines in MT4, then Link") + "</pre>" +
       pane("Review (code-scored)", rec.review) +
       "<h3>Analyses</h3>" + (analyses || "<pre>none</pre>");
