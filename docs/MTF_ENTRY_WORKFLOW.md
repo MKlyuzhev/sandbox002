@@ -28,9 +28,10 @@ GBP/USD"); the skill is picked up from its description.
 
 - The dashboard is running (`.venv/bin/python -m dashboard`): it syncs MT4
   orders into the journal every 5 s. Without it, ticket states are stale.
-- `SandboxChartBridge` v1.10 is attached to the pair's chart. Reads work from
-  the last capture of each timeframe even when that chart is not live; only
-  **drawing** needs the chart live on that timeframe.
+- `SandboxChartBridge` v1.11 is attached to **one chart per pair**; the W1, D1
+  and H1 grids all live on it, visible on every timeframe. Reads work from the
+  last capture of each timeframe; drawing switches the chart to the timeframe
+  it draws (`--switch`) and back.
 - OANDA credentials are set (bars and live prices).
 
 ## 2. The steps
@@ -53,10 +54,11 @@ read ──► grids ──► analysis ──► proposal ──► [you approv
    | differs | lines more than 2% of the width off the proposal | asks: your re-anchor (kept) or a stale grid (redraw) |
    | no_proposal | the leg is too young for a channel | reads the previous leg |
 
-   Drawing needs the MT4 window on that timeframe; Claude asks you to switch
-   it. D1 is drawn before H1, because H1 legs are cut inside the current D1
-   grid. Existing lines are never overwritten: to redraw a grid, delete its
-   five objects in MT4 first.
+   To draw, Claude switches your chart to W1, D1, H1 in turn (you see the
+   window change for a few seconds) and back to where it was. Top-down order:
+   H1 legs are cut inside the current D1 grid. Existing lines are never
+   overwritten: a redraw deletes the old grid's objects first, and only after
+   you approve it.
 3. **Analysis.** Per pair:
    - failed checks or a met cancel condition first;
    - a W1 / D1 / H1 table: zone, how long, and how past visits to that zone
@@ -115,9 +117,11 @@ files or the OANDA setup on this machine.
 .venv/bin/python scripts/mtf_entry_read.py EUR_USD USD_JPY --out read.json
 .venv/bin/python scripts/mtf_entry_read.py --active
 
-# grids (MT4 window on that timeframe)
-.venv/bin/python scripts/mtf_channel.py EUR_USD --tf D1 --draw --leg current
-.venv/bin/python scripts/mtf_channel.py EUR_USD --tf H1 --draw
+# grids (--switch moves the pair's chart to that timeframe first)
+.venv/bin/python scripts/mt4_period.py EUR_USD            # which timeframe is live
+.venv/bin/python scripts/mtf_channel.py EUR_USD --tf D1 --draw --switch --leg current
+.venv/bin/python scripts/mtf_channel.py EUR_USD --tf H1 --draw --switch
+.venv/bin/python scripts/mt4_period.py EUR_USD H1         # switch back
 
 # plans
 .venv/bin/python scripts/trader_plan.py store plan.json
@@ -153,7 +157,9 @@ files or the OANDA setup on this machine.
 
 | Symptom | Cause / fix |
 |---|---|
-| "EA heartbeat missing or stale" | That timeframe's chart is not live. Reads still use its last capture; to draw, switch the MT4 window to that timeframe. |
+| "EA heartbeat missing or stale" | That timeframe's chart is not live. Reads still use its last capture; drawing uses `--switch`. |
+| "unknown op set_period" / chart did not switch | The chart runs an EA older than v1.11. Re-attach SandboxChartBridge (or restart MT4) after a recompile. |
+| "Several live <SYM> charts" | More than one chart of that pair has the EA; the switch needs exactly one. Close the extras or switch by hand. |
 | A grid shows `differs` right after you re-anchored it | Expected: your re-anchor is kept unless you ask for a redraw. |
 | Plan does not attach to your ticket | The order differs from the plan by more than 1 pip, or its type differs. Use `link`. |
 | Ticket shows an old entry price | The sync updates within 5 s of the EA's next write. The revision history records entry moves from EA v1.10 on. |

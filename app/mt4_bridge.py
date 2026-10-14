@@ -566,6 +566,65 @@ def delete_objects(
     return {"ok": True, "cmd_id": cmd_id, "status": st}
 
 
+SWITCH_FRESH_SEC = 2.0  # the EA heartbeats every 250 ms; a chart just switched away goes quiet
+SWITCH_TIMEOUT_SEC = 15.0
+
+
+def _fresh_timeframes(symbol: str) -> list[str]:
+    want = map_symbol(symbol)
+    return [
+        str(c.get("timeframe"))
+        for c in _scan_charts()
+        if c.get("ea_ok")
+        and str(c.get("symbol") or "").upper() == want
+        and (c.get("age") or 0.0) <= SWITCH_FRESH_SEC
+    ]
+
+
+def set_period(
+    symbol: str, timeframe: str, *, timeout: float = SWITCH_TIMEOUT_SEC
+) -> dict[str, Any]:
+    """Switch the symbol's one live chart to ``timeframe`` (EA v1.11 ``set_period``).
+
+    MT4 re-inits the EA on the new period; this returns once it heartbeats
+    there. Objects stay on the chart, so one window can carry W1/D1/H1 grids.
+    """
+    tf = map_timeframe(timeframe)[0]
+    fresh = _fresh_timeframes(symbol)
+    if tf in fresh:
+        return {"ok": True, "switched": False, "from": tf, "to": tf}
+    if not fresh:
+        return {
+            "ok": False,
+            "error": f"No live SandboxChartBridge chart for {map_symbol(symbol)}; attach the EA.",
+        }
+    if len(fresh) > 1:
+        return {
+            "ok": False,
+            "error": f"Several live {map_symbol(symbol)} charts ({', '.join(fresh)}); "
+            f"switch one to {tf} in MT4.",
+        }
+    current = fresh[0]
+    sent = time.time()
+    cmd_id = write_command(
+        {"op": "set_period", "period": tf}, symbol=symbol, timeframe=current
+    )
+    path = chart_dir(symbol, tf) / HEARTBEAT_NAME
+    deadline = time.monotonic() + max(0.5, float(timeout))
+    while time.monotonic() < deadline:
+        if path.is_file() and path.stat().st_mtime > sent:
+            hb = _load_heartbeat(path) or {}
+            if hb.get("timeframe") == tf:
+                return {"ok": True, "switched": True, "from": current, "to": tf, "cmd_id": cmd_id}
+        time.sleep(CMD_ACK_POLL_SEC)
+    err = (read_heartbeat(symbol, current) or {}).get("last_error") or ""
+    return {
+        "ok": False,
+        "error": f"chart did not switch {current} -> {tf} within {timeout:.0f}s"
+        + (f": {err}" if err else " (EA older than v1.11?)"),
+    }
+
+
 def clear_layer(
     prefix: str = DEFAULT_PREFIX,
     *,

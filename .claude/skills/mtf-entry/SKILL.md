@@ -46,17 +46,27 @@ For `D1` and `H1`, `previous` and `current`, look at `grid.status`:
 A new current leg also makes the old current leg the new previous one; mention
 which old grids the trader can delete in MT4.
 
-To draw (after approval), the MT4 window must show that timeframe
-(`charts_live[tf]` true); otherwise ask the trader to switch it.
-`draw_grid` keeps existing lines with the same names, so for a redraw of a
-`differs` grid the trader deletes its five objects first.
+The trader keeps **one chart per pair** carrying all three grids (to see
+their intersections). The EA draws only on the period its chart shows, so draw
+with `--switch`: it switches that chart to the timeframe first (EA v1.11).
+Note the starting timeframe and switch back to it at the end.
 
 ```
-.venv/bin/python scripts/mtf_channel.py <PAIR> --tf D1 --draw [--leg current|previous|both]
-.venv/bin/python scripts/mtf_channel.py <PAIR> --tf H1 --draw [--leg ...]
+.venv/bin/python scripts/mt4_period.py <PAIR>                 # live timeframe now
+.venv/bin/python scripts/mtf_channel.py <PAIR> --tf W1 --draw --switch
+.venv/bin/python scripts/mtf_channel.py <PAIR> --tf D1 --draw --switch [--leg current|previous|both]
+.venv/bin/python scripts/mtf_channel.py <PAIR> --tf H1 --draw --switch [--leg ...]
+.venv/bin/python scripts/mt4_period.py <PAIR> <TF>            # back to where it was
 ```
 
-Draw D1 before H1 (H1 legs are cut inside the current D1 grid), then re-run step 1.
+Draw top-down, W1 → D1 → H1 (D1 legs are cut inside W1, H1 inside the
+current D1 grid), then re-run step 1. If the switch fails ("unknown op
+set_period"), the chart runs an older EA: ask the trader to re-attach it.
+
+`draw_grid` keeps existing lines with the same names. To redraw a `differs`
+grid (after approval), delete its four objects first (`Channel <SYM> <TF> leg
+<start>` and the `Trendline ... air-lower/center/air-upper`) with
+`mt4_bridge.delete_objects(names, symbol=..., timeframe=<that TF>)`.
 
 ## 3. Analysis (per pair)
 

@@ -11,6 +11,7 @@ Examples:
     .venv/bin/python scripts/mtf_channel.py USD_JPY --read proposed --candidate 1
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1             # D1 legs + proposals
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1 --draw      # previous + current leg
+    .venv/bin/python scripts/mtf_channel.py USD_JPY --tf H1 --draw --switch   # switch the chart to H1 first
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf D1 --read chart --leg previous
     .venv/bin/python scripts/mtf_channel.py USD_JPY --tf H1 --read chart  # + D1 and W1 context
 """
@@ -46,6 +47,10 @@ async def run(args: argparse.Namespace) -> dict:
         out["oanda_bars_added"] = data["oanda_bars_added"]
     if data["note"]:
         out["fetch_note"] = data["note"]
+    if args.draw and args.switch:
+        out["switch"] = mt4_bridge.set_period(args.instrument, tf.name)
+        if not out["switch"]["ok"]:
+            raise SystemExit(out["switch"]["error"])
     if args.draw and legs:
         out["draw"] = [
             mtf_channel.draw_grid(args.instrument, mtf_channel.grid_from_leg(bars, legs, name, cand))
@@ -92,6 +97,8 @@ def main() -> int:
                         help="D1/H1: which leg to draw (default both) or read (default current)")
     parser.add_argument("--previous-candidate", type=int, default=0, help="D1/H1 previous leg's candidate")
     parser.add_argument("--draw", action="store_true", help="draw the candidate on the live chart of --tf")
+    parser.add_argument("--switch", action="store_true",
+                        help="with --draw: switch the pair's one live chart to --tf first (EA v1.11)")
     parser.add_argument("--read", choices=("chart", "proposed"))
     parser.add_argument("--channel-name", default="")
     parser.add_argument("--no-fetch", action="store_true", help=".hst bars only, no OANDA")

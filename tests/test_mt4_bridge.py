@@ -333,6 +333,56 @@ class TestInbox(unittest.TestCase):
         )
 
 
+    def test_set_period_already_there(self) -> None:
+        self._write_heartbeat(period=10080)  # W1
+        out = mt4_bridge.set_period("GBP_USD", "W1")
+        self.assertEqual(out, {"ok": True, "switched": False, "from": "W1", "to": "W1"})
+        self.assertFalse(self._cmd_path("GBPUSD", "W1").exists())
+
+    def test_set_period_switches_and_waits_for_new_heartbeat(self) -> None:
+        self._write_heartbeat(period=10080)  # the chart is on W1
+
+        def _ea_switches() -> None:  # MT4 re-inits the EA on D1
+            time.sleep(0.15)
+            self._write_heartbeat(period=1440)
+
+        threading.Thread(target=_ea_switches, daemon=True).start()
+        out = mt4_bridge.set_period("GBP_USD", "D1", timeout=2.0)
+        self.assertTrue(out["ok"])
+        self.assertEqual((out["switched"], out["from"], out["to"]), (True, "W1", "D1"))
+        cmd = json.loads(self._cmd_path("GBPUSD", "W1").read_text(encoding="utf-8"))
+        self.assertEqual((cmd["op"], cmd["period"], cmd["timeframe"]), ("set_period", "D1", "W1"))
+
+    def test_set_period_ignores_the_folder_the_chart_just_left(self) -> None:
+        # EA v1.11 deinit: the H1 folder's last heartbeat says ea_ok false.
+        self._write_heartbeat(period=60, ea_ok=False)
+        self._write_heartbeat(period=1440)  # the chart is on D1 now
+
+        def _ea_switches() -> None:
+            time.sleep(0.15)
+            self._write_heartbeat(period=60)
+
+        threading.Thread(target=_ea_switches, daemon=True).start()
+        out = mt4_bridge.set_period("GBP_USD", "H1", timeout=2.0)
+        self.assertEqual((out["ok"], out["switched"], out["from"]), (True, True, "D1"))
+
+    def test_set_period_times_out_on_an_old_ea(self) -> None:
+        self._write_heartbeat(period=10080)
+        out = mt4_bridge.set_period("GBP_USD", "D1", timeout=0.3)
+        self.assertFalse(out["ok"])
+        self.assertIn("v1.11", out["error"])
+
+    def test_set_period_without_a_live_chart(self) -> None:
+        self.assertFalse(mt4_bridge.set_period("GBP_USD", "D1")["ok"])
+
+    def test_set_period_refuses_several_live_charts(self) -> None:
+        self._write_heartbeat(period=10080)
+        self._write_heartbeat(period=60)
+        out = mt4_bridge.set_period("GBP_USD", "D1")
+        self.assertFalse(out["ok"])
+        self.assertIn("Several", out["error"])
+
+
 class TestRegimeObjects(unittest.TestCase):
     def test_regime_to_objects_has_bands_mas_and_label(self) -> None:
         from datetime import datetime, timedelta, timezone

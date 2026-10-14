@@ -38,6 +38,10 @@ placed, and how well was the exit executed.
      (no `close_time`, never reviewed) on its `order_close` event or when a live folder's
      `orders.json` no longer lists it. A `closed`/`deleted` ticket never reopens from a
      stale folder; a fill updates the ticket's type, price and time.
+   - Commands come in through `cmd.json` in the same folder: `upsert`, `delete`,
+     `clear`, and (v1.11) `set_period`, which switches the chart's timeframe;
+     MT4 re-inits the EA there and its files move to the new `<SYMBOL>_<TF>`
+     folder (`mt4_bridge.set_period`, `scripts/mt4_period.py`).
 3. Do **not** rely on `TA_Object_Exporter` auto-rename (`type_tf_stamp` wipes
    meaning). Optional: put role tags in the object **tooltip** or text:
 
