@@ -277,7 +277,13 @@ must show H1 to draw; D1 and W1 lines stay on it when it is switched.
 
 ---
 
-## 8. Next steps
+## 8. Using the grids for entries
+
+The routine from grids to an MT4 order ticket (grid drift checks, the
+analysis, plans in the journal) is the `/mtf-entry` skill:
+[MTF entry workflow](MTF_ENTRY_WORKFLOW.md).
+
+## 9. Next steps
 
 What the trader reads from D1 and H1 inside the W1 context is not documented
 yet. A new timeframe is a row in `mtf_channel.TFS` with its `parent`.

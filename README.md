@@ -23,6 +23,9 @@ sandbox001 `trend_trade` / `cycle_trade` vs this corpus:
 [sandbox001 vs RAG](docs/SANDBOX001_RAG_CORRELATION.md).
 Ops dashboard (status strip, terminal, journal, GPU):
 [Dashboard](docs/DASHBOARD.md).
+MTF channel grids (W1 → D1 → H1) and the `/mtf-entry` plan workflow:
+[MTF channel analysis](docs/MTF_CHANNEL_ANALYSIS.md),
+[MTF entry workflow](docs/MTF_ENTRY_WORKFLOW.md).
 
 ## Architecture
 
