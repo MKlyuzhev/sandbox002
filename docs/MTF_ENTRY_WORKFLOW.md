@@ -90,7 +90,7 @@ A plan is a `pre_trade` analysis with an order spec:
 |---|---|
 | `type`, `price`, `sl`, `tp` | each tied to a grid line or swing, at its value when the order should fill |
 | `expiry` | broker time; until the next decision close, since lines drift (H1 about 18 pips a day on EUR/USD) |
-| `risk` | amount and account currency; the dashboard sizes lots from it |
+| `risk` | amount and currency, e.g. `{"amount": 500, "ccy": "USD"}`; the dashboard sizes lots from it. Rule: 0.5% of equity per trade ($500 on the $100k practice account), plans on the same currency move share 1% ($1,000), all open and pending risk at most 2% ($2,000) |
 | `checks` | `{timeframe, leg, line, rule}`, e.g. D1 current leg `lower` `close_above`; evaluated on the last completed close (Plans tab → Refresh) |
 | `status` | `active`, `superseded` (replaced by a newer plan), `cancelled` |
 

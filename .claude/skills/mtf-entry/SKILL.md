@@ -99,9 +99,12 @@ changes (now vs proposed, with the reason in grid terms) and the ticket:
   order is expected to fill**.
 - `expiry` (broker `YYYY-MM-DD HH:MM`): until the next decision close; lines
   drift, so no open-ended orders.
-- `risk`: amount and account currency (the trader's has been about JPY
-  23,000); lots follow from it (the read's `plans[].sizing` shows the current
-  plan's).
+- `risk`: `{"amount": 500, "ccy": "USD"}`. The trader's rule (OANDA practice
+  account, $100k, USD): **0.5% of equity = $500 per trade**; plans on the same
+  currency move (e.g. two short-USD plans) share a **1% cap ($1,000)**; all
+  open and pending risk at most **2% ($2,000)**. Check `exposure` and the other
+  active plans against the caps; a plan over a cap waits or splits the budget.
+  Lots follow from it (`plans[].sizing`; USD-quoted pairs: $10 per pip per lot).
 - `checks`: `{label, timeframe, leg, line, rule}` with `line` one of lower,
   air_lower, center, air_upper, upper and `rule` close_above / close_below.
   They are evaluated on the last completed close of their timeframe.
